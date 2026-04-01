@@ -204,14 +204,14 @@ export function LeaveRequest() {
                         <SelectValue placeholder="Select type..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="annual">Annual Leave</SelectItem>
-                        <SelectItem value="sick">Sick Leave</SelectItem>
-                        <SelectItem value="family">Family Responsibility</SelectItem>
-                        <SelectItem value="maternity">Maternity Leave</SelectItem>
-                        <SelectItem value="paternity">Paternity Leave</SelectItem>
-                        <SelectItem value="adoption">Adoption Leave</SelectItem>
-                        <SelectItem value="special">Special Leave</SelectItem>
-                        <SelectItem value="unpaid">Unpaid Leave</SelectItem>
+                        <SelectItem value="Annual Leave">Annual Leave</SelectItem>
+                        <SelectItem value="Sick Leave">Sick Leave</SelectItem>
+                        <SelectItem value="Family Responsibility">Family Responsibility</SelectItem>
+                        <SelectItem value="Maternity Leave">Maternity Leave</SelectItem>
+                        <SelectItem value="Parental Leave">Parental Leave</SelectItem>
+                        <SelectItem value="Adoption Leave">Adoption Leave</SelectItem>
+                        <SelectItem value="Commissioning Leave">Commissioning Leave</SelectItem>
+                        <SelectItem value="Unpaid Leave">Unpaid Leave</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

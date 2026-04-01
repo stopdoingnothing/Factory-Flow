@@ -45,6 +45,23 @@ export interface BceaEntitlements {
 }
 
 /**
+ * Statutory leave entitlements under BCEA Chapter 3 (event-based, not accrual-based).
+ * These are fixed per-employee values that are provisioned once on first startup.
+ * The startup recalc never overwrites them after creation so that HR adjustments persist.
+ *
+ * Maternity  (s25):   4 consecutive months ≈ 87 working days
+ * Parental   (s25A):  10 consecutive days (interpreted as working days per industry norm)
+ * Adoption   (s25B):  10 consecutive weeks = 50 working days
+ * Commissioning (s25C): 10 consecutive weeks = 50 working days
+ */
+export const STATUTORY_LEAVE_ENTITLEMENTS: Record<string, number> = {
+  'Maternity Leave':     87,
+  'Parental Leave':      10,
+  'Adoption Leave':      50,
+  'Commissioning Leave': 50,
+};
+
+/**
  * Calculate SA BCEA leave entitlements for an employee based on their start date.
  *
  * Annual Leave (s20):  21 days per 12-month leave cycle, pro-rated monthly.

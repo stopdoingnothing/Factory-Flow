@@ -3,7 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { storage } from "./storage";
-import { calculateBceaEntitlements } from "./bcea";
+import { calculateBceaEntitlements, STATUTORY_LEAVE_ENTITLEMENTS } from "./bcea";
 
 const app = express();
 const httpServer = createServer(app);
@@ -128,6 +128,16 @@ async function recalculateBceaLeaveBalances() {
       await upsert('Annual Leave', ent.annualLeave);
       await upsert('Sick Leave', ent.sickLeave);
       await upsert('Family Responsibility', ent.familyResponsibility);
+
+      // Statutory leave types (event-based, not accrual-based).
+      // Only create if missing — never overwrite so HR adjustments survive restarts.
+      for (const [leaveType, days] of Object.entries(STATUTORY_LEAVE_ENTITLEMENTS)) {
+        const existing = balances.find(b => b.leaveType === leaveType);
+        if (!existing) {
+          await storage.createLeaveBalance({ userId: user.id, leaveType, total: days, taken: 0, pending: 0 });
+          updated++;
+        }
+      }
     } catch (err) {
       console.error(`[startup] BCEA recalc failed for user ${user.id}:`, err);
     }

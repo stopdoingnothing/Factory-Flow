@@ -60,6 +60,31 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
   return bcrypt.compare(password, hash);
 }
 
+// Decrement pending balance when a non-historic leave request is cancelled or rejected.
+// For historic entries use decrementTaken instead.
+async function decrementPending(request: { userId: string; leaveType: string; startDate: string; endDate: string; isHistoric: boolean }, religion: string | null) {
+  if (request.isHistoric) return;
+  const days = await countWorkingDays(request.startDate, request.endDate, religion);
+  const balances = await storage.getLeaveBalances(request.userId);
+  const balance = balances.find(b => b.leaveType === request.leaveType);
+  if (balance) {
+    await storage.updateLeaveBalance(balance.id, {
+      pending: Math.max(0, (balance.pending ?? 0) - days),
+    });
+  }
+}
+
+async function decrementTaken(request: { userId: string; leaveType: string; startDate: string; endDate: string }, religion: string | null) {
+  const days = await countWorkingDays(request.startDate, request.endDate, religion);
+  const balances = await storage.getLeaveBalances(request.userId);
+  const balance = balances.find(b => b.leaveType === request.leaveType);
+  if (balance) {
+    await storage.updateLeaveBalance(balance.id, {
+      taken: Math.max(0, (balance.taken ?? 0) - days),
+    });
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -819,9 +844,60 @@ export async function registerRoutes(
   app.post("/api/leave-requests", async (req, res) => {
     try {
       const validatedData = insertLeaveRequestSchema.parse(req.body);
-      
-      // Determine initial status based on whether user has a manager/reporting position
+
       const user = await storage.getUser(validatedData.userId);
+
+      // ── Validation 1: date range sanity ────────────────────────────────────
+      if (validatedData.startDate > validatedData.endDate) {
+        return res.status(400).json({ error: "End date must be on or after start date" });
+      }
+
+      // ── Validation 2: cannot start before employment start date ────────────
+      if (user?.startDate && validatedData.startDate < user.startDate) {
+        return res.status(400).json({ error: "Leave cannot start before your employment start date" });
+      }
+
+      // ── Validation 3: overlap with existing active requests ────────────────
+      const existingRequests = await storage.getLeaveRequests(validatedData.userId);
+      const activeRequests = existingRequests.filter(
+        r => !['rejected', 'cancelled'].includes(r.status)
+      );
+      const hasOverlap = activeRequests.some(
+        r => validatedData.startDate <= r.endDate && validatedData.endDate >= r.startDate
+      );
+      if (hasOverlap) {
+        return res.status(400).json({ error: "These dates overlap with an existing leave request" });
+      }
+
+      // ── Validation 4: sufficient leave balance ─────────────────────────────
+      // 'taken' only reflects historic entries; the main approval flow never
+      // updates it. So we compute consumed days from live pending/approved
+      // requests and add the stored 'taken' (historic) on top.
+      const requestedDays = await countWorkingDays(
+        validatedData.startDate,
+        validatedData.endDate,
+        user?.religion ?? null
+      );
+      const balances = await storage.getLeaveBalances(validatedData.userId);
+      const balance = balances.find(b => b.leaveType === validatedData.leaveType);
+      if (balance) {
+        const pendingApprovedForType = activeRequests.filter(
+          r => r.leaveType === validatedData.leaveType && !r.isHistoric
+        );
+        let consumedByRequests = 0;
+        for (const r of pendingApprovedForType) {
+          consumedByRequests += await countWorkingDays(r.startDate, r.endDate, user?.religion ?? null);
+        }
+        const totalConsumed = (balance.taken ?? 0) + consumedByRequests;
+        const available = (balance.total ?? 0) + (balance.carryOverDays ?? 0) - totalConsumed;
+        if (available < requestedDays) {
+          return res.status(400).json({
+            error: `Insufficient ${validatedData.leaveType} balance. Available: ${available.toFixed(1)} day(s), requested: ${requestedDays} day(s)`,
+          });
+        }
+      }
+
+      // Determine initial status based on whether user has a manager/reporting position
       let initialStatus = 'pending_manager';
       
       // Resolve manager: prefer reportsToPositionId (position-based), fall back to managerId (legacy)
@@ -843,7 +919,15 @@ export async function registerRoutes(
       // Override the status with the correct initial status
       const requestWithStatus = { ...validatedData, status: initialStatus };
       const newRequest = await storage.createLeaveRequest(requestWithStatus);
-      
+
+      // Soft-reserve the requested days in pending balance (see decisions.md DEC-001)
+      const pendingBalance = balances.find(b => b.leaveType === validatedData.leaveType);
+      if (pendingBalance) {
+        await storage.updateLeaveBalance(pendingBalance.id, {
+          pending: (pendingBalance.pending ?? 0) + requestedDays,
+        });
+      }
+
       // Send email notification to manager and admin recipients
       try {
         const adminEmailSetting = await storage.getSetting('admin_email');
@@ -994,6 +1078,11 @@ export async function registerRoutes(
       
       const updatedRequest = await storage.updateManagerDecision(requestId, approverId, decision, notes);
 
+      if (decision === 'rejected') {
+        const employee = await storage.getUser(request.userId);
+        await decrementPending(request, (employee as any)?.religion ?? null);
+      }
+
       // Send notifications after manager decision
       try {
         const senderEmail = (await storage.getSetting('sender_email'))?.value || 'noreply@aece.co.za';
@@ -1061,6 +1150,11 @@ export async function registerRoutes(
       }
       
       const updatedRequest = await storage.updateHRDecision(requestId, approverId, decision, notes);
+
+      if (decision === 'rejected') {
+        const employee = await storage.getUser(request.userId);
+        await decrementPending(request, (employee as any)?.religion ?? null);
+      }
 
       // Send notifications after HR decision
       try {
@@ -1132,7 +1226,12 @@ export async function registerRoutes(
       const isBypassingHR = request.status === 'pending_hr' && bypassHR;
       
       const updatedRequest = await storage.updateMDDecision(requestId, approverId, decision, notes, isBypassingHR);
-      
+
+      if (decision === 'rejected') {
+        const employee = await storage.getUser(request.userId);
+        await decrementPending(request, (employee as any)?.religion ?? null);
+      }
+
       // Send final email notification to employee
       if (updatedRequest) {
         try {
@@ -1183,7 +1282,10 @@ export async function registerRoutes(
       
       // Update status to cancelled
       const updatedRequest = await storage.updateLeaveRequestStatus(requestId, 'cancelled');
-      
+
+      const cancelEmployee = await storage.getUser(request.userId);
+      await decrementPending(request, (cancelEmployee as any)?.religion ?? null);
+
       return res.json({ message: "Leave request cancelled successfully", request: updatedRequest });
     } catch (error) {
       console.error("Cancel leave request error:", error);
@@ -1207,25 +1309,16 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Leave request is already cancelled" });
       }
       
-      const wasApproved = request.status === 'approved';
-      
       // Update status to cancelled
       const updatedRequest = await storage.updateLeaveRequestStatus(requestId, 'cancelled');
-      
-      // If the leave was already approved, we need to credit back the leave balance
-      if (wasApproved && updatedRequest) {
-        // Calculate working days (Mon–Fri, excluding public holidays)
-        const cancelEmployee = await storage.getUser(request.userId);
-        const days = await countWorkingDays(request.startDate, request.endDate, (cancelEmployee as any)?.religion || null);
-        
-        // Credit back the taken days
-        const balances = await storage.getLeaveBalances(request.userId);
-        const balance = balances.find(b => b.leaveType === request.leaveType);
-        if (balance) {
-          await storage.updateLeaveBalance(balance.id, {
-            taken: Math.max(0, balance.taken - days)
-          });
-        }
+
+      // Credit back the balance — historic entries live in `taken`, all others in `pending`
+      const adminCancelEmployee = await storage.getUser(request.userId);
+      const religion = (adminCancelEmployee as any)?.religion ?? null;
+      if (request.isHistoric) {
+        await decrementTaken(request, religion);
+      } else {
+        await decrementPending(request, religion);
       }
       
       // Send email notification to employee
@@ -1246,12 +1339,9 @@ export async function registerRoutes(
         console.error('Failed to send cancellation notification:', emailError);
       }
       
-      return res.json({ 
-        message: wasApproved 
-          ? "Leave request cancelled and balance credited back" 
-          : "Leave request cancelled successfully", 
+      return res.json({
+        message: "Leave request cancelled and balance credited back",
         request: updatedRequest,
-        balanceAdjusted: wasApproved
       });
     } catch (error) {
       console.error("Admin cancel leave request error:", error);
