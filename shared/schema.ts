@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, integer, real, timestamp, serial, varchar, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, timestamp, serial, varchar, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -408,3 +408,19 @@ export const insertFaceDescriptorSchema = createInsertSchema(faceDescriptors).om
 });
 export type InsertFaceDescriptor = z.infer<typeof insertFaceDescriptorSchema>;
 export type FaceDescriptor = typeof faceDescriptors.$inferSelect;
+
+// Audit Log Table
+// Records admin-initiated changes to sensitive data: user profiles, leave balances, settings.
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  actorId: text("actor_id"),          // session userId; null for system-initiated actions
+  action: text("action").notNull(),   // e.g. "update_user_profile", "update_leave_balance"
+  entityType: text("entity_type").notNull(), // "user" | "leave_balance" | "setting" | "leave_request"
+  entityId: text("entity_id"),        // primary key of the affected row (as string)
+  changes: jsonb("changes"),          // { field: { before, after } } or event-specific payload
+  description: text("description"),   // human-readable one-liner
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;

@@ -39,6 +39,8 @@ import type {
   InsertOrgPosition,
   Company,
   InsertCompany,
+  AuditLog,
+  InsertAuditLog,
 } from "@shared/schema";
 
 const pool = new Pool({
@@ -67,6 +69,7 @@ export interface IStorage {
 
   // Leave balance operations
   getLeaveBalances(userId: string): Promise<LeaveBalance[]>;
+  getLeaveBalance(id: number): Promise<LeaveBalance | undefined>;
   getAllLeaveBalances(): Promise<LeaveBalance[]>;
   createLeaveBalance(balance: InsertLeaveBalance): Promise<LeaveBalance>;
   updateLeaveBalance(id: number, balance: Partial<InsertLeaveBalance>): Promise<LeaveBalance | undefined>;
@@ -195,6 +198,10 @@ export interface IStorage {
   createPasswordResetToken(token: string, email: string, expiry: Date): Promise<void>;
   getPasswordResetToken(token: string): Promise<{ email: string; expiry: Date } | undefined>;
   deletePasswordResetToken(token: string): Promise<void>;
+
+  // Audit log operations
+  createAuditLog(entry: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(limit?: number): Promise<AuditLog[]>;
 }
 
 export class DrizzleStorage implements IStorage {
@@ -341,6 +348,11 @@ export class DrizzleStorage implements IStorage {
       .select()
       .from(schema.leaveBalances)
       .where(eq(schema.leaveBalances.userId, userId));
+  }
+
+  async getLeaveBalance(id: number): Promise<LeaveBalance | undefined> {
+    const [b] = await db.select().from(schema.leaveBalances).where(eq(schema.leaveBalances.id, id));
+    return b;
   }
 
   async getAllLeaveBalances(): Promise<LeaveBalance[]> {
@@ -1188,6 +1200,15 @@ export class DrizzleStorage implements IStorage {
 
   async deletePasswordResetToken(token: string): Promise<void> {
     await db.delete(schema.passwordResetTokens).where(eq(schema.passwordResetTokens.token, token));
+  }
+
+  async createAuditLog(entry: InsertAuditLog): Promise<AuditLog> {
+    const [log] = await db.insert(schema.auditLogs).values(entry).returning();
+    return log;
+  }
+
+  async getAuditLogs(limit = 500): Promise<AuditLog[]> {
+    return db.select().from(schema.auditLogs).orderBy(desc(schema.auditLogs.timestamp)).limit(limit);
   }
 }
 

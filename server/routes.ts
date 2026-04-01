@@ -591,15 +591,37 @@ export async function registerRoutes(
   app.patch("/api/users/:id", async (req, res) => {
     try {
       const { id, createdAt, ...updateData } = req.body;
-      
+
+      // Fetch before-state for audit diff on sensitive fields
+      const AUDITED_FIELDS = ['role', 'adminRole', 'hasFullAdminAccess', 'terminationDate', 'startDate', 'email', 'department'] as const;
+      const before = await storage.getUser(req.params.id);
+
       if (updateData.password && !updateData.password.startsWith('$2')) {
         updateData.password = await hashPassword(updateData.password);
       }
-      
+
       const updatedUser = await storage.updateUser(req.params.id, updateData);
-      
+
       if (!updatedUser) {
         return res.status(404).json({ error: "User not found" });
+      }
+
+      // Build change diff for audited fields only
+      const changes: Record<string, { before: unknown; after: unknown }> = {};
+      for (const field of AUDITED_FIELDS) {
+        if (field in updateData && before && String(before[field]) !== String(updateData[field])) {
+          changes[field] = { before: before[field], after: updateData[field] };
+        }
+      }
+      if (Object.keys(changes).length > 0) {
+        await storage.createAuditLog({
+          actorId: req.session.userId ?? null,
+          action: 'update_user_profile',
+          entityType: 'user',
+          entityId: req.params.id,
+          changes,
+          description: `Updated ${Object.keys(changes).join(', ')} for user ${req.params.id}`,
+        }).catch(e => console.error('[audit] log failed:', e));
       }
 
       return res.json(updatedUser);
@@ -755,15 +777,28 @@ export async function registerRoutes(
   // Update leave balance
   app.patch("/api/leave-balances/:id", async (req, res) => {
     try {
+      const balanceId = parseInt(req.params.id);
       const { total, taken, pending } = req.body;
-      const updatedBalance = await storage.updateLeaveBalance(
-        parseInt(req.params.id),
-        { total, taken, pending }
-      );
-      
+
+      const before = await storage.getLeaveBalance(balanceId);
+      const updatedBalance = await storage.updateLeaveBalance(balanceId, { total, taken, pending });
+
       if (!updatedBalance) {
         return res.status(404).json({ error: "Leave balance not found" });
       }
+
+      await storage.createAuditLog({
+        actorId: req.session.userId ?? null,
+        action: 'update_leave_balance',
+        entityType: 'leave_balance',
+        entityId: String(balanceId),
+        changes: {
+          total:   { before: before?.total,   after: updatedBalance.total },
+          taken:   { before: before?.taken,   after: updatedBalance.taken },
+          pending: { before: before?.pending, after: updatedBalance.pending },
+        },
+        description: `Adjusted ${updatedBalance.leaveType} balance for user ${updatedBalance.userId}`,
+      }).catch(e => console.error('[audit] log failed:', e));
 
       return res.json(updatedBalance);
     } catch (error) {
@@ -1461,6 +1496,15 @@ export async function registerRoutes(
         console.error('Failed to send cancellation notification:', emailError);
       }
       
+      await storage.createAuditLog({
+        actorId: req.session.userId ?? null,
+        action: 'admin_cancel_leave',
+        entityType: 'leave_request',
+        entityId: String(requestId),
+        changes: { previousStatus: request.status, userId: request.userId, leaveType: request.leaveType, startDate: request.startDate, endDate: request.endDate, reason: reason ?? null },
+        description: `Admin cancelled ${request.leaveType} leave for ${request.userId} (was ${request.status})`,
+      }).catch(e => console.error('[audit] log failed:', e));
+
       return res.json({
         message: "Leave request cancelled and balance credited back",
         request: updatedRequest,
@@ -1516,6 +1560,15 @@ export async function registerRoutes(
           taken: balance.taken + days,
         });
       }
+
+      await storage.createAuditLog({
+        actorId: req.session.userId ?? null,
+        action: 'create_historic_leave',
+        entityType: 'leave_request',
+        entityId: String(newRequest.id),
+        changes: { userId, leaveType, startDate, endDate, days, authorizedBy: authorizedBy ?? null, referenceNumber: referenceNumber ?? null },
+        description: `Created historic ${leaveType} leave for ${userId}: ${startDate} – ${endDate} (${days} days)`,
+      }).catch(e => console.error('[audit] log failed:', e));
 
       return res.status(201).json(newRequest);
     } catch (error) {
@@ -2143,6 +2196,19 @@ export async function registerRoutes(
     }
   });
 
+  // ========== AUDIT LOG ROUTES ==========
+
+  app.get("/api/audit-logs", async (req, res) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 200, 1000);
+      const logs = await storage.getAuditLogs(limit);
+      return res.json(logs);
+    } catch (error) {
+      console.error("Get audit logs error:", error);
+      return res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
   // ========== SETTINGS ROUTES ==========
   
   // Get setting by key
@@ -2165,12 +2231,23 @@ export async function registerRoutes(
   app.put("/api/settings/:key", async (req, res) => {
     try {
       const { value } = req.body;
-      
+
       if (value === undefined || value === null) {
         return res.status(400).json({ error: "Value is required" });
       }
 
+      const existing = await storage.getSetting(req.params.key);
       const setting = await storage.setSetting(req.params.key, value);
+
+      await storage.createAuditLog({
+        actorId: req.session.userId ?? null,
+        action: 'update_setting',
+        entityType: 'setting',
+        entityId: req.params.key,
+        changes: { value: { before: existing?.value ?? null, after: value } },
+        description: `Changed setting "${req.params.key}"`,
+      }).catch(e => console.error('[audit] log failed:', e));
+
       return res.json(setting);
     } catch (error) {
       console.error("Set setting error:", error);

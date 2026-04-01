@@ -13,16 +13,30 @@ echo "[entrypoint] Database ready."
 echo "[entrypoint] Running database schema push..."
 npx drizzle-kit push --config=drizzle.config.ts
 
-echo "[entrypoint] Ensuring sessions table exists..."
-psql "$DATABASE_URL" -c "
-CREATE TABLE IF NOT EXISTS \"sessions\" (
-  \"sid\" varchar NOT NULL COLLATE \"default\",
-  \"sess\" json NOT NULL,
-  \"expire\" timestamp(6) NOT NULL,
-  CONSTRAINT session_pkey PRIMARY KEY (\"sid\") NOT DEFERRABLE INITIALLY IMMEDIATE
+echo "[entrypoint] Ensuring unmanaged tables exist..."
+psql "$DATABASE_URL" <<'EOSQL' 2>/dev/null || true
+-- Sessions table (managed by connect-pg-simple, not Drizzle)
+CREATE TABLE IF NOT EXISTS "sessions" (
+  "sid" varchar NOT NULL COLLATE "default",
+  "sess" json NOT NULL,
+  "expire" timestamp(6) NOT NULL,
+  CONSTRAINT session_pkey PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE
 );
-CREATE INDEX IF NOT EXISTS \"IDX_session_expire\" ON \"sessions\" (\"expire\");
-" 2>/dev/null || true
+CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "sessions" ("expire");
+
+-- Audit log table (pre-created so drizzle-kit push doesn't confuse it with sessions rename)
+CREATE TABLE IF NOT EXISTS "audit_logs" (
+  "id" serial PRIMARY KEY,
+  "timestamp" timestamp NOT NULL DEFAULT now(),
+  "actor_id" text,
+  "action" text NOT NULL,
+  "entity_type" text NOT NULL,
+  "entity_id" text,
+  "changes" jsonb,
+  "description" text
+);
+CREATE INDEX IF NOT EXISTS "audit_logs_timestamp_idx" ON "audit_logs" ("timestamp" DESC);
+EOSQL
 
 echo "[entrypoint] Starting application..."
 exec node dist/index.cjs
