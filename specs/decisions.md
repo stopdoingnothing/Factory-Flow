@@ -133,6 +133,52 @@ If no balance record exists for the requested leave type, the balance check is *
 
 ---
 
+## DEC-007 — Custom leave rule execution engine
+
+**Date:** 2026-04-01  
+**Status:** Implemented
+
+### Background
+
+The `leave_rules` and `leave_rule_phases` tables have always existed and are configurable in the admin UI, but the balance recalculation at startup only handled three hardcoded BCEA types. Custom rules stored in `leave_rules` were never applied — balances for custom types had to be entered manually.
+
+### Engine location
+
+`server/custom-leave-rules.ts` — `applyCustomLeaveRules(storage)`. Called at startup after `recalculateBceaLeaveBalances()`.
+
+### Scope
+
+The engine skips the seven BCEA-managed leave types (Annual Leave, Sick Leave, Family Responsibility, Maternity, Parental, Adoption, Commissioning). All other `leave_rules` records are treated as custom rules.
+
+### Accrual type calculations
+
+| `accrualType` | Calculation |
+|---|---|
+| `per_days_worked` | `floor(totalWorkingDays / periodDaysWorked) × daysEarned` |
+| `monthly` | `daysEarned × totalMonths` |
+| `annual` | `daysEarned × completedYears` |
+| `fixed_per_cycle` | `daysEarned` (flat allocation per cycle, no pro-rating) |
+
+Working days are approximated as `totalMonths × 21.67` (5-day week, 52 weeks/12 months) — same approximation used by the BCEA sick leave engine.
+
+### Phases
+
+If a rule has phases (`leave_rule_phases`), the engine finds the most advanced phase the employee has reached (`startsAfterMonths ≤ totalMonths`) and applies that phase's accrual settings to the employee's **total** months worked. This is the same "current phase wins globally" approach used for BCEA sick leave (DEC-004).
+
+### Employee type scoping
+
+Rules with a non-null `employeeTypeId` only apply to employees of that type. Rules with `employeeTypeId = null` apply to all employees.
+
+### Waiting period
+
+If `waitingPeriodDays > 0` and the employee hasn't worked that many days yet, the entitlement is 0 until the waiting period is satisfied.
+
+### Update behaviour
+
+Same as the BCEA engine: updates only if the stored total differs by ≥ 0.05 days (floating-point tolerance). Creates the balance record if it doesn't exist yet.
+
+---
+
 ## DEC-006 — Medical certificate flag triggers
 
 **Date:** 2026-04-01  

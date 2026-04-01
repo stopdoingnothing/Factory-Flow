@@ -3,6 +3,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pg from "pg";
 import { registerRoutes, runEscalationReminders } from "./routes";
+import { applyCustomLeaveRules } from "./custom-leave-rules";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { storage } from "./storage";
@@ -117,6 +118,10 @@ app.use((req, res, next) => {
       recalculateBceaLeaveBalances().catch(err =>
         console.error('[startup] BCEA recalculation failed:', err)
       );
+      // Apply custom leave rules after BCEA recalc
+      applyCustomLeaveRules(storage)
+        .then(n => { if (n > 0) log(`[startup] Custom leave rules: updated ${n} balance record(s)`); })
+        .catch(err => console.error('[startup] Custom leave rule engine failed:', err));
       // Schedule escalation reminders every 8 hours
       const EIGHT_HOURS = 8 * 60 * 60 * 1000;
       setInterval(() => {
