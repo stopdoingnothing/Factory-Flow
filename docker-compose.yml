@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: factoryflow
+      POSTGRES_USER: factoryflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      # Bind mount keeps DB files on the host filesystem, independent of Docker.
+      # This survives Docker reinstalls, volume corruption, and container rebuilds.
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U factoryflow -d factoryflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgres://factoryflow:${POSTGRES_PASSWORD:-changeme}@db:5432/factoryflow
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-in-production}
+      POSTMARK_API_KEY: ${POSTMARK_API_KEY:-}
+      PORT: 5000
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backup:
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      # Backups also land on the host, in a separate directory from live data.
+      - ./data/backups:/backups
+    # Runs pg_dump every hour. Keeps the last 7 days of dumps (168 files max).
+    # Each dump is named with a timestamp for easy point-in-time recovery.
+    entrypoint: >
+      sh -c "
+        while true; do
+          FILENAME=/backups/factoryflow_$$(date +%Y%m%d_%H%M%S).sql.gz
+          echo \"[backup] dumping to $$FILENAME\"
+          pg_dump -h db -U factoryflow factoryflow | gzip > $$FILENAME
+          # Delete dumps older than 7 days
+          find /backups -name 'factoryflow_*.sql.gz' -mtime +7 -delete
+          echo \"[backup] done. sleeping 1h\"
+          sleep 3600
+        done
+      "
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
