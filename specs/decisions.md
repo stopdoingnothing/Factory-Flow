@@ -130,3 +130,38 @@ This is correct in the interim. Once DEC-001 is fully implemented (pending/taken
 ### Leave types without a balance record
 
 If no balance record exists for the requested leave type, the balance check is **skipped** — the request proceeds. This applies to leave types not yet configured in the system (e.g., future statutory types). Validation of these types is left to the approval workflow.
+
+---
+
+## DEC-004 — Sick leave probationary rule (BCEA s22)
+
+**Date:** 2026-04-01  
+**Status:** Implemented
+
+### BCEA text
+
+- **s22(1):** During every sick leave cycle of 36 months, an employee is entitled to sick leave equal to 6 weeks of work (30 days for a 5-day week).
+- **s22(2):** During the first 6 months of employment, an employee is entitled to 1 day's paid sick leave for every 26 days worked.
+
+### Previous behaviour (incorrect)
+
+The BCEA engine pro-rated 30 days linearly across 36 months from day 1. This both overstated entitlement during probation (employee was shown more days than s22(2) allows) and understated it after month 6 (employee had to wait for the full 30 days to "accrue" rather than receiving them immediately).
+
+### Decision: strict BCEA interpretation
+
+| Period | Entitlement |
+|---|---|
+| Months 0–5 (< 6 months employed) | 1 day per 26 days worked |
+| Month 6+ (first cycle onwards) | 30 days for the full 36-month cycle, available immediately |
+
+**Why full entitlement immediately at month 6:** s22(1) grants the full cycle amount unconditionally. s22(2) is a temporary restriction on that right, applicable only during the first 6 months of employment. Once the restriction lifts, the full s22(1) entitlement is available — BCEA does not authorise further pro-rating within the cycle.
+
+**Why no pro-rating on subsequent cycles:** s22(2) applies to "the first six months of employment", not to the start of each 36-month cycle. An employee starting their second cycle immediately has 30 days.
+
+### Working days approximation during probation
+
+Exact attendance records exist but the BCEA recalc runs at startup without loading per-employee attendance. Working days are approximated as `months × 21.67` (5-day week, 52 weeks/12 months). The difference from actual is small (±1–2 days over 6 months) and acceptable given the probationary entitlement is also small. A future improvement could use actual attendance records.
+
+### Implementation
+
+`server/bcea.ts` — `calculateBceaEntitlements()`: the sick leave block now branches on `totalMonths < 6`. The startup recalculation in `server/index.ts` calls this function and upserts balances, so all employees are updated on next restart.

@@ -86,13 +86,25 @@ export function calculateBceaEntitlements(startDate: string): BceaEntitlements {
   const annualLeave = Math.round((monthsForAnnual / 12) * 21 * 10) / 10;
   const annualNote = `${monthsForAnnual} of 12 months completed in current cycle × 21 days = ${annualLeave} days`;
 
-  // SICK LEAVE — BCEA Section 22
-  // 30 days per 36-month (3-year) sick leave cycle, pro-rated monthly.
-  // This prevents employees from seeing the full 30 days before they have accrued it.
-  const monthsInCurrentSickCycle = totalMonths % 36;
-  const monthsForSick = totalMonths > 0 && monthsInCurrentSickCycle === 0 ? 36 : monthsInCurrentSickCycle;
-  const sickLeave = Math.round((monthsForSick / 36) * 30 * 10) / 10;
-  const sickNote = `${monthsForSick} of 36 months completed in current sick leave cycle × 30 days = ${sickLeave} days`;
+  // SICK LEAVE — BCEA Section 22 (strictly applied per DEC-004)
+  // s22(1): 30 days per 36-month cycle.
+  // s22(2): During the first 6 months of employment, 1 day per 26 days worked.
+  // After 6 months the full 30-day cycle entitlement is available immediately —
+  // no pro-rating within the cycle. Subsequent cycles also start at full entitlement
+  // (s22(2) applies only to the first 6 months of employment, not to later cycles).
+  let sickLeave: number;
+  let sickNote: string;
+  if (totalMonths < 6) {
+    // Probationary accrual: 1 day per 26 working days.
+    // Working days approximated as months × 21.67 (5-day week, 52 weeks/12 months).
+    const workingDaysWorked = Math.floor(totalMonths * (52 * 5 / 12));
+    sickLeave = Math.floor(workingDaysWorked / 26);
+    sickNote = `Probationary period (${totalMonths} months < 6): ~${workingDaysWorked} working days ÷ 26 = ${sickLeave} days (BCEA s22(2))`;
+  } else {
+    // Full cycle entitlement: 30 days, available immediately from month 6.
+    sickLeave = 30;
+    sickNote = `Full entitlement (${totalMonths} months ≥ 6): 30 days per 36-month cycle (BCEA s22(1))`;
+  }
 
   // FAMILY RESPONSIBILITY — BCEA Section 27
   // 3 days per leave cycle, only available after 4 months of continuous employment.
