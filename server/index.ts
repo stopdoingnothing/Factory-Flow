@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pg from "pg";
-import { registerRoutes } from "./routes";
+import { registerRoutes, runEscalationReminders } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { storage } from "./storage";
@@ -117,6 +117,13 @@ app.use((req, res, next) => {
       recalculateBceaLeaveBalances().catch(err =>
         console.error('[startup] BCEA recalculation failed:', err)
       );
+      // Schedule escalation reminders every 8 hours
+      const EIGHT_HOURS = 8 * 60 * 60 * 1000;
+      setInterval(() => {
+        runEscalationReminders()
+          .then(n => { if (n > 0) log(`[escalation] Sent ${n} reminder(s)`); })
+          .catch(err => console.error('[escalation] Failed:', err));
+      }, EIGHT_HOURS);
     },
   );
 })();

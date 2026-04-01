@@ -111,6 +111,65 @@ async function decrementTaken(request: { userId: string; leaveType: string; star
   }
 }
 
+/**
+ * Send escalation reminder emails for leave requests that have been pending
+ * approval for more than 3 days. Called automatically every 8 hours by the
+ * scheduler in index.ts and also available via POST /api/leave-requests/send-escalation-reminders.
+ *
+ * Returns the number of emails sent.
+ */
+export async function runEscalationReminders(): Promise<number> {
+  const senderSetting = await storage.getSetting('sender_email');
+  const senderEmail = senderSetting?.value || 'noreply@aece.co.za';
+  const allRequests = await storage.getLeaveRequests();
+  const now = new Date();
+  let sent = 0;
+
+  for (const request of allRequests) {
+    if (!['pending_manager', 'pending_hr'].includes(request.status)) continue;
+
+    const submittedAt = new Date((request as any).createdAt || request.startDate);
+    const daysPending = Math.floor((now.getTime() - submittedAt.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysPending < 3) continue;
+
+    const employee = await storage.getUser(request.userId);
+    const emailData = {
+      employeeName: employee ? `${employee.firstName} ${employee.surname}` : request.userId,
+      leaveType: request.leaveType,
+      startDate: request.startDate,
+      endDate: request.endDate,
+      daysPending,
+      requestId: request.id,
+    };
+
+    if (request.status === 'pending_manager') {
+      const managerIds = [employee?.managerId, employee?.secondManagerId].filter(Boolean) as string[];
+      for (const mgId of managerIds) {
+        const manager = await storage.getUser(mgId);
+        if (manager?.email) {
+          await sendLeaveEscalationReminder(manager.email, senderEmail, {
+            managerName: `${manager.firstName} ${manager.surname}`,
+            ...emailData,
+          });
+          sent++;
+        }
+      }
+    } else if (request.status === 'pending_hr') {
+      const adminSetting = await storage.getSetting('admin_email');
+      const hrEmails = adminSetting?.value?.split('\n').map((e: string) => e.trim()).filter(Boolean) || [];
+      for (const hrEmail of hrEmails) {
+        await sendLeaveEscalationReminder(hrEmail, senderEmail, {
+          managerName: 'HR',
+          ...emailData,
+        });
+        sent++;
+      }
+    }
+  }
+
+  return sent;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -2053,50 +2112,8 @@ export async function registerRoutes(
       }
 
       // ── #17 Auto escalation: remind approvers of leave pending > 3 days ──
-      let escalationsSent = 0;
       try {
-        const allRequests = await storage.getLeaveRequests();
-        const now = new Date();
-        for (const request of allRequests) {
-          if (!['pending_manager', 'pending_hr'].includes(request.status)) continue;
-          const submittedAt = new Date((request as any).createdAt || request.startDate);
-          const daysPending = Math.floor((now.getTime() - submittedAt.getTime()) / (1000 * 60 * 60 * 24));
-          if (daysPending < 3) continue;
-
-          const employee = await storage.getUser(request.userId);
-          const emailData = {
-            employeeName: employee ? `${employee.firstName} ${employee.surname}` : request.userId,
-            leaveType: request.leaveType,
-            startDate: request.startDate,
-            endDate: request.endDate,
-            daysPending,
-            requestId: request.id,
-          };
-
-          if (request.status === 'pending_manager') {
-            const managerIds = [employee?.managerId, employee?.secondManagerId].filter(Boolean) as string[];
-            for (const mgId of managerIds) {
-              const manager = await storage.getUser(mgId);
-              if (manager?.email) {
-                await sendLeaveEscalationReminder(manager.email, senderEmail, {
-                  managerName: `${manager.firstName} ${manager.surname}`,
-                  ...emailData,
-                });
-                escalationsSent++;
-              }
-            }
-          } else if (request.status === 'pending_hr') {
-            const adminSetting = await storage.getSetting('admin_email');
-            const hrEmails = adminSetting?.value?.split('\n').map((e: string) => e.trim()).filter(Boolean) || [];
-            for (const hrEmail of hrEmails) {
-              await sendLeaveEscalationReminder(hrEmail, senderEmail, {
-                managerName: 'HR',
-                ...emailData,
-              });
-              escalationsSent++;
-            }
-          }
-        }
+        const escalationsSent = await runEscalationReminders();
         if (escalationsSent > 0) {
           results.push({ userId: 'escalation', name: `Escalation reminders: ${escalationsSent} sent`, success: true });
         }
@@ -2118,56 +2135,8 @@ export async function registerRoutes(
   // #17 Leave escalation: send reminders for requests pending > 3 days
   app.post("/api/leave-requests/send-escalation-reminders", async (req, res) => {
     try {
-      const senderSetting = await storage.getSetting('sender_email');
-      const senderEmail = senderSetting?.value || 'noreply@aece.co.za';
-      
-      const allRequests = await storage.getLeaveRequests();
-      const now = new Date();
-      const sent: any[] = [];
-
-      for (const request of allRequests) {
-        if (!['pending_manager', 'pending_hr'].includes(request.status)) continue;
-        
-        const submittedAt = new Date((request as any).createdAt || request.startDate);
-        const daysPending = Math.floor((now.getTime() - submittedAt.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysPending < 3) continue;
-
-        const employee = await storage.getUser(request.userId);
-        const emailData = {
-          employeeName: employee ? `${employee.firstName} ${employee.surname}` : request.userId,
-          leaveType: request.leaveType,
-          startDate: request.startDate,
-          endDate: request.endDate,
-          daysPending,
-          requestId: request.id,
-        };
-
-        if (request.status === 'pending_manager') {
-          const managerIds = [employee?.managerId, employee?.secondManagerId].filter(Boolean) as string[];
-          for (const mgId of managerIds) {
-            const manager = await storage.getUser(mgId);
-            if (manager?.email) {
-              await sendLeaveEscalationReminder(manager.email, senderEmail, {
-                managerName: `${manager.firstName} ${manager.surname}`,
-                ...emailData,
-              });
-              sent.push({ requestId: request.id, sentTo: manager.email });
-            }
-          }
-        } else if (request.status === 'pending_hr') {
-          const adminSetting = await storage.getSetting('admin_email');
-          const hrEmails = adminSetting?.value?.split('\n').map((e: string) => e.trim()).filter(Boolean) || [];
-          for (const hrEmail of hrEmails) {
-            await sendLeaveEscalationReminder(hrEmail, senderEmail, {
-              managerName: 'HR',
-              ...emailData,
-            });
-            sent.push({ requestId: request.id, sentTo: hrEmail });
-          }
-        }
-      }
-
-      return res.json({ message: `Sent ${sent.length} escalation reminder(s)`, sent });
+      const sent = await runEscalationReminders();
+      return res.json({ message: `Sent ${sent} escalation reminder(s)` });
     } catch (error) {
       console.error("Escalation reminder error:", error);
       return res.status(500).json({ error: "Failed to send escalation reminders" });
