@@ -220,6 +220,10 @@ export const leaveRequests = pgTable("leave_requests", {
   finalizedById: text("finalized_by_id"), // Who made the final decision
   finalizedAt: timestamp("finalized_at"), // When it was finalized
   
+  // Medical certificate flags (set on submission for sick leave)
+  requiresMedCert: boolean("requires_med_cert").default(false).notNull(),
+  medCertFlags: text("med_cert_flags"), // JSON array: ["exceeds_2_days","fri_mon_pattern","public_holiday_adjacent"]
+
   // Historic leave entry fields (admin backfill from physical records)
   isHistoric: boolean("is_historic").default(false).notNull(),
   authorizedBy: text("authorized_by"), // Name of the person who authorized in the old system

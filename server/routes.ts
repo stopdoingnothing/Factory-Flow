@@ -1087,9 +1087,46 @@ export async function registerRoutes(
         }
       }
 
+      // ── Medical certificate flags (sick leave only) ───────────────────────
+      let requiresMedCert = false;
+      const medCertFlagList: string[] = [];
+      if (validatedData.leaveType === 'Sick Leave') {
+        if (requestedDays > 2) {
+          requiresMedCert = true;
+          medCertFlagList.push('exceeds_2_days');
+        }
+        const holidays = await storage.getAllPublicHolidays();
+        const isHoliday = (dateStr: string): boolean => {
+          const d = new Date(dateStr + 'T00:00:00');
+          const ymd = dateStr;
+          const mmdd = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          return holidays.some(h => h.isRecurring
+            ? `${String(new Date(h.date + 'T00:00:00').getMonth() + 1).padStart(2, '0')}-${String(new Date(h.date + 'T00:00:00').getDate()).padStart(2, '0')}` === mmdd
+            : h.date === ymd
+          );
+        };
+        const addDays = (dateStr: string, n: number): string => {
+          const d = new Date(dateStr + 'T00:00:00');
+          d.setDate(d.getDate() + n);
+          return d.toISOString().split('T')[0];
+        };
+        const startDow = new Date(validatedData.startDate + 'T00:00:00').getDay(); // 0=Sun,1=Mon
+        const endDow   = new Date(validatedData.endDate   + 'T00:00:00').getDay();
+        // Mon (1) start — suspicious if preceded by a weekend or public holiday
+        if (startDow === 1 || isHoliday(addDays(validatedData.startDate, -1))) {
+          requiresMedCert = true;
+          medCertFlagList.push('mon_start_or_post_holiday');
+        }
+        // Fri (5) end — suspicious if followed by a weekend or public holiday
+        if (endDow === 5 || isHoliday(addDays(validatedData.endDate, 1))) {
+          requiresMedCert = true;
+          medCertFlagList.push('fri_end_or_pre_holiday');
+        }
+      }
+
       // Determine initial status based on whether user has a manager/reporting position
       let initialStatus = 'pending_manager';
-      
+
       // Resolve manager: prefer reportsToPositionId (position-based), fall back to managerId (legacy)
       let resolvedManagerId: string | null = null;
       if (user?.reportsToPositionId) {
@@ -1106,8 +1143,13 @@ export async function registerRoutes(
         initialStatus = 'pending_hr';
       }
       
-      // Override the status with the correct initial status
-      const requestWithStatus = { ...validatedData, status: initialStatus };
+      // Override the status with the correct initial status; include med cert flags
+      const requestWithStatus = {
+        ...validatedData,
+        status: initialStatus,
+        requiresMedCert,
+        medCertFlags: medCertFlagList.length ? JSON.stringify(medCertFlagList) : null,
+      };
       const newRequest = await storage.createLeaveRequest(requestWithStatus);
 
       // Soft-reserve the requested days in pending balance (see decisions.md DEC-001)

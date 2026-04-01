@@ -133,6 +133,39 @@ If no balance record exists for the requested leave type, the balance check is *
 
 ---
 
+## DEC-006 — Medical certificate flag triggers
+
+**Date:** 2026-04-01  
+**Status:** Implemented
+
+### Purpose
+
+Per company policy, sick leave in certain patterns is suspicious and requires a medical certificate. These are flagged automatically at submission — the approval workflow can then enforce the certificate before approval.
+
+### Flag conditions (any triggers `requiresMedCert = true`)
+
+| Flag | Condition |
+|---|---|
+| `exceeds_2_days` | Requested working days > 2 |
+| `mon_start_or_post_holiday` | Start date is a Monday, OR the day before start is a public holiday |
+| `fri_end_or_pre_holiday` | End date is a Friday, OR the day after end is a public holiday |
+
+### Schema
+
+Two fields added to `leave_requests`:
+- `requires_med_cert` (boolean, default false) — set at submission time; survives in the DB for managers/HR to see
+- `med_cert_flags` (text, JSON array) — array of flag codes that triggered the requirement
+
+### What is NOT done
+
+The system flags the requirement but does not enforce it — i.e., it will not block approval if a certificate has not been uploaded. Enforcement (requiring a document upload before HR approval) is a P3 item. For now, managers/HR see the flag and act on it manually.
+
+### Why flags rather than a hard block?
+
+A hard block would require the certificate upload to happen before submission, which is often impossible (employee is at home sick). The flag-and-review model matches real-world HR practice.
+
+---
+
 ## DEC-005 — Unpaid leave 7-day notice period
 
 **Date:** 2026-04-01  
