@@ -2315,8 +2315,135 @@ export async function registerRoutes(
     }
   });
 
+  // ========== HR REPORTING ROUTES ==========
+
+  // GET /api/reports/leave?from=YYYY-MM-DD&to=YYYY-MM-DD
+  // Returns leave usage summary, breakdown by type and department, sick leave flags,
+  // and employees with high sick leave frequency.
+  app.get("/api/reports/leave", async (req, res) => {
+    try {
+      const { from, to } = req.query as { from?: string; to?: string };
+
+      const allRequests = await storage.getLeaveRequests();
+      const allUsers = await storage.getAllUsers();
+
+      // Build user lookup
+      const userMap = new Map(allUsers.map(u => [u.id, u]));
+
+      // Filter to the requested date window (match on startDate)
+      const filtered = allRequests.filter(r => {
+        if (from && r.startDate < from) return false;
+        if (to && r.startDate > to) return false;
+        return true;
+      });
+
+      // Count working days for a request (reuse the same weekday counter used in submission validation)
+      const countWorkingDays = (start: string, end: string): number => {
+        const s = new Date(start + 'T00:00:00');
+        const e = new Date(end + 'T00:00:00');
+        let days = 0;
+        const cur = new Date(s);
+        while (cur <= e) {
+          const dow = cur.getDay();
+          if (dow !== 0 && dow !== 6) days++;
+          cur.setDate(cur.getDate() + 1);
+        }
+        return days;
+      };
+
+      // Summary counts
+      const summary = {
+        totalRequests: filtered.length,
+        approved: filtered.filter(r => r.status === 'approved').length,
+        rejected: filtered.filter(r => r.status === 'rejected').length,
+        cancelled: filtered.filter(r => r.status === 'cancelled').length,
+        pending: filtered.filter(r => ['pending_manager', 'pending_hr', 'pending_md'].includes(r.status)).length,
+      };
+
+      // Breakdown by leave type (approved only for meaningful usage stats)
+      const typeMap = new Map<string, { approved: number; totalDays: number }>();
+      for (const r of filtered) {
+        const entry = typeMap.get(r.leaveType) ?? { approved: 0, totalDays: 0 };
+        if (r.status === 'approved') {
+          entry.approved++;
+          entry.totalDays += countWorkingDays(r.startDate, r.endDate);
+        }
+        typeMap.set(r.leaveType, entry);
+      }
+      const byType = Array.from(typeMap.entries())
+        .map(([leaveType, data]) => ({ leaveType, ...data }))
+        .sort((a, b) => b.totalDays - a.totalDays);
+
+      // Breakdown by department (approved only)
+      const deptMap = new Map<string, { approved: number; totalDays: number }>();
+      for (const r of filtered.filter(r => r.status === 'approved')) {
+        const user = userMap.get(r.userId);
+        const dept = user?.department || 'Unknown';
+        const entry = deptMap.get(dept) ?? { approved: 0, totalDays: 0 };
+        entry.approved++;
+        entry.totalDays += countWorkingDays(r.startDate, r.endDate);
+        deptMap.set(dept, entry);
+      }
+      const byDepartment = Array.from(deptMap.entries())
+        .map(([department, data]) => ({ department, ...data }))
+        .sort((a, b) => b.totalDays - a.totalDays);
+
+      // Sick leave: requests with med cert flags (not historic, any status except cancelled)
+      const sickLeaveFlags = filtered
+        .filter(r => r.leaveType === 'Sick Leave' && r.requiresMedCert && r.status !== 'cancelled')
+        .map(r => {
+          const user = userMap.get(r.userId);
+          return {
+            requestId: r.id,
+            userId: r.userId,
+            name: user ? `${user.firstName} ${user.surname}` : r.userId,
+            department: user?.department || null,
+            startDate: r.startDate,
+            endDate: r.endDate,
+            status: r.status,
+            flags: r.medCertFlags ? JSON.parse(r.medCertFlags) : [],
+            days: countWorkingDays(r.startDate, r.endDate),
+          };
+        });
+
+      // Employees with high sick leave frequency: >= 3 sick leave requests in the filtered window
+      const sickByEmployee = new Map<string, { count: number; totalDays: number }>();
+      for (const r of filtered.filter(r => r.leaveType === 'Sick Leave' && r.status !== 'cancelled' && r.status !== 'rejected')) {
+        const entry = sickByEmployee.get(r.userId) ?? { count: 0, totalDays: 0 };
+        entry.count++;
+        entry.totalDays += countWorkingDays(r.startDate, r.endDate);
+        sickByEmployee.set(r.userId, entry);
+      }
+      const excessiveSickLeave = Array.from(sickByEmployee.entries())
+        .filter(([, data]) => data.count >= 3)
+        .map(([userId, data]) => {
+          const user = userMap.get(userId);
+          return {
+            userId,
+            name: user ? `${user.firstName} ${user.surname}` : userId,
+            department: user?.department || null,
+            requestCount: data.count,
+            totalDays: data.totalDays,
+          };
+        })
+        .sort((a, b) => b.requestCount - a.requestCount);
+
+      return res.json({
+        period: { from: from || null, to: to || null },
+        summary,
+        byType,
+        byDepartment,
+        sickLeaveFlags,
+        excessiveSickLeave,
+      });
+    } catch (error) {
+      console.error("Leave report error:", error);
+      return res.status(500).json({ error: "Failed to generate leave report" });
+    }
+  });
+
   // ========== SETTINGS ROUTES ==========
-  
+
   // Get setting by key
   app.get("/api/settings/:key", async (req, res) => {
     try {
