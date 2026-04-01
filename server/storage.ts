@@ -84,7 +84,7 @@ export interface IStorage {
   deleteLeaveRequest(id: number): Promise<boolean>;
   
   // Approval workflow operations
-  updateManagerDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string): Promise<LeaveRequest | undefined>;
+  updateManagerDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string, skipHR?: boolean): Promise<LeaveRequest | undefined>;
   updateHRDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string): Promise<LeaveRequest | undefined>;
   updateMDDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string, bypassHR?: boolean): Promise<LeaveRequest | undefined>;
   
@@ -443,9 +443,9 @@ export class DrizzleStorage implements IStorage {
       .orderBy(desc(schema.leaveRequests.createdAt));
   }
 
-  async updateManagerDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string): Promise<LeaveRequest | undefined> {
+  async updateManagerDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string, skipHR = false): Promise<LeaveRequest | undefined> {
     const now = new Date();
-    const nextStatus = decision === 'approved' ? 'pending_hr' : 'rejected';
+    const nextStatus = decision === 'approved' ? (skipHR ? 'pending_md' : 'pending_hr') : 'rejected';
     
     const updateData: Record<string, unknown> = {
       status: nextStatus,

@@ -126,7 +126,7 @@ export async function runEscalationReminders(): Promise<number> {
   let sent = 0;
 
   for (const request of allRequests) {
-    if (!['pending_manager', 'pending_hr'].includes(request.status)) continue;
+    if (!['pending_manager', 'pending_hr', 'pending_md'].includes(request.status)) continue;
 
     const submittedAt = new Date((request as any).createdAt || request.startDate);
     const daysPending = Math.floor((now.getTime() - submittedAt.getTime()) / (1000 * 60 * 60 * 24));
@@ -160,6 +160,16 @@ export async function runEscalationReminders(): Promise<number> {
       for (const hrEmail of hrEmails) {
         await sendLeaveEscalationReminder(hrEmail, senderEmail, {
           managerName: 'HR',
+          ...emailData,
+        });
+        sent++;
+      }
+    } else if (request.status === 'pending_md') {
+      const adminSetting = await storage.getSetting('admin_email');
+      const mdEmails = adminSetting?.value?.split('\n').map((e: string) => e.trim()).filter(Boolean) || [];
+      for (const mdEmail of mdEmails) {
+        await sendLeaveEscalationReminder(mdEmail, senderEmail, {
+          managerName: 'Management',
           ...emailData,
         });
         sent++;
@@ -1312,8 +1322,12 @@ export async function registerRoutes(
       if (request.status !== 'pending_manager') {
         return res.status(400).json({ error: "Leave request is not awaiting manager approval" });
       }
-      
-      const updatedRequest = await storage.updateManagerDecision(requestId, approverId, decision, notes);
+
+      // Read approval hierarchy setting: if HR stage is disabled, manager approval goes straight to MD
+      const hrStageSetting = await storage.getSetting('leave_require_hr_stage');
+      const skipHR = hrStageSetting?.value === 'false';
+
+      const updatedRequest = await storage.updateManagerDecision(requestId, approverId, decision, notes, skipHR);
 
       if (decision === 'rejected') {
         const employee = await storage.getUser(request.userId);
@@ -1331,14 +1345,15 @@ export async function registerRoutes(
           endDate: request.endDate,
         };
         if (decision === 'approved') {
-          // Notify HR (admin_email recipients) that request is now pending HR review
           const adminEmailSetting = await storage.getSetting('admin_email');
-          const hrEmails = adminEmailSetting?.value?.split('\n').map((e: string) => e.trim()).filter(Boolean) || [];
-          for (const hrEmail of hrEmails) {
-            await sendLeaveStageNotification(hrEmail, senderEmail, {
-              recipientName: 'HR',
+          const nextStage = skipHR ? 'pending_md' : 'pending_hr';
+          const recipientName = skipHR ? 'Management' : 'HR';
+          const nextEmails = adminEmailSetting?.value?.split('\n').map((e: string) => e.trim()).filter(Boolean) || [];
+          for (const email of nextEmails) {
+            await sendLeaveStageNotification(email, senderEmail, {
+              recipientName,
               ...emailData,
-              newStage: 'pending_hr',
+              newStage: nextStage,
               notes: notes || undefined,
             });
           }
