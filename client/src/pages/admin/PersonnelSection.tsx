@@ -625,7 +625,10 @@ export default function PersonnelSection() {
       pdf.line(margin, y - 1, margin + usableWidth, y - 1);
 
       const empBalances = leaveBalances.filter((b: LeaveBalance) => b.userId === emp.id);
-      const totalAvailable = empBalances.reduce((sum: number, b: LeaveBalance) => sum + ((b.total ?? 0) - (b.taken ?? 0) - (b.pending ?? 0)), 0);
+      const annualBal = empBalances.find((b: LeaveBalance) => b.leaveType === 'Annual Leave');
+      const totalAvailable = annualBal
+        ? Math.round(((annualBal.total ?? 0) + (annualBal.carryOverDays ?? 0) - (annualBal.taken ?? 0) - (annualBal.pending ?? 0)) * 10) / 10
+        : 0;
 
       // ── Row 1: primary info ────────────────────────────────────────────────
       pdf.setFontSize(8);
@@ -1023,7 +1026,10 @@ export default function PersonnelSection() {
             <TableBody>
               {filteredUsers.map((emp) => {
                 const empBalances = leaveBalances.filter((b: LeaveBalance) => b.userId === emp.id);
-                const totalAvailable = empBalances.reduce((sum: number, b: LeaveBalance) => sum + ((b.total ?? 0) - (b.taken ?? 0) - (b.pending ?? 0)), 0);
+                const annualBalance = empBalances.find((b: LeaveBalance) => b.leaveType === 'Annual Leave');
+                const totalAvailable = annualBalance
+                  ? Math.round(((annualBalance.total ?? 0) + (annualBalance.carryOverDays ?? 0) - (annualBalance.taken ?? 0) - (annualBalance.pending ?? 0)) * 10) / 10
+                  : 0;
                 const isExpanded = expandedEmployees.has(emp.id);
                 return (
                   <React.Fragment key={emp.id}>
@@ -1054,9 +1060,9 @@ export default function PersonnelSection() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        {empBalances.length > 0 ? (
+                        {annualBalance ? (
                           <Badge variant={totalAvailable > 5 ? 'default' : totalAvailable > 0 ? 'secondary' : 'destructive'}>
-                            {totalAvailable} days available
+                            {totalAvailable} days annual leave
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground text-sm">Not set</span>
