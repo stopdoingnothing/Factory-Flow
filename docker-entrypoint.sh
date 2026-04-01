@@ -10,8 +10,8 @@ until pg_isready -h db -p 5432 -U factoryflow 2>/dev/null; do
 done
 echo "[entrypoint] Database ready."
 
-echo "[entrypoint] Running database schema push..."
-npx drizzle-kit push --config=drizzle.config.ts
+echo "[entrypoint] Running database migrations..."
+npx drizzle-kit migrate --config=drizzle.config.ts
 
 echo "[entrypoint] Ensuring unmanaged tables exist..."
 psql "$DATABASE_URL" <<'EOSQL' 2>/dev/null || true

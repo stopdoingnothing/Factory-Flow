@@ -30,3 +30,6 @@ desktop.ini
 
 # Docker persistent data (DB files + backups live on host, not in git)
 data/
+
+# Internal specs and documentation
+specs/
