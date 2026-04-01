@@ -32,13 +32,8 @@ Open `.env` and set the following values:
 | Variable | Description |
 |---|---|
 | `POSTGRES_PASSWORD` | Password for the database. Use any strong password. |
-| `SESSION_SECRET` | Long random string used to sign session cookies. Generate one with the command below. |
-| `POSTMARK_API_KEY` | API key for email notifications. Leave empty to disable emails. |
-
-Generate a session secret:
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
+| `SESSION_SECRET` | Optional. Long random string used to sign session cookies. A default is used if not set — recommended to change for production. |
+| `POSTMARK_API_KEY` | Optional. API key for email notifications. Leave empty to disable emails. |
 
 ### 3. Start the application
 
@@ -142,7 +137,7 @@ The database port is not exposed outside the Docker network.
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `POSTGRES_PASSWORD` | Yes | `changeme` | Database password |
-| `SESSION_SECRET` | Yes | `dev-session-secret-change-in-production` | Session signing key — **must be changed in production** |
+| `SESSION_SECRET` | No | built-in default | Session signing key — recommended to set in production |
 | `POSTMARK_API_KEY` | No | _(empty)_ | Postmark API key for email. Leave empty to disable. |
 
 ---
