@@ -696,6 +696,8 @@ export async function registerRoutes(
       if (user && user.startDate && !user.terminationDate && !user.excludeFromLeave) {
         const entitlements = calculateBceaEntitlements(user.startDate);
         const existingBalances = await storage.getLeaveBalances(userId);
+        const graceMonthsSetting = await storage.getSetting('leave_carry_over_grace_months');
+        const carryOverGraceMonths = graceMonthsSetting ? parseInt(graceMonthsSetting.value, 10) || 6 : 6;
 
         const upsertAnnualBalance = async (newTotal: number) => {
           const existing = existingBalances.find(b => b.leaveType === 'Annual Leave');
@@ -704,7 +706,7 @@ export async function registerRoutes(
             const currentCarryOver = existing.carryOverDays || 0;
             const carryOverExpiry = (existing as any).carryOverExpiry as string | null;
 
-            // Forfeit carry-over if the 6-month window has passed
+            // Forfeit carry-over if the grace window has passed
             if (currentCarryOver > 0 && carryOverExpiry && todayStr > carryOverExpiry) {
               const safeTaken = existing.taken + existing.pending;
               const safeTotal = Math.max(newTotal, safeTaken);
@@ -716,7 +718,7 @@ export async function registerRoutes(
             const cycleReset = purePrev > newTotal + 5;
             if (cycleReset) {
               const unusedDays = Math.max(0, Math.round((existing.total - existing.taken - existing.pending) * 10) / 10);
-              const expiry = getCarryOverExpiryDate(user.startDate!);
+              const expiry = getCarryOverExpiryDate(user.startDate!, carryOverGraceMonths);
               await storage.updateLeaveBalance(existing.id, { total: newTotal + unusedDays, carryOverDays: unusedDays, carryOverExpiry: expiry } as any);
             } else if (Math.abs((existing.total - currentCarryOver) - newTotal) >= 0.05) {
               await storage.updateLeaveBalance(existing.id, { total: newTotal + currentCarryOver });
@@ -896,6 +898,9 @@ export async function registerRoutes(
         details: [],
       };
 
+      const graceMonthsSetting = await storage.getSetting('leave_carry_over_grace_months');
+      const carryOverGraceMonths = graceMonthsSetting ? parseInt(graceMonthsSetting.value, 10) || 6 : 6;
+
       for (const user of workers) {
         try {
           const entitlements = calculateBceaEntitlements(user.startDate!);
@@ -908,7 +913,7 @@ export async function registerRoutes(
               const currentCarryOver = existing.carryOverDays || 0;
               const carryOverExpiry = (existing as any).carryOverExpiry as string | null;
 
-              // Forfeit carry-over if the 6-month window has passed
+              // Forfeit carry-over if the grace window has passed
               if (currentCarryOver > 0 && carryOverExpiry && todayStr > carryOverExpiry) {
                 const safeTaken = existing.taken + existing.pending;
                 const safeTotal = Math.max(total, safeTaken);
@@ -921,7 +926,7 @@ export async function registerRoutes(
               const cycleReset = purePrevTotal > total + 5;
               if (cycleReset) {
                 const unusedDays = Math.max(0, Math.round((existing.total - existing.taken - existing.pending) * 10) / 10);
-                const expiry = getCarryOverExpiryDate(user.startDate!);
+                const expiry = getCarryOverExpiryDate(user.startDate!, carryOverGraceMonths);
                 await storage.updateLeaveBalance(existing.id, { total: total + unusedDays, carryOverDays: unusedDays, carryOverExpiry: expiry } as any);
               } else {
                 await storage.updateLeaveBalance(existing.id, { total: total + currentCarryOver });

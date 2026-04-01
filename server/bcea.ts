@@ -5,13 +5,14 @@
 
 /**
  * Calculate the date by which carry-over annual leave must be taken.
- * Under BCEA, unused leave must be taken within 6 months of the anniversary date
- * on which it was carried over. After that it is forfeited.
+ * Under BCEA, unused leave must be taken within the grace period after the
+ * anniversary date on which it was carried over. After that it is forfeited.
  *
- * @param startDate  Employee employment start date ('yyyy-MM-dd')
- * @returns  Expiry date string ('yyyy-MM-dd') — 6 months after the most recent anniversary
+ * @param startDate    Employee employment start date ('yyyy-MM-dd')
+ * @param graceMonths  Months after anniversary before carry-over is forfeited (default 6, configurable via setting 'leave_carry_over_grace_months')
+ * @returns  Expiry date string ('yyyy-MM-dd')
  */
-export function getCarryOverExpiryDate(startDate: string): string {
+export function getCarryOverExpiryDate(startDate: string, graceMonths = 6): string {
   const start = new Date(startDate + 'T00:00:00');
   const today = new Date();
 
@@ -25,9 +26,9 @@ export function getCarryOverExpiryDate(startDate: string): string {
   const anniversary = new Date(start);
   anniversary.setFullYear(anniversary.getFullYear() + completedYears);
 
-  // Carry-over expires 6 months after the anniversary
+  // Carry-over expires graceMonths after the anniversary
   const expiry = new Date(anniversary);
-  expiry.setMonth(expiry.getMonth() + 6);
+  expiry.setMonth(expiry.getMonth() + graceMonths);
 
   return expiry.toISOString().split('T')[0];
 }
