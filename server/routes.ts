@@ -3234,33 +3234,41 @@ export async function registerRoutes(
       const departments = await storage.getAllDepartments();
       const userGroups = await storage.getAllUserGroups();
       const employeeTypes = await storage.getAllEmployeeTypes();
+      const companies = await storage.getAllCompanies();
+      const orgPositions = await storage.getAllOrgPositions();
       const leaveBalances = await storage.getAllLeaveBalances();
       const leaveRequests = await storage.getLeaveRequests();
-      const attendanceRecords = await storage.getAllAttendanceRecords();
       const leaveRules = await storage.getAllLeaveRules();
       const leaveRulePhases = await storage.getAllLeaveRulePhases();
-      const settings = await storage.getAllSettings();
+      const attendanceRecords = await storage.getAllAttendanceRecords();
+      const contractHistory = await storage.getAllContractHistory();
       const grievances = await storage.getAllGrievances();
       const publicHolidays = await storage.getAllPublicHolidays();
       const notifications = await storage.getAllNotifications();
-      
+      const settings = await storage.getAllSettings();
+      const faceDescriptors = await storage.getAllFaceDescriptorsForMatching();
+
       const backup = {
-        version: "1.0",
+        version: "2.0",
         exportedAt: new Date().toISOString(),
         data: {
           departments,
           userGroups,
           employeeTypes,
+          companies,
+          orgPositions,
           users,
           leaveBalances,
           leaveRequests,
-          attendanceRecords,
           leaveRules,
           leaveRulePhases,
-          settings,
+          attendanceRecords,
+          contractHistory,
           grievances,
           publicHolidays,
           notifications,
+          settings,
+          faceDescriptors,
         }
       };
       
@@ -3285,149 +3293,152 @@ export async function registerRoutes(
       const clearExisting = options?.clearExisting ?? false;
       const importedCounts: Record<string, number> = {};
       
-      // Import in order of dependencies
-      
+      // Import in dependency order — referenced tables before referencing tables.
+      // All inserts are additive: existing records (matched by natural key or id) are skipped.
+
       // 1. Departments
       if (backup.data.departments?.length) {
         for (const dept of backup.data.departments) {
-          try {
-            const existing = await storage.getDepartment(dept.id);
-            if (!existing) {
-              await storage.createDepartment({ name: dept.name, description: dept.description });
-            }
-          } catch (e) { /* skip duplicates */ }
+          try { const e = await storage.getDepartment(dept.id); if (!e) await storage.createDepartment({ name: dept.name, description: dept.description }); } catch (e) {}
         }
         importedCounts.departments = backup.data.departments.length;
       }
-      
+
       // 2. User Groups
       if (backup.data.userGroups?.length) {
         for (const group of backup.data.userGroups) {
-          try {
-            const existing = await storage.getUserGroup(group.id);
-            if (!existing) {
-              await storage.createUserGroup({ name: group.name, description: group.description });
-            }
-          } catch (e) { /* skip duplicates */ }
+          try { const e = await storage.getUserGroup(group.id); if (!e) await storage.createUserGroup({ name: group.name, description: group.description }); } catch (e) {}
         }
         importedCounts.userGroups = backup.data.userGroups.length;
       }
-      
+
       // 3. Employee Types
       if (backup.data.employeeTypes?.length) {
         for (const type of backup.data.employeeTypes) {
-          try {
-            const existing = await storage.getEmployeeType(type.id);
-            if (!existing) {
-              await storage.createEmployeeType({ name: type.name, description: type.description });
-            }
-          } catch (e) { /* skip duplicates */ }
+          try { const e = await storage.getEmployeeType(type.id); if (!e) await storage.createEmployeeType({ name: type.name, description: type.description, leaveLabel: type.leaveLabel, hasLeaveEntitlement: type.hasLeaveEntitlement, isDefault: type.isDefault, isPermanent: type.isPermanent }); } catch (e) {}
         }
         importedCounts.employeeTypes = backup.data.employeeTypes.length;
       }
-      
-      // 4. Users (with photos in base64)
+
+      // 4. Companies
+      if (backup.data.companies?.length) {
+        const existing = await storage.getAllCompanies();
+        const existingNames = new Set(existing.map((c: any) => c.name));
+        for (const company of backup.data.companies) {
+          try { if (!existingNames.has(company.name)) await storage.createCompany({ name: company.name, registrationNumber: company.registrationNumber, description: company.description }); } catch (e) {}
+        }
+        importedCounts.companies = backup.data.companies.length;
+      }
+
+      // 5. Org Positions (insert in order: parents before children, sort by id)
+      if (backup.data.orgPositions?.length) {
+        const sorted = [...backup.data.orgPositions].sort((a: any, b: any) => a.id - b.id);
+        const existing = await storage.getAllOrgPositions();
+        const existingIds = new Set(existing.map((p: any) => p.id));
+        for (const pos of sorted) {
+          try { if (!existingIds.has(pos.id)) await storage.createOrgPosition({ title: pos.title, department: pos.department, parentPositionId: pos.parentPositionId, sortOrder: pos.sortOrder, isOutsourced: pos.isOutsourced, tier: pos.tier }); } catch (e) {}
+        }
+        importedCounts.orgPositions = backup.data.orgPositions.length;
+      }
+
+      // 6. Users
       if (backup.data.users?.length) {
         for (const user of backup.data.users) {
-          try {
-            const existing = await storage.getUser(user.id);
-            if (!existing) {
-              await storage.createUser(user);
-            }
-          } catch (e) { /* skip duplicates */ }
+          try { const e = await storage.getUser(user.id); if (!e) await storage.createUser(user); } catch (e) {}
         }
         importedCounts.users = backup.data.users.length;
       }
-      
-      // 5. Leave Balances
+
+      // 7. Leave Balances
       if (backup.data.leaveBalances?.length) {
         for (const balance of backup.data.leaveBalances) {
-          try {
-            await storage.createLeaveBalance({
-              userId: balance.userId,
-              leaveType: balance.leaveType,
-              total: balance.total,
-              taken: balance.taken,
-              pending: balance.pending,
-            });
-          } catch (e) { /* skip duplicates */ }
+          try { await storage.createLeaveBalance({ userId: balance.userId, leaveType: balance.leaveType, total: balance.total, taken: balance.taken, pending: balance.pending, carryOverDays: balance.carryOverDays ?? 0 }); } catch (e) {}
         }
         importedCounts.leaveBalances = backup.data.leaveBalances.length;
       }
-      
-      // 6. Leave Requests
+
+      // 8. Leave Requests
       if (backup.data.leaveRequests?.length) {
         for (const request of backup.data.leaveRequests) {
-          try {
-            await storage.createLeaveRequest(request);
-          } catch (e) { /* skip duplicates */ }
+          try { await storage.createLeaveRequest(request); } catch (e) {}
         }
         importedCounts.leaveRequests = backup.data.leaveRequests.length;
       }
-      
-      // 7. Attendance Records (with photo verification in base64)
-      if (backup.data.attendanceRecords?.length) {
-        for (const record of backup.data.attendanceRecords) {
-          try {
-            await storage.createAttendanceRecord(record);
-          } catch (e) { /* skip duplicates */ }
-        }
-        importedCounts.attendanceRecords = backup.data.attendanceRecords.length;
-      }
-      
-      // 8. Leave Rules and Phases
+
+      // 9. Leave Rules and Phases
       if (backup.data.leaveRules?.length) {
         for (const rule of backup.data.leaveRules) {
-          try {
-            await storage.createLeaveRule(rule);
-          } catch (e) { /* skip duplicates */ }
+          try { await storage.createLeaveRule(rule); } catch (e) {}
         }
         importedCounts.leaveRules = backup.data.leaveRules.length;
       }
-      
       if (backup.data.leaveRulePhases?.length) {
         for (const phase of backup.data.leaveRulePhases) {
-          try {
-            await storage.createLeaveRulePhase(phase);
-          } catch (e) { /* skip duplicates */ }
+          try { await storage.createLeaveRulePhase(phase); } catch (e) {}
         }
         importedCounts.leaveRulePhases = backup.data.leaveRulePhases.length;
       }
-      
-      // 9. Settings
-      if (backup.data.settings?.length) {
-        for (const setting of backup.data.settings) {
-          try {
-            await storage.upsertSetting(setting.key, setting.value);
-          } catch (e) { /* skip errors */ }
+
+      // 10. Attendance Records
+      if (backup.data.attendanceRecords?.length) {
+        for (const record of backup.data.attendanceRecords) {
+          try { await storage.createAttendanceRecord(record); } catch (e) {}
         }
-        importedCounts.settings = backup.data.settings.length;
+        importedCounts.attendanceRecords = backup.data.attendanceRecords.length;
       }
-      
-      // 10. Grievances
+
+      // 11. Contract History
+      if (backup.data.contractHistory?.length) {
+        for (const entry of backup.data.contractHistory) {
+          try { await storage.createContractHistory(entry); } catch (e) {}
+        }
+        importedCounts.contractHistory = backup.data.contractHistory.length;
+      }
+
+      // 12. Grievances
       if (backup.data.grievances?.length) {
         for (const grievance of backup.data.grievances) {
-          try {
-            await storage.createGrievance(grievance);
-          } catch (e) { /* skip duplicates */ }
+          try { await storage.createGrievance(grievance); } catch (e) {}
         }
         importedCounts.grievances = backup.data.grievances.length;
       }
-      
-      // 11. Public Holidays
+
+      // 13. Public Holidays
       if (backup.data.publicHolidays?.length) {
         for (const holiday of backup.data.publicHolidays) {
-          try {
-            await storage.createPublicHoliday(holiday);
-          } catch (e) { /* skip duplicates */ }
+          try { await storage.createPublicHoliday(holiday); } catch (e) {}
         }
         importedCounts.publicHolidays = backup.data.publicHolidays.length;
       }
-      
-      return res.json({ 
-        success: true, 
+
+      // 14. Notifications
+      if (backup.data.notifications?.length) {
+        for (const notif of backup.data.notifications) {
+          try { await storage.createNotification(notif); } catch (e) {}
+        }
+        importedCounts.notifications = backup.data.notifications.length;
+      }
+
+      // 15. Settings
+      if (backup.data.settings?.length) {
+        for (const setting of backup.data.settings) {
+          try { await storage.upsertSetting(setting.key, setting.value); } catch (e) {}
+        }
+        importedCounts.settings = backup.data.settings.length;
+      }
+
+      // 16. Face Descriptors
+      if (backup.data.faceDescriptors?.length) {
+        for (const fd of backup.data.faceDescriptors) {
+          try { await storage.createFaceDescriptor({ userId: fd.userId, descriptor: fd.descriptor, photoData: fd.photoData ?? null, label: fd.label ?? null }); } catch (e) {}
+        }
+        importedCounts.faceDescriptors = backup.data.faceDescriptors.length;
+      }
+
+      return res.json({
+        success: true,
         message: "Backup imported successfully",
-        importedCounts 
+        importedCounts,
       });
     } catch (error) {
       console.error("Import backup error:", error);
@@ -3452,14 +3463,20 @@ export async function registerRoutes(
           departments: backup.data.departments?.length || 0,
           userGroups: backup.data.userGroups?.length || 0,
           employeeTypes: backup.data.employeeTypes?.length || 0,
+          companies: backup.data.companies?.length || 0,
+          orgPositions: backup.data.orgPositions?.length || 0,
           users: backup.data.users?.length || 0,
           leaveBalances: backup.data.leaveBalances?.length || 0,
           leaveRequests: backup.data.leaveRequests?.length || 0,
-          attendanceRecords: backup.data.attendanceRecords?.length || 0,
           leaveRules: backup.data.leaveRules?.length || 0,
-          settings: backup.data.settings?.length || 0,
+          leaveRulePhases: backup.data.leaveRulePhases?.length || 0,
+          attendanceRecords: backup.data.attendanceRecords?.length || 0,
+          contractHistory: backup.data.contractHistory?.length || 0,
           grievances: backup.data.grievances?.length || 0,
           publicHolidays: backup.data.publicHolidays?.length || 0,
+          notifications: backup.data.notifications?.length || 0,
+          settings: backup.data.settings?.length || 0,
+          faceDescriptors: backup.data.faceDescriptors?.length || 0,
         }
       };
       

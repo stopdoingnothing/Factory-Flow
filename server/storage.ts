@@ -148,6 +148,7 @@ export interface IStorage {
 
   // Contract History operations
   getContractHistory(userId: string): Promise<ContractHistory[]>;
+  getAllContractHistory(): Promise<ContractHistory[]>;
   createContractHistory(history: InsertContractHistory): Promise<ContractHistory>;
 
   // Grievance operations
@@ -938,6 +939,10 @@ export class DrizzleStorage implements IStorage {
       .from(schema.contractHistory)
       .where(eq(schema.contractHistory.userId, userId))
       .orderBy(desc(schema.contractHistory.createdAt));
+  }
+
+  async getAllContractHistory(): Promise<ContractHistory[]> {
+    return db.select().from(schema.contractHistory).orderBy(desc(schema.contractHistory.createdAt));
   }
 
   async createContractHistory(history: InsertContractHistory): Promise<ContractHistory> {

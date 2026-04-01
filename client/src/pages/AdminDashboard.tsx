@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Layout from '@/components/Layout';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, Settings, Camera, Building2, Loader2, CheckCircle2, Calendar, Clock, FileText, LayoutDashboard, LogOut, Network, MessageSquareWarning, CalendarDays, TrendingUp, Briefcase } from 'lucide-react';
+import { Users, Settings, Camera, Building2, Loader2, CheckCircle2, Calendar, Clock, FileText, LayoutDashboard, LogOut, Network, MessageSquareWarning, CalendarDays, TrendingUp, Briefcase, Database } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useToast } from "@/hooks/use-toast";
@@ -25,9 +25,10 @@ import LeaveCalendarSection from './admin/LeaveCalendarSection';
 import OrgPositionsSection from './admin/OrgPositionsSection';
 import CompaniesSection from './admin/CompaniesSection';
 import SettingsSection from './admin/SettingsSection';
+import DatabaseBackupSection from './admin/DatabaseBackupSection';
 import { LeaveRequest as LeaveRequestForm } from './LeaveRequest';
 
-type ActiveSection = 'dashboard' | 'employees' | 'leave-requests' | 'attendance' | 'departments' | 'employee-types' | 'leave-rules' | 'grievances' | 'holidays' | 'leave-calendar' | 'positions' | 'companies' | 'settings' | 'apply-leave' | 'employee-grievances';
+type ActiveSection = 'dashboard' | 'employees' | 'leave-requests' | 'attendance' | 'departments' | 'employee-types' | 'leave-rules' | 'grievances' | 'holidays' | 'leave-calendar' | 'positions' | 'companies' | 'settings' | 'backup' | 'apply-leave' | 'employee-grievances';
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -60,7 +61,7 @@ export default function AdminDashboard() {
   const [adminFaceDescriptor, setAdminFaceDescriptor] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && user.role === 'manager' && !user.faceDescriptor) {
+    if (user && user.role === 'manager' && !user.faceDescriptor && !sessionStorage.getItem('photoSetupSkipped')) {
       setShowPhotoSetup(true);
     }
   }, [user]);
@@ -197,7 +198,7 @@ export default function AdminDashboard() {
                 <Button
                   variant="ghost"
                   className="w-full text-slate-500"
-                  onClick={() => setShowPhotoSetup(false)}
+                  onClick={() => { sessionStorage.setItem('photoSetupSkipped', '1'); setShowPhotoSetup(false); }}
                 >
                   Skip for now
                 </Button>
@@ -318,6 +319,15 @@ export default function AdminDashboard() {
               >
                 <Settings className="h-4 w-4" /> Settings
               </button>
+              <button
+                onClick={() => setActiveSection('backup')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                  activeSection === 'backup' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
+                }`}
+                data-testid="nav-backup"
+              >
+                <Database className="h-4 w-4" /> Database Backup
+              </button>
 
               <div className="pt-3 mt-3 border-t">
                 <p className="px-3 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
@@ -400,6 +410,9 @@ export default function AdminDashboard() {
           )}
           {activeSection === 'settings' && (
             <SettingsSection />
+          )}
+          {activeSection === 'backup' && (
+            <DatabaseBackupSection />
           )}
           {activeSection === 'apply-leave' && (
             <LeaveRequestForm />
