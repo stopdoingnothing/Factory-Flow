@@ -1,5 +1,31 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+
+// Extend express-session with our fields
+declare module "express-session" {
+  interface SessionData {
+    userId: string;
+    userRole: string;
+  }
+}
+
+// Endpoints that don't require a session.
+// Paths are relative to the /api mount point (i.e. without the /api prefix).
+//   - auth routes (login, logout, me, reset)
+//   - kiosk attendance clock-in/out (workers authenticate per-request via ID/face)
+//   - face descriptors (needed before login for face recognition to load models)
+const PUBLIC_ROUTES = [
+  "/auth/",
+  "/attendance",             // kiosk clock-in/out
+  "/attendance/status/",     // kiosk status check
+  "/users/face-descriptors", // pre-login face model load
+];
+
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (PUBLIC_ROUTES.some(p => req.path.startsWith(p))) return next();
+  if (req.session?.userId) return next();
+  return res.status(401).json({ error: "Unauthorised" });
+}
 import { storage } from "./storage";
 import { z } from "zod";
 import { insertUserSchema, insertLeaveRequestSchema, insertAttendanceRecordSchema, insertDepartmentSchema, insertUserGroupSchema, insertEmployeeTypeSchema, insertLeaveRuleSchema, insertLeaveRulePhaseSchema, insertGrievanceSchema } from "@shared/schema";
@@ -89,8 +115,30 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+
+  // Apply session enforcement to all /api routes
+  app.use("/api", requireAuth);
+
   // ========== AUTH ROUTES ==========
+
+  // Returns the currently authenticated user, or 401 if no session.
+  // Used by the client on page load to verify the session is still valid.
+  app.get("/api/auth/me", async (req, res) => {
+    if (!req.session?.userId) return res.status(401).json({ error: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      req.session.destroy(() => {});
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    return res.json(user);
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid");
+      res.json({ message: "Logged out" });
+    });
+  });
   
   // Worker login by ID (company ID or national ID)
   app.post("/api/auth/login", async (req, res) => {
@@ -103,12 +151,17 @@ export async function registerRoutes(
 
       // Try to find user by company ID or national ID
       const user = await storage.getUserByIdOrNationalId(id);
-      
+
       if (!user) {
         return res.status(401).json({ error: "Invalid ID" });
       }
 
-      return res.json(user);
+      req.session.userId = user.id;
+      req.session.userRole = user.role;
+      req.session.save(err => {
+        if (err) { console.error("Session save failed (worker login):", err); return res.status(500).json({ error: "Session save failed" }); }
+        return res.json(user);
+      });
     } catch (error) {
       console.error("Login error:", error);
       return res.status(500).json({ error: "Login failed" });
@@ -137,7 +190,12 @@ export async function registerRoutes(
         return res.status(401).json({ error: "No face registered for this user" });
       }
 
-      return res.json(user);
+      req.session.userId = user.id;
+      req.session.userRole = user.role;
+      req.session.save(err => {
+        if (err) return res.status(500).json({ error: "Session save failed" });
+        return res.json(user);
+      });
     } catch (error) {
       console.error("Face login error:", error);
       return res.status(500).json({ error: "Face login failed" });
@@ -170,7 +228,12 @@ export async function registerRoutes(
         await storage.updateUser(user.id, { password: hashed });
       }
 
-      return res.json(user);
+      req.session.userId = user.id;
+      req.session.userRole = user.adminRole || user.role;
+      req.session.save(err => {
+        if (err) { console.error("Session save failed (admin login):", err); return res.status(500).json({ error: "Session save failed" }); }
+        return res.json(user);
+      });
     } catch (error) {
       console.error("Admin login error:", error);
       return res.status(500).json({ error: "Login failed" });

@@ -2,10 +2,14 @@ import type { User, LeaveBalance, LeaveRequest, AttendanceRecord, Setting, Depar
 
 const API_BASE = "/api";
 
+// All API calls include credentials so the session cookie is sent automatically.
+const apiFetch: typeof fetch = (input, init) =>
+  fetch(input, { credentials: "include", ...init });
+
 // Auth API
 export const authApi = {
   async loginWorker(id: string): Promise<User> {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    const res = await apiFetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
@@ -15,7 +19,7 @@ export const authApi = {
   },
 
   async loginAdmin(email: string, password: string): Promise<User> {
-    const res = await fetch(`${API_BASE}/auth/admin-login`, {
+    const res = await apiFetch(`${API_BASE}/auth/admin-login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -25,13 +29,24 @@ export const authApi = {
   },
 
   async loginByFace(id: string): Promise<User> {
-    const res = await fetch(`${API_BASE}/auth/login-by-face`, {
+    const res = await apiFetch(`${API_BASE}/auth/login-by-face`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
     if (!res.ok) throw new Error("Face login failed");
     return res.json();
+  },
+
+  async me(): Promise<User | null> {
+    const res = await apiFetch(`${API_BASE}/auth/me`);
+    if (res.status === 401) return null;
+    if (!res.ok) throw new Error("Failed to fetch session");
+    return res.json();
+  },
+
+  async logout(): Promise<void> {
+    await apiFetch(`${API_BASE}/auth/logout`, { method: "POST" });
   },
 };
 
@@ -50,7 +65,7 @@ export const faceApi = {
     const url = includeAdmins 
       ? `${API_BASE}/users/face-descriptors?includeAdmins=true`
       : `${API_BASE}/users/face-descriptors`;
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (!res.ok) throw new Error("Failed to fetch face descriptors");
     return res.json();
   },
@@ -78,19 +93,19 @@ export const userApi = {
     if (userId) {
       headers['X-User-Id'] = userId;
     }
-    const res = await fetch(`${API_BASE}/users`, { headers });
+    const res = await apiFetch(`${API_BASE}/users`, { headers });
     if (!res.ok) throw new Error("Failed to fetch users");
     return res.json();
   },
 
   async getById(id: string): Promise<User> {
-    const res = await fetch(`${API_BASE}/users/${id}`);
+    const res = await apiFetch(`${API_BASE}/users/${id}`);
     if (!res.ok) throw new Error("Failed to fetch user");
     return res.json();
   },
 
   async create(user: Partial<User>): Promise<User> {
-    const res = await fetch(`${API_BASE}/users`, {
+    const res = await apiFetch(`${API_BASE}/users`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(user),
@@ -103,7 +118,7 @@ export const userApi = {
   },
 
   async update(id: string, user: Partial<User>): Promise<User> {
-    const res = await fetch(`${API_BASE}/users/${id}`, {
+    const res = await apiFetch(`${API_BASE}/users/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(user),
@@ -113,14 +128,14 @@ export const userApi = {
   },
 
   async delete(id: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/users/${id}`, {
+    const res = await apiFetch(`${API_BASE}/users/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) throw new Error("Failed to delete user");
   },
 
   async changeId(oldId: string, newId: string): Promise<User> {
-    const res = await fetch(`${API_BASE}/users/${oldId}/change-id`, {
+    const res = await apiFetch(`${API_BASE}/users/${oldId}/change-id`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ newId }),
@@ -133,7 +148,7 @@ export const userApi = {
   },
 
   async resendCredentials(id: string): Promise<{ message: string }> {
-    const res = await fetch(`${API_BASE}/users/${id}/resend-credentials`, {
+    const res = await apiFetch(`${API_BASE}/users/${id}/resend-credentials`, {
       method: "POST",
     });
     if (!res.ok) {
@@ -147,19 +162,19 @@ export const userApi = {
 // Leave Balance API
 export const leaveBalanceApi = {
   async getByUserId(userId: string): Promise<LeaveBalance[]> {
-    const res = await fetch(`${API_BASE}/leave-balances/${userId}`);
+    const res = await apiFetch(`${API_BASE}/leave-balances/${userId}`);
     if (!res.ok) throw new Error("Failed to fetch leave balances");
     return res.json();
   },
 
   async getAll(): Promise<LeaveBalance[]> {
-    const res = await fetch(`${API_BASE}/leave-balances`);
+    const res = await apiFetch(`${API_BASE}/leave-balances`);
     if (!res.ok) throw new Error("Failed to fetch leave balances");
     return res.json();
   },
 
   async create(balance: { userId: string; leaveType: string; total: number; taken?: number; pending?: number }): Promise<LeaveBalance> {
-    const res = await fetch(`${API_BASE}/leave-balances`, {
+    const res = await apiFetch(`${API_BASE}/leave-balances`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(balance),
@@ -169,7 +184,7 @@ export const leaveBalanceApi = {
   },
 
   async update(id: number, balance: Partial<LeaveBalance>): Promise<LeaveBalance> {
-    const res = await fetch(`${API_BASE}/leave-balances/${id}`, {
+    const res = await apiFetch(`${API_BASE}/leave-balances/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(balance),
@@ -179,7 +194,7 @@ export const leaveBalanceApi = {
   },
 
   async bulkImport(records: { employeeId: string; leaveType: string; total: number; taken?: number; pending?: number }[]): Promise<{ imported: number; updated: number; errors: string[] }> {
-    const res = await fetch(`${API_BASE}/leave-balances/bulk-import`, {
+    const res = await apiFetch(`${API_BASE}/leave-balances/bulk-import`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ records }),
@@ -189,7 +204,7 @@ export const leaveBalanceApi = {
   },
 
   async recalculateSA(employeeIds?: string[]): Promise<{ message: string; updated: number; skipped: number; errors: string[]; details: { userId: string; name: string; annualLeave: number; sickLeave: number; familyResponsibility: number; monthsWorked: number }[] }> {
-    const res = await fetch(`${API_BASE}/leave-balances/recalculate-sa`, {
+    const res = await apiFetch(`${API_BASE}/leave-balances/recalculate-sa`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ employeeIds }),
@@ -199,7 +214,7 @@ export const leaveBalanceApi = {
   },
 
   async getSAPreview(userId: string): Promise<{ annualLeave: number; sickLeave: number; familyResponsibility: number; monthsWorked: number; notes: { annualLeave: string; sickLeave: string; familyResponsibility: string } }> {
-    const res = await fetch(`${API_BASE}/leave-balances/sa-preview/${userId}`);
+    const res = await apiFetch(`${API_BASE}/leave-balances/sa-preview/${userId}`);
     if (!res.ok) throw new Error("Failed to fetch SA preview");
     return res.json();
   },
@@ -211,13 +226,13 @@ export const leaveRequestApi = {
     const url = userId 
       ? `${API_BASE}/leave-requests?userId=${userId}` 
       : `${API_BASE}/leave-requests`;
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (!res.ok) throw new Error("Failed to fetch leave requests");
     return res.json();
   },
 
   async create(request: Partial<LeaveRequest>): Promise<LeaveRequest> {
-    const res = await fetch(`${API_BASE}/leave-requests`, {
+    const res = await apiFetch(`${API_BASE}/leave-requests`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -227,7 +242,7 @@ export const leaveRequestApi = {
   },
 
   async updateStatus(id: number, status: string, adminNotes?: string): Promise<LeaveRequest> {
-    const res = await fetch(`${API_BASE}/leave-requests/${id}/status`, {
+    const res = await apiFetch(`${API_BASE}/leave-requests/${id}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status, adminNotes }),
@@ -237,7 +252,7 @@ export const leaveRequestApi = {
   },
 
   async cancel(id: number): Promise<{ message: string }> {
-    const res = await fetch(`${API_BASE}/leave-requests/${id}`, {
+    const res = await apiFetch(`${API_BASE}/leave-requests/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -248,7 +263,7 @@ export const leaveRequestApi = {
   },
 
   async permanentDelete(id: number): Promise<{ message: string }> {
-    const res = await fetch(`${API_BASE}/leave-requests/${id}/permanent`, {
+    const res = await apiFetch(`${API_BASE}/leave-requests/${id}/permanent`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -260,13 +275,13 @@ export const leaveRequestApi = {
 
   async getByStatus(status: string | string[]): Promise<LeaveRequest[]> {
     const statusStr = Array.isArray(status) ? status.join(',') : status;
-    const res = await fetch(`${API_BASE}/leave-requests/by-status/${statusStr}`);
+    const res = await apiFetch(`${API_BASE}/leave-requests/by-status/${statusStr}`);
     if (!res.ok) throw new Error("Failed to fetch leave requests by status");
     return res.json();
   },
 
   async managerDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string): Promise<LeaveRequest> {
-    const res = await fetch(`${API_BASE}/leave-requests/${id}/manager-decision`, {
+    const res = await apiFetch(`${API_BASE}/leave-requests/${id}/manager-decision`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ approverId, decision, notes }),
@@ -279,7 +294,7 @@ export const leaveRequestApi = {
   },
 
   async hrDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string): Promise<LeaveRequest> {
-    const res = await fetch(`${API_BASE}/leave-requests/${id}/hr-decision`, {
+    const res = await apiFetch(`${API_BASE}/leave-requests/${id}/hr-decision`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ approverId, decision, notes }),
@@ -292,7 +307,7 @@ export const leaveRequestApi = {
   },
 
   async mdDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string, bypassHR?: boolean): Promise<LeaveRequest> {
-    const res = await fetch(`${API_BASE}/leave-requests/${id}/md-decision`, {
+    const res = await apiFetch(`${API_BASE}/leave-requests/${id}/md-decision`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ approverId, decision, notes, bypassHR }),
@@ -305,7 +320,7 @@ export const leaveRequestApi = {
   },
 
   async adminCancel(id: number, adminId: string, reason?: string): Promise<{ message: string; request: LeaveRequest; balanceAdjusted: boolean }> {
-    const res = await fetch(`${API_BASE}/leave-requests/${id}/admin-cancel`, {
+    const res = await apiFetch(`${API_BASE}/leave-requests/${id}/admin-cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ adminId, reason }),
@@ -327,7 +342,7 @@ export const leaveRequestApi = {
     referenceNumber?: string;
     notes?: string;
   }): Promise<LeaveRequest> {
-    const res = await fetch(`${API_BASE}/leave-requests/historic`, {
+    const res = await apiFetch(`${API_BASE}/leave-requests/historic`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -349,7 +364,7 @@ export const leaveRequestApi = {
     referenceNumber?: string;
     notes?: string;
   }): Promise<LeaveRequest> {
-    const res = await fetch(`${API_BASE}/leave-requests/historic/${id}`, {
+    const res = await apiFetch(`${API_BASE}/leave-requests/historic/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -368,7 +383,7 @@ export const attendanceApi = {
     let url = `${API_BASE}/attendance/${userId}?limit=${limit}`;
     if (startDate) url += `&startDate=${startDate}`;
     if (endDate) url += `&endDate=${endDate}`;
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (!res.ok) throw new Error("Failed to fetch attendance records");
     return res.json();
   },
@@ -379,7 +394,7 @@ export const attendanceApi = {
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
     if (params.toString()) url += `?${params.toString()}`;
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (!res.ok) throw new Error("Failed to fetch attendance records");
     return res.json();
   },
@@ -391,7 +406,7 @@ export const attendanceApi = {
     method?: string;
     context?: string;
   }): Promise<AttendanceRecord> {
-    const res = await fetch(`${API_BASE}/attendance`, {
+    const res = await apiFetch(`${API_BASE}/attendance`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(record),
@@ -407,7 +422,7 @@ export const attendanceApi = {
   },
 
   async createBulk(records: { userId: string; type: string; timestamp: string }[]): Promise<AttendanceRecord[]> {
-    const res = await fetch(`${API_BASE}/attendance/bulk`, {
+    const res = await apiFetch(`${API_BASE}/attendance/bulk`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ records }),
@@ -420,13 +435,13 @@ export const attendanceApi = {
   },
 
   async getStatus(userId: string): Promise<{ isClockedIn: boolean; lastRecord: AttendanceRecord | null }> {
-    const res = await fetch(`${API_BASE}/attendance/status/${userId}`);
+    const res = await apiFetch(`${API_BASE}/attendance/status/${userId}`);
     if (!res.ok) throw new Error("Failed to fetch clock-in status");
     return res.json();
   },
 
   async triggerAutoReset(): Promise<{ message: string; processed: number; results: any[] }> {
-    const res = await fetch(`${API_BASE}/attendance/auto-reset`, {
+    const res = await apiFetch(`${API_BASE}/attendance/auto-reset`, {
       method: "POST",
     });
     if (!res.ok) {
@@ -437,7 +452,7 @@ export const attendanceApi = {
   },
 
   async updateInfringementReason(id: number, infringementReason: string): Promise<AttendanceRecord> {
-    const res = await fetch(`${API_BASE}/attendance/${id}/infringement-reason`, {
+    const res = await apiFetch(`${API_BASE}/attendance/${id}/infringement-reason`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ infringementReason }),
@@ -450,7 +465,7 @@ export const attendanceApi = {
   },
 
   async update(id: number, data: { timestamp?: string; type?: string; isInfringement?: string | null; infringementReason?: string | null }): Promise<AttendanceRecord> {
-    const res = await fetch(`${API_BASE}/attendance/${id}`, {
+    const res = await apiFetch(`${API_BASE}/attendance/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -463,7 +478,7 @@ export const attendanceApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/attendance/${id}`, {
+    const res = await apiFetch(`${API_BASE}/attendance/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -476,7 +491,7 @@ export const attendanceApi = {
 // Password Reset API
 export const passwordResetApi = {
   async requestReset(email: string): Promise<{ message: string }> {
-    const res = await fetch(`${API_BASE}/auth/request-reset`, {
+    const res = await apiFetch(`${API_BASE}/auth/request-reset`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -489,7 +504,7 @@ export const passwordResetApi = {
   },
 
   async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+    const res = await apiFetch(`${API_BASE}/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, newPassword }),
@@ -505,14 +520,14 @@ export const passwordResetApi = {
 // Settings API
 export const settingsApi = {
   async get(key: string): Promise<Setting | null> {
-    const res = await fetch(`${API_BASE}/settings/${key}`);
+    const res = await apiFetch(`${API_BASE}/settings/${key}`);
     if (res.status === 404) return null;
     if (!res.ok) throw new Error("Failed to fetch setting");
     return res.json();
   },
 
   async set(key: string, value: string): Promise<Setting> {
-    const res = await fetch(`${API_BASE}/settings/${key}`, {
+    const res = await apiFetch(`${API_BASE}/settings/${key}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ value }),
@@ -525,13 +540,13 @@ export const settingsApi = {
 // Department API
 export const companyApi = {
   async getAll(): Promise<any[]> {
-    const res = await fetch(`${API_BASE}/companies`);
+    const res = await apiFetch(`${API_BASE}/companies`);
     if (!res.ok) throw new Error("Failed to fetch companies");
     return res.json();
   },
 
   async create(company: { name: string; registrationNumber?: string; description?: string }): Promise<any> {
-    const res = await fetch(`${API_BASE}/companies`, {
+    const res = await apiFetch(`${API_BASE}/companies`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(company),
@@ -544,7 +559,7 @@ export const companyApi = {
   },
 
   async update(id: number, company: { name?: string; registrationNumber?: string; description?: string }): Promise<any> {
-    const res = await fetch(`${API_BASE}/companies/${id}`, {
+    const res = await apiFetch(`${API_BASE}/companies/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(company),
@@ -557,7 +572,7 @@ export const companyApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/companies/${id}`, {
+    const res = await apiFetch(`${API_BASE}/companies/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -569,19 +584,19 @@ export const companyApi = {
 
 export const departmentApi = {
   async getAll(): Promise<Department[]> {
-    const res = await fetch(`${API_BASE}/departments`);
+    const res = await apiFetch(`${API_BASE}/departments`);
     if (!res.ok) throw new Error("Failed to fetch departments");
     return res.json();
   },
 
   async getById(id: number): Promise<Department> {
-    const res = await fetch(`${API_BASE}/departments/${id}`);
+    const res = await apiFetch(`${API_BASE}/departments/${id}`);
     if (!res.ok) throw new Error("Failed to fetch department");
     return res.json();
   },
 
   async create(department: { name: string; description?: string }): Promise<Department> {
-    const res = await fetch(`${API_BASE}/departments`, {
+    const res = await apiFetch(`${API_BASE}/departments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(department),
@@ -594,7 +609,7 @@ export const departmentApi = {
   },
 
   async update(id: number, department: { name?: string; description?: string }): Promise<Department> {
-    const res = await fetch(`${API_BASE}/departments/${id}`, {
+    const res = await apiFetch(`${API_BASE}/departments/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(department),
@@ -607,7 +622,7 @@ export const departmentApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/departments/${id}`, {
+    const res = await apiFetch(`${API_BASE}/departments/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -620,19 +635,19 @@ export const departmentApi = {
 // User Group API
 export const userGroupApi = {
   async getAll(): Promise<UserGroup[]> {
-    const res = await fetch(`${API_BASE}/user-groups`);
+    const res = await apiFetch(`${API_BASE}/user-groups`);
     if (!res.ok) throw new Error("Failed to fetch user groups");
     return res.json();
   },
 
   async getById(id: number): Promise<UserGroup> {
-    const res = await fetch(`${API_BASE}/user-groups/${id}`);
+    const res = await apiFetch(`${API_BASE}/user-groups/${id}`);
     if (!res.ok) throw new Error("Failed to fetch user group");
     return res.json();
   },
 
   async create(group: { name: string; description?: string }): Promise<UserGroup> {
-    const res = await fetch(`${API_BASE}/user-groups`, {
+    const res = await apiFetch(`${API_BASE}/user-groups`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(group),
@@ -645,7 +660,7 @@ export const userGroupApi = {
   },
 
   async update(id: number, group: { name?: string; description?: string }): Promise<UserGroup> {
-    const res = await fetch(`${API_BASE}/user-groups/${id}`, {
+    const res = await apiFetch(`${API_BASE}/user-groups/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(group),
@@ -658,7 +673,7 @@ export const userGroupApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/user-groups/${id}`, {
+    const res = await apiFetch(`${API_BASE}/user-groups/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -671,19 +686,19 @@ export const userGroupApi = {
 // Employee Type API
 export const employeeTypeApi = {
   async getAll(): Promise<EmployeeType[]> {
-    const res = await fetch(`${API_BASE}/employee-types`);
+    const res = await apiFetch(`${API_BASE}/employee-types`);
     if (!res.ok) throw new Error("Failed to fetch employee types");
     return res.json();
   },
 
   async getById(id: number): Promise<EmployeeType> {
-    const res = await fetch(`${API_BASE}/employee-types/${id}`);
+    const res = await apiFetch(`${API_BASE}/employee-types/${id}`);
     if (!res.ok) throw new Error("Failed to fetch employee type");
     return res.json();
   },
 
   async create(type: { name: string; description?: string; leaveLabel?: string; hasLeaveEntitlement?: string; isDefault?: string; isPermanent?: string }): Promise<EmployeeType> {
-    const res = await fetch(`${API_BASE}/employee-types`, {
+    const res = await apiFetch(`${API_BASE}/employee-types`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(type),
@@ -696,7 +711,7 @@ export const employeeTypeApi = {
   },
 
   async update(id: number, type: Partial<EmployeeType>): Promise<EmployeeType> {
-    const res = await fetch(`${API_BASE}/employee-types/${id}`, {
+    const res = await apiFetch(`${API_BASE}/employee-types/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(type),
@@ -709,7 +724,7 @@ export const employeeTypeApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/employee-types/${id}`, {
+    const res = await apiFetch(`${API_BASE}/employee-types/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -722,19 +737,19 @@ export const employeeTypeApi = {
 // Leave Rule API
 export const leaveRuleApi = {
   async getAll(): Promise<LeaveRule[]> {
-    const res = await fetch(`${API_BASE}/leave-rules`);
+    const res = await apiFetch(`${API_BASE}/leave-rules`);
     if (!res.ok) throw new Error("Failed to fetch leave rules");
     return res.json();
   },
 
   async getById(id: number): Promise<LeaveRule> {
-    const res = await fetch(`${API_BASE}/leave-rules/${id}`);
+    const res = await apiFetch(`${API_BASE}/leave-rules/${id}`);
     if (!res.ok) throw new Error("Failed to fetch leave rule");
     return res.json();
   },
 
   async create(rule: { name: string; leaveType: string; description?: string; employeeTypeId?: number; accrualType?: string; accrualRate?: string; daysEarned?: string; periodDaysWorked?: number; maxAccrual?: number; waitingPeriodDays?: number; cycleMonths?: number; notes?: string }): Promise<LeaveRule> {
-    const res = await fetch(`${API_BASE}/leave-rules`, {
+    const res = await apiFetch(`${API_BASE}/leave-rules`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(rule),
@@ -747,7 +762,7 @@ export const leaveRuleApi = {
   },
 
   async update(id: number, rule: Partial<LeaveRule>): Promise<LeaveRule> {
-    const res = await fetch(`${API_BASE}/leave-rules/${id}`, {
+    const res = await apiFetch(`${API_BASE}/leave-rules/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(rule),
@@ -760,7 +775,7 @@ export const leaveRuleApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/leave-rules/${id}`, {
+    const res = await apiFetch(`${API_BASE}/leave-rules/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -773,13 +788,13 @@ export const leaveRuleApi = {
 // Leave Rule Phase API
 export const leaveRulePhaseApi = {
   async getByRuleId(ruleId: number): Promise<LeaveRulePhase[]> {
-    const res = await fetch(`${API_BASE}/leave-rules/${ruleId}/phases`);
+    const res = await apiFetch(`${API_BASE}/leave-rules/${ruleId}/phases`);
     if (!res.ok) throw new Error("Failed to fetch leave rule phases");
     return res.json();
   },
 
   async create(ruleId: number, phase: { phaseName: string; sequence: number; accrualType: string; daysEarned: string; periodDaysWorked?: number | null; startsAfterMonths?: number | null; startsAfterDaysWorked?: number | null; cycleMonths?: number | null; maxBalanceDays?: number | null; notes?: string | null }): Promise<LeaveRulePhase> {
-    const res = await fetch(`${API_BASE}/leave-rules/${ruleId}/phases`, {
+    const res = await apiFetch(`${API_BASE}/leave-rules/${ruleId}/phases`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(phase),
@@ -792,7 +807,7 @@ export const leaveRulePhaseApi = {
   },
 
   async update(id: number, phase: Partial<LeaveRulePhase>): Promise<LeaveRulePhase> {
-    const res = await fetch(`${API_BASE}/leave-rule-phases/${id}`, {
+    const res = await apiFetch(`${API_BASE}/leave-rule-phases/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(phase),
@@ -805,7 +820,7 @@ export const leaveRulePhaseApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/leave-rule-phases/${id}`, {
+    const res = await apiFetch(`${API_BASE}/leave-rule-phases/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -815,7 +830,7 @@ export const leaveRulePhaseApi = {
   },
 
   async deleteAll(ruleId: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/leave-rules/${ruleId}/phases`, {
+    const res = await apiFetch(`${API_BASE}/leave-rules/${ruleId}/phases`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -828,13 +843,13 @@ export const leaveRulePhaseApi = {
 // Contract History API
 export const contractHistoryApi = {
   async getByUserId(userId: string): Promise<ContractHistory[]> {
-    const res = await fetch(`${API_BASE}/users/${userId}/contract-history`);
+    const res = await apiFetch(`${API_BASE}/users/${userId}/contract-history`);
     if (!res.ok) throw new Error("Failed to fetch contract history");
     return res.json();
   },
 
   async create(userId: string, history: { action: string; previousEmployeeTypeId?: number | null; newEmployeeTypeId?: number | null; previousEndDate?: string | null; newEndDate?: string | null; reason?: string | null; performedBy?: string | null }): Promise<ContractHistory> {
-    const res = await fetch(`${API_BASE}/users/${userId}/contract-history`, {
+    const res = await apiFetch(`${API_BASE}/users/${userId}/contract-history`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(history),
@@ -850,25 +865,25 @@ export const contractHistoryApi = {
 // Grievance API
 export const grievanceApi = {
   async getAll(): Promise<Grievance[]> {
-    const res = await fetch(`${API_BASE}/grievances`);
+    const res = await apiFetch(`${API_BASE}/grievances`);
     if (!res.ok) throw new Error("Failed to fetch grievances");
     return res.json();
   },
 
   async getByUserId(userId: string): Promise<Grievance[]> {
-    const res = await fetch(`${API_BASE}/grievances?userId=${userId}`);
+    const res = await apiFetch(`${API_BASE}/grievances?userId=${userId}`);
     if (!res.ok) throw new Error("Failed to fetch grievances");
     return res.json();
   },
 
   async getById(id: number): Promise<Grievance> {
-    const res = await fetch(`${API_BASE}/grievances/${id}`);
+    const res = await apiFetch(`${API_BASE}/grievances/${id}`);
     if (!res.ok) throw new Error("Failed to fetch grievance");
     return res.json();
   },
 
   async create(grievance: InsertGrievance): Promise<Grievance> {
-    const res = await fetch(`${API_BASE}/grievances`, {
+    const res = await apiFetch(`${API_BASE}/grievances`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(grievance),
@@ -881,7 +896,7 @@ export const grievanceApi = {
   },
 
   async update(id: number, grievance: Partial<InsertGrievance>): Promise<Grievance> {
-    const res = await fetch(`${API_BASE}/grievances/${id}`, {
+    const res = await apiFetch(`${API_BASE}/grievances/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(grievance),
@@ -894,7 +909,7 @@ export const grievanceApi = {
   },
 
   async updateStatus(id: number, status: string, adminNotes?: string, resolution?: string): Promise<Grievance> {
-    const res = await fetch(`${API_BASE}/grievances/${id}/status`, {
+    const res = await apiFetch(`${API_BASE}/grievances/${id}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status, adminNotes, resolution }),
@@ -910,13 +925,13 @@ export const grievanceApi = {
 // Public Holiday API
 export const publicHolidayApi = {
   async getAll(): Promise<PublicHoliday[]> {
-    const res = await fetch(`${API_BASE}/public-holidays`);
+    const res = await apiFetch(`${API_BASE}/public-holidays`);
     if (!res.ok) throw new Error("Failed to fetch public holidays");
     return res.json();
   },
 
   async create(holiday: Partial<InsertPublicHoliday>): Promise<PublicHoliday> {
-    const res = await fetch(`${API_BASE}/public-holidays`, {
+    const res = await apiFetch(`${API_BASE}/public-holidays`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(holiday),
@@ -929,7 +944,7 @@ export const publicHolidayApi = {
   },
 
   async update(id: number, holiday: Partial<InsertPublicHoliday>): Promise<PublicHoliday> {
-    const res = await fetch(`${API_BASE}/public-holidays/${id}`, {
+    const res = await apiFetch(`${API_BASE}/public-holidays/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(holiday),
@@ -942,7 +957,7 @@ export const publicHolidayApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/public-holidays/${id}`, {
+    const res = await apiFetch(`${API_BASE}/public-holidays/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) throw new Error("Failed to delete public holiday");
@@ -952,20 +967,20 @@ export const publicHolidayApi = {
 // Notification API
 export const notificationApi = {
   async getAll(userId: string): Promise<Notification[]> {
-    const res = await fetch(`${API_BASE}/notifications?userId=${userId}`);
+    const res = await apiFetch(`${API_BASE}/notifications?userId=${userId}`);
     if (!res.ok) throw new Error("Failed to fetch notifications");
     return res.json();
   },
 
   async getUnreadCount(userId: string): Promise<number> {
-    const res = await fetch(`${API_BASE}/notifications/unread-count?userId=${userId}`);
+    const res = await apiFetch(`${API_BASE}/notifications/unread-count?userId=${userId}`);
     if (!res.ok) throw new Error("Failed to fetch unread count");
     const data = await res.json();
     return data.count;
   },
 
   async create(notification: Partial<InsertNotification>): Promise<Notification> {
-    const res = await fetch(`${API_BASE}/notifications`, {
+    const res = await apiFetch(`${API_BASE}/notifications`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(notification),
@@ -975,7 +990,7 @@ export const notificationApi = {
   },
 
   async markAsRead(id: number): Promise<Notification> {
-    const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
+    const res = await apiFetch(`${API_BASE}/notifications/${id}/read`, {
       method: "PATCH",
     });
     if (!res.ok) throw new Error("Failed to mark notification as read");
@@ -983,7 +998,7 @@ export const notificationApi = {
   },
 
   async markAllAsRead(userId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/notifications/mark-all-read`, {
+    const res = await apiFetch(`${API_BASE}/notifications/mark-all-read`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),
@@ -992,7 +1007,7 @@ export const notificationApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/notifications/${id}`, {
+    const res = await apiFetch(`${API_BASE}/notifications/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) throw new Error("Failed to delete notification");
@@ -1012,7 +1027,7 @@ export type DashboardStats = {
 
 export const dashboardApi = {
   async getStats(): Promise<DashboardStats> {
-    const res = await fetch(`${API_BASE}/dashboard/stats`);
+    const res = await apiFetch(`${API_BASE}/dashboard/stats`);
     if (!res.ok) throw new Error("Failed to fetch dashboard stats");
     return res.json();
   },
@@ -1057,19 +1072,19 @@ export type FaceDescriptorRecord = {
 
 export const faceDescriptorApi = {
   async getForUser(userId: string): Promise<FaceDescriptorRecord[]> {
-    const res = await fetch(`${API_BASE}/face-descriptors/${userId}`);
+    const res = await apiFetch(`${API_BASE}/face-descriptors/${userId}`);
     if (!res.ok) throw new Error("Failed to fetch face descriptors");
     return res.json();
   },
 
   async getAll(): Promise<{ userId: string; descriptor: string }[]> {
-    const res = await fetch(`${API_BASE}/face-descriptors`);
+    const res = await apiFetch(`${API_BASE}/face-descriptors`);
     if (!res.ok) throw new Error("Failed to fetch face descriptors");
     return res.json();
   },
 
   async create(data: { userId: string; descriptor: string; photoData?: string; label?: string }): Promise<FaceDescriptorRecord> {
-    const res = await fetch(`${API_BASE}/face-descriptors`, {
+    const res = await apiFetch(`${API_BASE}/face-descriptors`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -1079,7 +1094,7 @@ export const faceDescriptorApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/face-descriptors/${id}`, {
+    const res = await apiFetch(`${API_BASE}/face-descriptors/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) throw new Error("Failed to delete face descriptor");
@@ -1088,13 +1103,13 @@ export const faceDescriptorApi = {
 
 export const orgPositionApi = {
   async getAll(): Promise<OrgPosition[]> {
-    const res = await fetch(`${API_BASE}/org-positions`);
+    const res = await apiFetch(`${API_BASE}/org-positions`);
     if (!res.ok) throw new Error("Failed to fetch org positions");
     return res.json();
   },
 
   async create(position: Partial<InsertOrgPosition>): Promise<OrgPosition> {
-    const res = await fetch(`${API_BASE}/org-positions`, {
+    const res = await apiFetch(`${API_BASE}/org-positions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(position),
@@ -1104,7 +1119,7 @@ export const orgPositionApi = {
   },
 
   async update(id: number, position: Partial<InsertOrgPosition>): Promise<OrgPosition> {
-    const res = await fetch(`${API_BASE}/org-positions/${id}`, {
+    const res = await apiFetch(`${API_BASE}/org-positions/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(position),
@@ -1114,7 +1129,7 @@ export const orgPositionApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/org-positions/${id}`, {
+    const res = await apiFetch(`${API_BASE}/org-positions/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) throw new Error("Failed to delete org position");
@@ -1123,13 +1138,13 @@ export const orgPositionApi = {
 
 export const backupApi = {
   async export(): Promise<Blob> {
-    const res = await fetch(`${API_BASE}/backup/export`);
+    const res = await apiFetch(`${API_BASE}/backup/export`);
     if (!res.ok) throw new Error("Failed to export backup");
     return res.blob();
   },
 
   async validate(backup: BackupData): Promise<BackupValidation> {
-    const res = await fetch(`${API_BASE}/backup/validate`, {
+    const res = await apiFetch(`${API_BASE}/backup/validate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ backup }),
@@ -1139,7 +1154,7 @@ export const backupApi = {
   },
 
   async import(backup: BackupData, options?: { clearExisting?: boolean }): Promise<{ success: boolean; message: string; importedCounts: Record<string, number> }> {
-    const res = await fetch(`${API_BASE}/backup/import`, {
+    const res = await apiFetch(`${API_BASE}/backup/import`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ backup, options }),

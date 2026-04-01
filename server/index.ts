@@ -1,4 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -23,6 +26,21 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+const PgSession = connectPgSimple(session);
+const sessionPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
+app.use(session({
+  store: new PgSession({ pool: sessionPool, tableName: "sessions" }),
+  secret: process.env.SESSION_SECRET || "dev-secret-change-in-production",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production" && process.env.TRUST_PROXY === "true",
+    maxAge: 8 * 60 * 60 * 1000, // 8 hours — typical working day
+  },
+}));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
