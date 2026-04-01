@@ -133,6 +133,28 @@ If no balance record exists for the requested leave type, the balance check is *
 
 ---
 
+## DEC-005 — Unpaid leave 7-day notice period
+
+**Date:** 2026-04-01  
+**Status:** Implemented
+
+### Rule
+
+Unpaid leave requests must be submitted at least 7 calendar days before the start date. Requests with less than 7 days' notice are rejected at the server with HTTP 400 and error code `NOTICE_PERIOD_REQUIRED`.
+
+### Bypass (discretion)
+
+A manager or admin may submit an unpaid leave request on behalf of an employee with short notice by including `bypassNoticeCheck: true` and a non-empty `bypassReason` string in the request body. The bypass is:
+
+1. Recorded in the audit log (`action: notice_period_bypass`) with the actor, days of notice, and reason.
+2. Appended to the leave request's `adminNotes` field so it is visible during the approval workflow.
+
+### Why 7 days?
+
+BCEA s37 requires written notice for temporary absence. Seven calendar days is the industry-standard minimum and aligns with common payroll cut-off cycles. The threshold is currently hardcoded; making it configurable via settings is a P3 backlog item.
+
+---
+
 ## DEC-004 — Sick leave probationary rule (BCEA s22)
 
 **Date:** 2026-04-01  

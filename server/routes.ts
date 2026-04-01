@@ -1054,6 +1054,39 @@ export async function registerRoutes(
         }
       }
 
+      // ── Validation 5: Unpaid Leave 7-day notice period ────────────────────
+      if (validatedData.leaveType === 'Unpaid Leave') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const start = new Date(validatedData.startDate + 'T00:00:00');
+        const daysUntilStart = Math.floor((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (daysUntilStart < 7) {
+          const { bypassNoticeCheck, bypassReason } = req.body;
+          if (!bypassNoticeCheck) {
+            return res.status(400).json({
+              error: `Unpaid leave requires 7 days' notice. This request starts in ${daysUntilStart} day(s). A manager can submit on behalf of the employee with a bypass reason.`,
+              code: 'NOTICE_PERIOD_REQUIRED',
+              daysUntilStart,
+            });
+          }
+          if (!bypassReason || typeof bypassReason !== 'string' || !bypassReason.trim()) {
+            return res.status(400).json({ error: "A bypass reason is required when overriding the notice period requirement" });
+          }
+          // Log the discretion bypass
+          await storage.createAuditLog({
+            actorId: req.session.userId ?? null,
+            action: 'notice_period_bypass',
+            entityType: 'leave_request',
+            entityId: null,
+            changes: { userId: validatedData.userId, startDate: validatedData.startDate, daysUntilStart, bypassReason: bypassReason.trim() },
+            description: `Notice period waived for ${validatedData.userId}: unpaid leave in ${daysUntilStart}d — "${bypassReason.trim()}"`,
+          }).catch(e => console.error('[audit] log failed:', e));
+          // Append bypass note to adminNotes so it's visible on the request
+          (validatedData as any).adminNotes = `[Notice period waived by ${req.session.userId ?? 'admin'}: ${bypassReason.trim()}]`;
+        }
+      }
+
       // Determine initial status based on whether user has a manager/reporting position
       let initialStatus = 'pending_manager';
       
