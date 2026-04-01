@@ -1380,7 +1380,18 @@ export async function registerRoutes(
       if (request.status !== 'pending_hr') {
         return res.status(400).json({ error: "Leave request is not awaiting HR approval" });
       }
-      
+
+      // Block HR approval if a medical certificate is required but not yet uploaded (P3.1)
+      if (decision === 'approved' && request.requiresMedCert) {
+        const hasDocs = request.documents && request.documents.length > 0;
+        if (!hasDocs) {
+          return res.status(400).json({
+            error: "A medical certificate must be uploaded before this sick leave request can be approved.",
+            code: 'MED_CERT_REQUIRED',
+          });
+        }
+      }
+
       const updatedRequest = await storage.updateHRDecision(requestId, approverId, decision, notes);
 
       if (decision === 'rejected') {
