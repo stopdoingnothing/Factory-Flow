@@ -82,6 +82,172 @@ async function seed() {
     ]).onConflictDoNothing();
   }
 
+  // Create departments
+  await db.insert(schema.departments).values([
+    { name: "Administration" },
+    { name: "Finance" },
+    { name: "Front Office" },
+    { name: "General Manager" },
+    { name: "Human Resources" },
+    { name: "Managing Director" },
+    { name: "Manufacturing" },
+    { name: "Mechanical" },
+    { name: "Quality Control" },
+    { name: "Repairs" },
+    { name: "Research & Development" },
+  ]).onConflictDoNothing();
+
+  // Create employee types
+  await db.insert(schema.employeeTypes).values([
+    {
+      name: "Consultant",
+      description: "Professional consultant engaged for specific projects",
+      leaveLabel: "Unavailable",
+      hasLeaveEntitlement: "no",
+      isDefault: "no",
+      isPermanent: "no",
+    },
+    {
+      name: "External Contractor",
+      description: "Independent contractor or agency worker",
+      leaveLabel: "Unavailable",
+      hasLeaveEntitlement: "no",
+      isDefault: "no",
+      isPermanent: "no",
+    },
+    {
+      name: "Permanent Employee",
+      description: "Full-time permanent staff member",
+      leaveLabel: "Leave",
+      hasLeaveEntitlement: "no",
+      isDefault: "no",
+      isPermanent: "yes",
+    },
+    {
+      name: "Temporary Worker",
+      description: "Short-term or seasonal worker",
+      leaveLabel: "Leave",
+      hasLeaveEntitlement: "no",
+      isDefault: "no",
+      isPermanent: "no",
+    },
+  ]).onConflictDoNothing();
+
+  // Create org positions — parents first, then children
+  // Manager positions (parent = null or "Managing Director")
+  const [managingDirector] = await db.insert(schema.orgPositions).values({
+    title: "Managing Director",
+    department: "Managing Director",
+    parentPositionId: null,
+    sortOrder: 0,
+    tier: 1,
+  }).onConflictDoNothing().returning();
+
+  if (managingDirector) {
+    // Tier-1 managers reporting to Managing Director
+    const [generalManager] = await db.insert(schema.orgPositions).values({
+      title: "General Manager",
+      department: "General Manager",
+      parentPositionId: managingDirector.id,
+      sortOrder: 0,
+      tier: 1,
+    }).returning();
+
+    const [financeManager] = await db.insert(schema.orgPositions).values({
+      title: "Finance Manager",
+      department: "Finance",
+      parentPositionId: managingDirector.id,
+      sortOrder: 1,
+      tier: 1,
+    }).returning();
+
+    const [frontOfficeManager] = await db.insert(schema.orgPositions).values({
+      title: "Front Office Manager",
+      department: "Front Office",
+      parentPositionId: managingDirector.id,
+      sortOrder: 2,
+      tier: 1,
+    }).returning();
+
+    await db.insert(schema.orgPositions).values({
+      title: "HR Manager",
+      department: "Human Resources",
+      parentPositionId: managingDirector.id,
+      sortOrder: 3,
+      tier: 1,
+    });
+
+    const [rdManager] = await db.insert(schema.orgPositions).values({
+      title: "R&D Manager",
+      department: "Research & Development",
+      parentPositionId: managingDirector.id,
+      sortOrder: 4,
+      tier: 1,
+    }).returning();
+
+    // Mechanical Manager reports to General Manager
+    const [mechanicalManager] = await db.insert(schema.orgPositions).values({
+      title: "Mechanical Manager",
+      department: "Mechanical",
+      parentPositionId: generalManager.id,
+      sortOrder: 0,
+      tier: 1,
+    }).returning();
+
+    // Staff positions — each reports to their respective manager
+    await db.insert(schema.orgPositions).values([
+      {
+        title: "Finance Staff",
+        department: "Finance",
+        parentPositionId: financeManager.id,
+        sortOrder: 0,
+        tier: 1,
+      },
+      {
+        title: "Front Office Staff",
+        department: "Front Office",
+        parentPositionId: frontOfficeManager.id,
+        sortOrder: 1,
+        tier: 1,
+      },
+      {
+        title: "Manufacturing Worker",
+        department: "Manufacturing",
+        parentPositionId: generalManager.id,
+        sortOrder: 2,
+        tier: 1,
+      },
+      {
+        title: "Mechanical Technician",
+        department: "Mechanical",
+        parentPositionId: mechanicalManager.id,
+        sortOrder: 3,
+        tier: 1,
+      },
+      {
+        title: "QC Staff",
+        department: "Quality Control",
+        parentPositionId: generalManager.id,
+        sortOrder: 4,
+        tier: 1,
+      },
+      {
+        title: "R&D Technician",
+        department: "Research & Development",
+        parentPositionId: rdManager.id,
+        sortOrder: 5,
+        tier: 1,
+      },
+      {
+        title: "Repairs Technician",
+        department: "Repairs",
+        parentPositionId: generalManager.id,
+        sortOrder: 6,
+        tier: 1,
+      },
+    ]);
+  }
+
   // Create default settings
   await db.insert(schema.settings).values({
     key: "admin_email",

@@ -571,7 +571,19 @@ export async function registerRoutes(
       }
       
       const newUser = await storage.createUser(validatedData);
-      
+
+      // Auto-provision mandatory BCEA leave balances if the employee has a start date
+      if (newUser.startDate && newUser.excludeFromLeave !== true) {
+        try {
+          const ent = calculateBceaEntitlements(newUser.startDate);
+          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Annual Leave',          total: ent.annualLeave,          taken: 0, pending: 0 });
+          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Sick Leave',             total: ent.sickLeave,            taken: 0, pending: 0 });
+          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Family Responsibility',  total: ent.familyResponsibility,  taken: 0, pending: 0 });
+        } catch (leaveErr) {
+          console.error('Failed to provision leave balances for new user:', leaveErr);
+        }
+      }
+
       if (validatedData.role === 'manager' && validatedData.email && plaintextPassword) {
         try {
           await sendAdminWelcomeEmail(
