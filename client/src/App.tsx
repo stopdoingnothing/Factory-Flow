@@ -1,28 +1,21 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/lib/auth-context";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { settingsApi } from "@/lib/api";
 import NotFound from "@/pages/not-found";
 import ModeSelect from "@/pages/ModeSelect";
 import Login from "@/pages/Login";
-import Dashboard from "@/pages/Dashboard";
-import LeaveRequest from "@/pages/LeaveRequest";
-import Attendance from "@/pages/Attendance";
 import AttendanceKiosk from "@/pages/AttendanceKiosk";
 import AttendanceTileMode from "@/pages/AttendanceTileMode";
-import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import MaintainerDashboard from "@/pages/MaintainerDashboard";
 import ResetPassword from "@/pages/ResetPassword";
-import EmployeeProfile from "@/pages/EmployeeProfile";
 import OrgChart from "@/pages/OrgChart";
-import Grievances from "@/pages/Grievances";
-import LeaveCalendar from "@/pages/LeaveCalendar";
 import AttendanceReports from "@/pages/AttendanceReports";
 
 function hexToHsl(hex: string): string {
@@ -72,26 +65,38 @@ function BrandingProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Guards a route by role. Unauthenticated → /login.
+// Authenticated but missing the role → best landing page for their actual roles.
+function RoleRoute({ roles, component: Component }: { roles: string[]; component: React.ComponentType }) {
+  const { user, loading, hasRole } = useAuth();
+  const [, setLocation] = useLocation();
+  const canAccess = roles.some(r => hasRole(r));
+  useEffect(() => {
+    if (loading) return;
+    if (!user) { setLocation('/login'); return; }
+    if (!canAccess) {
+      setLocation('/dashboard');
+    }
+  }, [loading, user, canAccess, setLocation]);
+  if (loading || !canAccess) return null;
+  return <Component />;
+}
+
 function Router() {
   return (
     <Switch>
+      {/* Public routes */}
       <Route path="/" component={ModeSelect} />
       <Route path="/login" component={Login} />
-      <Route path="/admin" component={AdminLogin} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/admin/dashboard" component={AdminDashboard} />
-      <Route path="/maintainer/dashboard" component={MaintainerDashboard} />
-      <Route path="/admin/org-chart" component={OrgChart} />
-      <Route path="/admin/leave-calendar" component={LeaveCalendar} />
-      <Route path="/leave-request" component={LeaveRequest} />
-      <Route path="/attendance" component={Attendance} />
       <Route path="/attendance-kiosk" component={AttendanceKiosk} />
       <Route path="/attendance-tiles" component={AttendanceTileMode} />
       <Route path="/attendance-tile" component={AttendanceTileMode} />
       <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/profile" component={EmployeeProfile} />
-      <Route path="/grievances" component={Grievances} />
-      <Route path="/admin/reports" component={AttendanceReports} />
+      {/* Main app — single dashboard for all authenticated users */}
+      <Route path="/dashboard">{() => <RoleRoute roles={['employee','manager','hr','md','admin']} component={AdminDashboard} />}</Route>
+      <Route path="/org-chart">{() => <RoleRoute roles={['manager','hr','admin']} component={OrgChart} />}</Route>
+      <Route path="/reports">{() => <RoleRoute roles={['manager','hr','admin']} component={AttendanceReports} />}</Route>
+      <Route path="/maintainer/dashboard">{() => <RoleRoute roles={['admin']} component={MaintainerDashboard} />}</Route>
       <Route component={NotFound} />
     </Switch>
   );

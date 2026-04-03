@@ -131,9 +131,12 @@ export const users = pgTable("users", {
   homeAddress: text("home_address"),
   gender: text("gender"), // 'male', 'female', 'other'
   religion: text("religion"), // null/unspecified, 'christian', 'muslim', 'jewish', 'hindu', 'other'
-  role: text("role").notNull().default("worker"), // 'worker' or 'manager'
-  adminRole: text("admin_role"), // 'manager' (full admin), 'maintainer' (user data only), null (no admin access)
-  hasFullAdminAccess: text("has_full_admin_access"), // 'yes' for full access to all employees, null/empty for limited access
+  role: text("role").notNull().default("worker"), // legacy — kept for compat; use roles[] as source of truth
+  adminRole: text("admin_role"), // legacy — kept for compat; use roles[] as source of truth
+  hasFullAdminAccess: text("has_full_admin_access"), // legacy
+  // Explicit role set: 'employee' | 'manager' | 'hr' | 'md' | 'admin'
+  // A user can hold multiple roles. Roles are additive — no implicit inheritance.
+  roles: text("roles").array().notNull().default(sql`ARRAY['employee']::text[]`),
   department: text("department"), // for workers
   userGroupId: integer("user_group_id").references(() => userGroups.id), // for admins
   employeeTypeId: integer("employee_type_id").references(() => employeeTypes.id), // employee type
@@ -198,9 +201,9 @@ export const leaveRequests = pgTable("leave_requests", {
   adminNotes: text("admin_notes"), // Legacy/general admin notes
   documents: text("documents").array(),
   
-  // Manager approval fields
+  // Manager recommendation fields (manager recommends or does not recommend; HR can override)
   managerApproverId: text("manager_approver_id"),
-  managerDecision: text("manager_decision"), // 'approved', 'rejected'
+  managerDecision: text("manager_decision"), // 'recommended', 'not_recommended'
   managerNotes: text("manager_notes"),
   managerDecisionAt: timestamp("manager_decision_at"),
   

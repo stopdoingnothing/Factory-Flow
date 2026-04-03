@@ -86,14 +86,11 @@ export default function AttendanceTileMode() {
       try {
         const today = new Date().toISOString().split('T')[0];
         const [usersData, deptsData, attendanceData] = await Promise.all([
-          userApi.getAll(),
+          userApi.getAllForKiosk(),
           departmentApi.getAll(),
           attendanceApi.getAll(today, today)
         ]);
-        const activeUsers = usersData.filter(u => 
-          !u.terminationDate && !u.exclude && u.attendanceRequired !== false && (u.role === 'worker' || u.role === 'manager')
-        );
-        setUsers(activeUsers);
+        setUsers(usersData);
         setDepartments(deptsData);
         setAttendanceRecords(attendanceData);
       } catch (err) {

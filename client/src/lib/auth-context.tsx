@@ -4,14 +4,17 @@ import { authApi } from './api';
 
 interface AuthContextType {
   user: User | null;
+  loading: boolean;
   setUser: (user: User | null) => void;
   logout: () => void;
+  hasRole: (role: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // On mount, verify the session with the server rather than trusting localStorage alone.
   // If the server says there's no valid session the user is treated as logged out.
@@ -31,6 +34,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (stored) {
         try { setUser(JSON.parse(stored)); } catch { localStorage.removeItem('factory_user'); }
       }
+    }).finally(() => {
+      setLoading(false);
     });
   }, []);
 
@@ -49,8 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('factory_user');
   };
 
+  const hasRole = (role: string): boolean => {
+    if (!user) return false;
+    const roles: string[] = (user as any).roles || [];
+    return roles.includes(role);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, setUser, logout }}>
+    <AuthContext.Provider value={{ user, loading, setUser, logout, hasRole }}>
       {children}
     </AuthContext.Provider>
   );

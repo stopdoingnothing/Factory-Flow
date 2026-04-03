@@ -5,7 +5,8 @@ import { createServer, type Server } from "http";
 declare module "express-session" {
   interface SessionData {
     userId: string;
-    userRole: string;
+    userRole: string;       // legacy — kept for compat
+    userRoles: string[];    // source of truth: ['employee','manager','hr','md','admin']
   }
 }
 
@@ -16,9 +17,13 @@ declare module "express-session" {
 //   - face descriptors (needed before login for face recognition to load models)
 const PUBLIC_ROUTES = [
   "/auth/",
-  "/attendance",             // kiosk clock-in/out
-  "/attendance/status/",     // kiosk status check
-  "/users/face-descriptors", // pre-login face model load
+  "/attendance",             // kiosk clock-in/out + tile mode reads
+  "/users/face-descriptors", // face recognition kiosk — pre-login model load
+  "/users/kiosk",            // tile mode — employee list
+  "/users/kiosk-lookup",     // attendance kiosk — resolve employee ID/national ID to basic info
+  "/users/search",           // manager-approval login — employee name search
+  "/departments",            // tile mode — department filter
+  "/settings/",             // company name/logo needed on login page and kiosks (PUT is separately guarded by requireAdmin)
 ];
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -26,7 +31,23 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (req.session?.userId) return next();
   return res.status(401).json({ error: "Unauthorised" });
 }
-import { storage } from "./storage";
+
+// Requires the session user to hold at least one of the specified roles.
+// Admin role implicitly satisfies any requirement — admins can do everything.
+function requireRole(...roles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.session?.userId) return res.status(401).json({ error: "Unauthorised" });
+    const userRoles: string[] = req.session.userRoles || [];
+    if (userRoles.includes('admin') || roles.some(r => userRoles.includes(r))) return next();
+    return res.status(403).json({ error: "Forbidden" });
+  };
+}
+
+// HR-or-admin covers the majority of previously admin-guarded routes.
+const requireAdmin = requireRole('hr', 'admin');
+// Pure system-config routes — admin only.
+const requireAdminOnly = requireRole('admin');
+import { storage, pool } from "./storage";
 import { z } from "zod";
 import { insertUserSchema, insertLeaveRequestSchema, insertAttendanceRecordSchema, insertDepartmentSchema, insertUserGroupSchema, insertEmployeeTypeSchema, insertLeaveRuleSchema, insertLeaveRulePhaseSchema, insertGrievanceSchema } from "@shared/schema";
 import { sendLeaveRequestNotification, sendLateAttendanceNotification, sendAdminWelcomeEmail, sendLeaveStatusNotification, sendPasswordResetEmail, sendAdminCredentialsEmail, sendManagerMissedClockOutAlert, sendLeaveStageNotification, sendLeaveEscalationReminder, sendAWOLAlert } from "./email";
@@ -180,10 +201,105 @@ export async function runEscalationReminders(): Promise<number> {
   return sent;
 }
 
+/**
+ * Walk up the org chart from a user and return the email addresses of all
+ * upstream managers (direct manager → their manager → … → top).
+ *
+ * Traversal strategy:
+ *  1. Use position-tree hierarchy via orgPositions.parentPositionId.
+ *  2. For each ancestor position, collect emails of all users who hold it.
+ *  3. Fall back to legacy managerId chain for users not on the position tree.
+ *
+ * The result is de-duplicated but does NOT include the starting employee.
+ */
+async function getHierarchyEmails(userId: string): Promise<string[]> {
+  const [allUsers, allPositions] = await Promise.all([
+    storage.getAllUsers(),
+    storage.getAllOrgPositions(),
+  ]);
+
+  const positionMap = new Map(allPositions.map(p => [p.id, p]));
+
+  // Map each position → users who hold it
+  const usersByPosition = new Map<number, typeof allUsers>();
+  for (const u of allUsers) {
+    if (u.orgPositionId != null) {
+      const arr = usersByPosition.get(u.orgPositionId) ?? [];
+      arr.push(u);
+      usersByPosition.set(u.orgPositionId, arr);
+    }
+  }
+
+  const userMap = new Map(allUsers.map(u => [u.id, u]));
+  const startUser = userMap.get(userId);
+  if (!startUser) return [];
+
+  const emails: string[] = [];
+  const visitedUserIds = new Set<string>([userId]); // exclude self
+
+  // Determine starting ancestor position id
+  // If reportsToPositionId is set, use that directly; otherwise use parent of own position
+  let currentPositionId: number | null | undefined =
+    startUser.reportsToPositionId ??
+    (startUser.orgPositionId != null
+      ? positionMap.get(startUser.orgPositionId)?.parentPositionId
+      : null);
+
+  while (currentPositionId != null) {
+    const position = positionMap.get(currentPositionId);
+    if (!position) break;
+
+    const holders = usersByPosition.get(currentPositionId) ?? [];
+    for (const holder of holders) {
+      if (!visitedUserIds.has(holder.id) && holder.email) {
+        visitedUserIds.add(holder.id);
+        emails.push(holder.email);
+      }
+    }
+
+    // Continue up to the next ancestor
+    currentPositionId = position.parentPositionId;
+  }
+
+  // Fallback: walk legacy managerId chain for any remaining un-covered managers
+  let legacyManagerId: string | null | undefined = startUser.managerId;
+  while (legacyManagerId) {
+    if (visitedUserIds.has(legacyManagerId)) break;
+    const mgr = userMap.get(legacyManagerId);
+    if (!mgr) break;
+    visitedUserIds.add(mgr.id);
+    if (mgr.email) emails.push(mgr.email);
+    legacyManagerId = mgr.managerId;
+  }
+
+  return emails;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // ── One-time startup migration: populate roles[] from legacy role/adminRole ──
+  try {
+    // Add column if not yet present (idempotent)
+    await pool.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS roles text[] NOT NULL DEFAULT ARRAY['employee']::text[]`
+    );
+    // Populate based on legacy fields for any user still on the default
+    await pool.query(`
+      UPDATE users SET roles =
+        CASE
+          WHEN admin_role IS NOT NULL THEN ARRAY['employee','manager','admin']::text[]
+          WHEN role = 'manager'       THEN ARRAY['employee','manager']::text[]
+          ELSE                             ARRAY['employee']::text[]
+        END
+      WHERE roles = ARRAY['employee']::text[]
+    `);
+    console.log('[migration] roles column migration complete');
+  } catch (e) {
+    console.warn('[migration] roles column migration failed:', (e as Error).message);
+  }
 
   // Apply session enforcement to all /api routes
   app.use("/api", requireAuth);
@@ -209,24 +325,42 @@ export async function registerRoutes(
     });
   });
   
-  // Worker login by ID (company ID or national ID)
+  // Worker login by ID (company ID or national ID) + password — application mode only.
+  // Kiosk attendance recording does NOT use this route; it posts directly to /api/attendance.
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { id } = req.body;
-      
-      if (!id) {
-        return res.status(400).json({ error: "ID is required" });
+      const { id, password } = req.body;
+
+      if (!id || !password) {
+        return res.status(400).json({ error: "ID and password are required" });
       }
 
       // Try to find user by company ID or national ID
       const user = await storage.getUserByIdOrNationalId(id);
 
+      // Use a generic message to prevent user enumeration
       if (!user) {
-        return res.status(401).json({ error: "Invalid ID" });
+        return res.status(401).json({ error: "Invalid ID or password" });
+      }
+
+      if (!user.password) {
+        return res.status(401).json({ error: "No password set for this account. Please contact your administrator." });
+      }
+
+      const passwordValid = await verifyPassword(password, user.password);
+      if (!passwordValid) {
+        return res.status(401).json({ error: "Invalid ID or password" });
+      }
+
+      // Upgrade plain-text password to bcrypt hash on first successful login
+      if (!user.password.startsWith('$2')) {
+        const hashed = await hashPassword(password);
+        await storage.updateUser(user.id, { password: hashed });
       }
 
       req.session.userId = user.id;
       req.session.userRole = user.role;
+      req.session.userRoles = user.roles || ['employee'];
       req.session.save(err => {
         if (err) { console.error("Session save failed (worker login):", err); return res.status(500).json({ error: "Session save failed" }); }
         return res.json(user);
@@ -261,6 +395,7 @@ export async function registerRoutes(
 
       req.session.userId = user.id;
       req.session.userRole = user.role;
+      req.session.userRoles = user.roles || ['employee'];
       req.session.save(err => {
         if (err) return res.status(500).json({ error: "Session save failed" });
         return res.json(user);
@@ -282,8 +417,8 @@ export async function registerRoutes(
 
       const user = await storage.getUserByEmail(email);
       
-      // Check for valid admin role (manager or maintainer)
-      if (!user || !user.adminRole || !['manager', 'maintainer'].includes(user.adminRole)) {
+      // Allow users with adminRole, or line managers (role === 'manager' without adminRole)
+      if (!user || (!user.adminRole && user.role !== 'manager')) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
@@ -299,12 +434,72 @@ export async function registerRoutes(
 
       req.session.userId = user.id;
       req.session.userRole = user.adminRole || user.role;
+      req.session.userRoles = user.roles || ['employee'];
       req.session.save(err => {
         if (err) { console.error("Session save failed (admin login):", err); return res.status(500).json({ error: "Session save failed" }); }
         return res.json(user);
       });
     } catch (error) {
       console.error("Admin login error:", error);
+      return res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  // Manager-approved login: a manager authenticates with their own credentials to log in a worker
+  app.post("/api/auth/manager-approved-login", async (req, res) => {
+    try {
+      const { employeeId, managerEmail, managerPassword } = req.body;
+
+      if (!employeeId || !managerEmail || !managerPassword) {
+        return res.status(400).json({ error: "employeeId, managerEmail, and managerPassword are required" });
+      }
+
+      const employee = await storage.getUser(employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+
+      if (employee.role === 'manager' || employee.adminRole) {
+        return res.status(403).json({ error: "This employee cannot use manager approval login" });
+      }
+
+      if (employee.terminationDate) {
+        return res.status(403).json({ error: "This employee account is inactive" });
+      }
+
+      const manager = await storage.getUserByEmail(managerEmail);
+      if (!manager || !manager.adminRole || !['manager', 'maintainer'].includes(manager.adminRole)) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const passwordValid = await verifyPassword(managerPassword, manager.password || '');
+      if (!passwordValid) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      if (manager.password && !manager.password.startsWith('$2')) {
+        const hashed = await hashPassword(managerPassword);
+        await storage.updateUser(manager.id, { password: hashed });
+      }
+
+      req.session.userId = employee.id;
+      req.session.userRole = employee.role;
+
+      await storage.createAuditLog({
+        actorId: manager.id,
+        action: 'manager_approved_login',
+        entityType: 'user',
+        entityId: employee.id,
+        changes: { managerId: manager.id, managerEmail: manager.email },
+        description: `Manager ${manager.firstName} ${manager.surname} approved kiosk login for ${employee.firstName} ${employee.surname}`,
+      }).catch(e => console.error('[audit] manager_approved_login log failed:', e));
+
+      req.session.save(err => {
+        if (err) { console.error("Session save failed (manager approved login):", err); return res.status(500).json({ error: "Session save failed" }); }
+        return res.json(employee);
+      });
+    } catch (error) {
+      console.error("Manager approved login error:", error);
       return res.status(500).json({ error: "Login failed" });
     }
   });
@@ -321,7 +516,7 @@ export async function registerRoutes(
       const user = await storage.getUserByEmail(email);
       
       // Always return success to prevent email enumeration
-      if (!user || user.role !== 'manager') {
+      if (!user) {
         return res.json({ message: "If an account exists with that email, a reset link has been sent." });
       }
 
@@ -392,19 +587,8 @@ export async function registerRoutes(
   // ========== USER MANAGEMENT ROUTES ==========
   
   // Generate random passwords for users without passwords (admin only)
-  // Requires adminUserId in request body for basic authorization
-  app.post("/api/users/generate-passwords", async (req, res) => {
+  app.post("/api/users/generate-passwords", requireAdmin, async (req, res) => {
     try {
-      // Basic authorization check - requires admin user ID
-      const { adminUserId } = req.body;
-      if (!adminUserId) {
-        return res.status(401).json({ error: "Admin user ID is required" });
-      }
-      
-      const adminUser = await storage.getUser(adminUserId);
-      if (!adminUser || adminUser.role !== 'manager') {
-        return res.status(403).json({ error: "Only administrators can perform this action" });
-      }
       
       const users = await storage.getAllUsers();
       const usersWithoutPasswords = users.filter(u => !u.password);
@@ -459,35 +643,93 @@ export async function registerRoutes(
     }
   });
 
-  // Get all users
+  // Get all users — admins (manager/maintainer) see everyone; workers see only themselves and direct reports
   app.get("/api/users", async (req, res) => {
     try {
-      const requestingUserId = req.headers['x-user-id'] as string;
+      const sessionUserId = req.session.userId!;
+      const sessionRole = req.session.userRole ?? '';
       const allUsers = await storage.getAllUsers();
-      
-      // If no requesting user specified, return all (for backward compatibility)
-      if (!requestingUserId) {
+
+      if (['manager', 'maintainer'].includes(sessionRole)) {
         return res.json(allUsers);
       }
-      
-      // Get the requesting user to check their access level
-      const requestingUser = await storage.getUser(requestingUserId);
-      
-      // Full admins see everyone
-      if (requestingUser?.hasFullAdminAccess === 'yes') {
-        return res.json(allUsers);
-      }
-      
-      // Limited access: only see themselves and their direct reports
-      const filteredUsers = allUsers.filter(u => 
-        u.id === requestingUserId || // Can see themselves
-        u.managerId === requestingUserId // Can see their direct reports
+
+      // Workers: only see themselves and their direct reports
+      const filteredUsers = allUsers.filter(u =>
+        u.id === sessionUserId ||
+        u.managerId === sessionUserId
       );
-      
       return res.json(filteredUsers);
     } catch (error) {
       console.error("Get users error:", error);
       return res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Public endpoint for tile mode kiosk — returns active workers/managers without requiring a session
+  app.get("/api/users/kiosk", async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const kioskUsers = allUsers.filter(u =>
+        !u.terminationDate && !u.exclude && u.attendanceRequired !== false &&
+        (u.role === 'worker' || u.role === 'manager')
+      );
+      return res.json(kioskUsers);
+    } catch (error) {
+      console.error("Kiosk users error:", error);
+      return res.status(500).json({ error: "Failed to fetch kiosk users" });
+    }
+  });
+
+  // Employee name search for manager-approved login kiosk flow (public — user not yet logged in)
+  app.get("/api/users/search", async (req, res) => {
+    try {
+      const q = (req.query.q as string || '').trim();
+      if (q.length < 2) return res.json([]);
+
+      const allUsers = await storage.getAllUsers();
+      const lower = q.toLowerCase();
+      const results = allUsers
+        .filter(u =>
+          !u.terminationDate &&
+          !u.exclude &&
+          !u.adminRole && // managers with admin credentials use their own login path
+          (`${u.firstName} ${u.surname}`.toLowerCase().includes(lower) ||
+           u.firstName.toLowerCase().includes(lower) ||
+           u.surname.toLowerCase().includes(lower))
+        )
+        .slice(0, 10)
+        .map(u => ({
+          id: u.id,
+          firstName: u.firstName,
+          surname: u.surname,
+          department: u.department,
+          role: u.role,
+          photoUrl: u.photoUrl,
+        }));
+
+      return res.json(results);
+    } catch (error) {
+      console.error("User search error:", error);
+      return res.status(500).json({ error: "Search failed" });
+    }
+  });
+
+  // Attendance kiosk — look up an employee by company ID or national ID (public, returns safe fields only)
+  app.get("/api/users/kiosk-lookup/:id", async (req, res) => {
+    try {
+      const user = await storage.getUserByIdOrNationalId(req.params.id);
+      if (!user) return res.status(404).json({ error: "Employee not found" });
+      if (user.terminationDate) return res.status(403).json({ error: "Employee account is inactive" });
+      return res.json({
+        id: user.id,
+        firstName: user.firstName,
+        surname: user.surname,
+        department: user.department,
+      });
+    } catch (error) {
+      console.error("Kiosk lookup error:", error);
+      return res.status(500).json({ error: "Lookup failed" });
     }
   });
 
@@ -561,7 +803,7 @@ export async function registerRoutes(
   });
 
   // Create new user
-  app.post("/api/users", async (req, res) => {
+  app.post("/api/users", requireAdmin, async (req, res) => {
     try {
       const validatedData = insertUserSchema.parse(req.body);
       
@@ -610,7 +852,7 @@ export async function registerRoutes(
   });
 
   // Update user
-  app.patch("/api/users/:id", async (req, res) => {
+  app.patch("/api/users/:id", requireAdmin, async (req, res) => {
     try {
       const { id, createdAt, ...updateData } = req.body;
 
@@ -654,7 +896,7 @@ export async function registerRoutes(
   });
 
   // Change user ID (rename — migrates all linked records atomically)
-  app.post("/api/users/:id/change-id", async (req, res) => {
+  app.post("/api/users/:id/change-id", requireAdmin, async (req, res) => {
     try {
       const oldId = req.params.id;
       const { newId } = req.body;
@@ -685,7 +927,7 @@ export async function registerRoutes(
   });
 
   // Delete user
-  app.delete("/api/users/:id", async (req, res) => {
+  app.delete("/api/users/:id", requireAdmin, async (req, res) => {
     try {
       await storage.deleteUser(req.params.id);
       return res.status(204).send();
@@ -698,7 +940,7 @@ export async function registerRoutes(
   // ========== LEAVE BALANCE ROUTES ==========
   
   // Get all leave balances (admin)
-  app.get("/api/leave-balances", async (req, res) => {
+  app.get("/api/leave-balances", requireAdmin, async (req, res) => {
     try {
       const balances = await storage.getAllLeaveBalances();
       return res.json(balances);
@@ -775,7 +1017,7 @@ export async function registerRoutes(
   });
 
   // Create leave balance
-  app.post("/api/leave-balances", async (req, res) => {
+  app.post("/api/leave-balances", requireAdmin, async (req, res) => {
     try {
       const { userId, leaveType, total, taken = 0, pending = 0 } = req.body;
       
@@ -799,7 +1041,7 @@ export async function registerRoutes(
   });
 
   // Update leave balance
-  app.patch("/api/leave-balances/:id", async (req, res) => {
+  app.patch("/api/leave-balances/:id", requireAdmin, async (req, res) => {
     try {
       const balanceId = parseInt(req.params.id);
       const { total, taken, pending } = req.body;
@@ -832,7 +1074,7 @@ export async function registerRoutes(
   });
 
   // Bulk import leave balances from CSV data
-  app.post("/api/leave-balances/bulk-import", async (req, res) => {
+  app.post("/api/leave-balances/bulk-import", requireAdmin, async (req, res) => {
     try {
       const { records } = req.body;
       
@@ -900,7 +1142,7 @@ export async function registerRoutes(
   // ========== SA BCEA LEAVE RECALCULATION ==========
 
   // Recalculate leave balances for all (or specified) employees using SA BCEA rules
-  app.post("/api/leave-balances/recalculate-sa", async (req, res) => {
+  app.post("/api/leave-balances/recalculate-sa", requireAdmin, async (req, res) => {
     try {
       const { employeeIds } = req.body as { employeeIds?: string[] };
 
@@ -1064,7 +1306,14 @@ export async function registerRoutes(
       );
       const balances = await storage.getLeaveBalances(validatedData.userId);
       const balance = balances.find(b => b.leaveType === validatedData.leaveType);
-      if (balance) {
+      let available: number | undefined;
+      let totalConsumed: number | undefined;
+      if (validatedData.leaveType !== 'Unpaid Leave') {
+        if (!balance) {
+          return res.status(400).json({
+            error: `No ${validatedData.leaveType} balance has been configured for your account. Please contact HR.`,
+          });
+        }
         const pendingApprovedForType = activeRequests.filter(
           r => r.leaveType === validatedData.leaveType && !r.isHistoric
         );
@@ -1072,8 +1321,8 @@ export async function registerRoutes(
         for (const r of pendingApprovedForType) {
           consumedByRequests += await countWorkingDays(r.startDate, r.endDate, user?.religion ?? null);
         }
-        const totalConsumed = (balance.taken ?? 0) + consumedByRequests;
-        const available = (balance.total ?? 0) + (balance.carryOverDays ?? 0) - totalConsumed;
+        totalConsumed = (balance.taken ?? 0) + consumedByRequests;
+        available = (balance.total ?? 0) + (balance.carryOverDays ?? 0) - totalConsumed;
         if (available < requestedDays) {
           return res.status(400).json({
             error: `Insufficient ${validatedData.leaveType} balance. Available: ${available.toFixed(1)} day(s), requested: ${requestedDays} day(s)`,
@@ -1207,6 +1456,10 @@ export async function registerRoutes(
           department: user?.department || undefined,
           requestId: newRequest.id,
           appUrl: appUrl,
+          requestedDays,
+          totalDays: balance?.total ?? undefined,
+          consumedDays: totalConsumed,
+          availableDays: available !== undefined ? available - requestedDays : undefined,
         };
         
         // Send notification to the resolved manager (via position or direct manager ID)
@@ -1239,7 +1492,7 @@ export async function registerRoutes(
   });
 
   // Update leave request status
-  app.patch("/api/leave-requests/:id/status", async (req, res) => {
+  app.patch("/api/leave-requests/:id/status", requireAdmin, async (req, res) => {
     try {
       const { status, adminNotes } = req.body;
       
@@ -1290,7 +1543,7 @@ export async function registerRoutes(
   });
 
   // Get leave requests by status (for approval workflows)
-  app.get("/api/leave-requests/by-status/:status", async (req, res) => {
+  app.get("/api/leave-requests/by-status/:status", requireAdmin, async (req, res) => {
     try {
       const status = req.params.status;
       const validStatuses = ['pending_manager', 'pending_hr', 'pending_md', 'approved', 'rejected', 'cancelled'];
@@ -1320,33 +1573,28 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Approver ID is required" });
       }
       
-      if (!['approved', 'rejected'].includes(decision)) {
-        return res.status(400).json({ error: "Decision must be 'approved' or 'rejected'" });
+      if (!['recommended', 'not_recommended'].includes(decision)) {
+        return res.status(400).json({ error: "Decision must be 'recommended' or 'not_recommended'" });
       }
-      
+
       const requestId = parseInt(req.params.id);
       const request = await storage.getLeaveRequest(requestId);
-      
+
       if (!request) {
         return res.status(404).json({ error: "Leave request not found" });
       }
-      
+
       if (request.status !== 'pending_manager') {
-        return res.status(400).json({ error: "Leave request is not awaiting manager approval" });
+        return res.status(400).json({ error: "Leave request is not awaiting manager recommendation" });
       }
 
-      // Read approval hierarchy setting: if HR stage is disabled, manager approval goes straight to MD
+      // Read approval hierarchy setting: if HR stage is disabled, manager recommendation goes straight to MD
       const hrStageSetting = await storage.getSetting('leave_require_hr_stage');
       const skipHR = hrStageSetting?.value === 'false';
 
       const updatedRequest = await storage.updateManagerDecision(requestId, approverId, decision, notes, skipHR);
 
-      if (decision === 'rejected') {
-        const employee = await storage.getUser(request.userId);
-        await decrementPending(request, (employee as any)?.religion ?? null);
-      }
-
-      // Send notifications after manager decision
+      // Send notification to next stage (HR or MD) — always forwarded regardless of recommendation
       try {
         const senderEmail = (await storage.getSetting('sender_email'))?.value || 'noreply@aece.co.za';
         const employee = await storage.getUser(request.userId);
@@ -1356,30 +1604,21 @@ export async function registerRoutes(
           startDate: request.startDate,
           endDate: request.endDate,
         };
-        if (decision === 'approved') {
-          const adminEmailSetting = await storage.getSetting('admin_email');
-          const nextStage = skipHR ? 'pending_md' : 'pending_hr';
-          const recipientName = skipHR ? 'Management' : 'HR';
-          const nextEmails = adminEmailSetting?.value?.split('\n').map((e: string) => e.trim()).filter(Boolean) || [];
-          for (const email of nextEmails) {
-            await sendLeaveStageNotification(email, senderEmail, {
-              recipientName,
-              ...emailData,
-              newStage: nextStage,
-              notes: notes || undefined,
-            });
-          }
-        } else if (decision === 'rejected' && employee?.email) {
-          // Notify employee their request was rejected by manager
-          await sendLeaveStageNotification(employee.email, senderEmail, {
-            recipientName: employee.firstName,
+        const adminEmailSetting = await storage.getSetting('admin_email');
+        const nextStage = skipHR ? 'pending_md' : 'pending_hr';
+        const recipientName = skipHR ? 'Management' : 'HR';
+        const recommendationLabel = decision === 'not_recommended' ? '[NOT RECOMMENDED] ' : '';
+        const nextEmails = adminEmailSetting?.value?.split('\n').map((e: string) => e.trim()).filter(Boolean) || [];
+        for (const email of nextEmails) {
+          await sendLeaveStageNotification(email, senderEmail, {
+            recipientName,
             ...emailData,
-            newStage: 'rejected',
-            notes: notes || undefined,
+            newStage: nextStage,
+            notes: notes ? `${recommendationLabel}${notes}` : (decision === 'not_recommended' ? '[NOT RECOMMENDED]' : undefined),
           });
         }
       } catch (emailError) {
-        console.error('Failed to send manager decision notification:', emailError);
+        console.error('Failed to send manager recommendation notification:', emailError);
       }
 
       return res.json(updatedRequest);
@@ -1569,7 +1808,7 @@ export async function registerRoutes(
   });
 
   // Admin cancel leave request (can cancel any status including approved, adjusts balance)
-  app.post("/api/leave-requests/:id/admin-cancel", async (req, res) => {
+  app.post("/api/leave-requests/:id/admin-cancel", requireAdmin, async (req, res) => {
     try {
       const requestId = parseInt(req.params.id);
       const { reason, adminId } = req.body;
@@ -1636,7 +1875,7 @@ export async function registerRoutes(
   // ========== HISTORIC LEAVE REQUEST ROUTES (admin only) ==========
 
   // Create a historic (pre-approved) leave entry - bypasses approval workflow
-  app.post("/api/leave-requests/historic", async (req, res) => {
+  app.post("/api/leave-requests/historic", requireAdmin, async (req, res) => {
     try {
       const { userId, leaveType, startDate, endDate, reason, authorizedBy, referenceNumber, notes } = req.body;
 
@@ -1696,7 +1935,7 @@ export async function registerRoutes(
   });
 
   // Update a historic leave entry (admin only)
-  app.put("/api/leave-requests/historic/:id", async (req, res) => {
+  app.put("/api/leave-requests/historic/:id", requireAdmin, async (req, res) => {
     try {
       const requestId = parseInt(req.params.id);
       const { userId, leaveType, startDate, endDate, reason, authorizedBy, referenceNumber, notes } = req.body;
@@ -1755,7 +1994,7 @@ export async function registerRoutes(
   });
 
   // Permanently delete leave request (admin only - for test data cleanup)
-  app.delete("/api/leave-requests/:id/permanent", async (req, res) => {
+  app.delete("/api/leave-requests/:id/permanent", requireAdmin, async (req, res) => {
     try {
       const requestId = parseInt(req.params.id);
       const request = await storage.getLeaveRequest(requestId);
@@ -1919,11 +2158,13 @@ export async function registerRoutes(
               // Get custom message template
               const messageSettingKey = infringementType === 'late_arrival' ? 'late_arrival_message' : 'early_departure_message';
               const messageSetting = await storage.getSetting(messageSettingKey);
-              
-              // Support multiple email addresses (one per line)
-              const emails = adminEmailSetting.value.split('\n').map((e: string) => e.trim()).filter((e: string) => e);
-              
-              for (const recipientEmail of emails) {
+
+              // Build recipient list: upstream managers via org hierarchy + admin_email fallback list
+              const hierarchyEmails = await getHierarchyEmails(user.id);
+              const adminEmails = adminEmailSetting.value.split('\n').map((e: string) => e.trim()).filter((e: string) => e);
+              const allEmailSet = new Set([...hierarchyEmails, ...adminEmails]);
+
+              for (const recipientEmail of allEmailSet) {
                 await sendLateAttendanceNotification(
                   recipientEmail,
                   'noreply@aece.co.za',
@@ -1956,7 +2197,7 @@ export async function registerRoutes(
   });
 
   // Create bulk attendance records (manual entry)
-  app.post("/api/attendance/bulk", async (req, res) => {
+  app.post("/api/attendance/bulk", requireAdmin, async (req, res) => {
     try {
       const { records } = req.body;
       
@@ -2010,7 +2251,7 @@ export async function registerRoutes(
   });
 
   // Update attendance record (admin only)
-  app.patch("/api/attendance/:id", async (req, res) => {
+  app.patch("/api/attendance/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const { timestamp, type, isInfringement, infringementReason } = req.body;
@@ -2045,7 +2286,7 @@ export async function registerRoutes(
   });
 
   // Update infringement reason (for worker popup)
-  app.patch("/api/attendance/:id/infringement-reason", async (req, res) => {
+  app.patch("/api/attendance/:id/infringement-reason", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const { infringementReason } = req.body;
@@ -2079,8 +2320,12 @@ export async function registerRoutes(
             const messageSettingKey = infringementType === 'late_arrival' ? 'late_arrival_message' : 'early_departure_message';
             const messageSetting = await storage.getSetting(messageSettingKey);
 
-            const emails = adminEmailSetting.value.split('\n').map((e: string) => e.trim()).filter((e: string) => e);
-            for (const recipientEmail of emails) {
+            // Build recipient list: upstream managers via org hierarchy + admin_email fallback list
+            const hierarchyEmails = await getHierarchyEmails(user.id);
+            const adminEmails = adminEmailSetting.value.split('\n').map((e: string) => e.trim()).filter((e: string) => e);
+            const allEmailSet = new Set([...hierarchyEmails, ...adminEmails]);
+
+            for (const recipientEmail of allEmailSet) {
               await sendLateAttendanceNotification(
                 recipientEmail,
                 'noreply@aece.co.za',
@@ -2112,7 +2357,7 @@ export async function registerRoutes(
   });
 
   // Delete attendance record (admin only)
-  app.delete("/api/attendance/:id", async (req, res) => {
+  app.delete("/api/attendance/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteAttendanceRecord(parseInt(id));
@@ -2139,7 +2384,7 @@ export async function registerRoutes(
   });
 
   // Auto-reset users who forgot to clock out (admin trigger)
-  app.post("/api/attendance/auto-reset", async (req, res) => {
+  app.post("/api/attendance/auto-reset", requireAdmin, async (req, res) => {
     try {
       const today = new Date();
       const yesterday = new Date(today);
@@ -2304,7 +2549,7 @@ export async function registerRoutes(
   });
 
   // #17 Leave escalation: send reminders for requests pending > 3 days
-  app.post("/api/leave-requests/send-escalation-reminders", async (req, res) => {
+  app.post("/api/leave-requests/send-escalation-reminders", requireAdmin, async (req, res) => {
     try {
       const sent = await runEscalationReminders();
       return res.json({ message: `Sent ${sent} escalation reminder(s)` });
@@ -2316,7 +2561,7 @@ export async function registerRoutes(
 
   // ========== AUDIT LOG ROUTES ==========
 
-  app.get("/api/audit-logs", async (req, res) => {
+  app.get("/api/audit-logs", requireAdmin, async (req, res) => {
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 200, 1000);
       const logs = await storage.getAuditLogs(limit);
@@ -2332,7 +2577,7 @@ export async function registerRoutes(
   // GET /api/reports/leave?from=YYYY-MM-DD&to=YYYY-MM-DD
   // Returns leave usage summary, breakdown by type and department, sick leave flags,
   // and employees with high sick leave frequency.
-  app.get("/api/reports/leave", async (req, res) => {
+  app.get("/api/reports/leave", requireAdmin, async (req, res) => {
     try {
       const { from, to } = req.query as { from?: string; to?: string };
 
@@ -2473,7 +2718,7 @@ export async function registerRoutes(
   });
 
   // Set setting
-  app.put("/api/settings/:key", async (req, res) => {
+  app.put("/api/settings/:key", requireAdminOnly, async (req, res) => {
     try {
       const { value } = req.body;
 
@@ -2530,7 +2775,7 @@ export async function registerRoutes(
   });
 
   // Create department
-  app.post("/api/departments", async (req, res) => {
+  app.post("/api/departments", requireAdminOnly, async (req, res) => {
     try {
       const validatedData = insertDepartmentSchema.parse(req.body);
       const newDepartment = await storage.createDepartment(validatedData);
@@ -2545,7 +2790,7 @@ export async function registerRoutes(
   });
 
   // Update department
-  app.patch("/api/departments/:id", async (req, res) => {
+  app.patch("/api/departments/:id", requireAdminOnly, async (req, res) => {
     try {
       const updatedDepartment = await storage.updateDepartment(parseInt(req.params.id), req.body);
       
@@ -2564,7 +2809,7 @@ export async function registerRoutes(
   });
 
   // Delete department
-  app.delete("/api/departments/:id", async (req, res) => {
+  app.delete("/api/departments/:id", requireAdminOnly, async (req, res) => {
     try {
       const department = await storage.getDepartment(parseInt(req.params.id));
       
@@ -2620,7 +2865,7 @@ export async function registerRoutes(
   });
 
   // Create user group
-  app.post("/api/user-groups", async (req, res) => {
+  app.post("/api/user-groups", requireAdmin, async (req, res) => {
     try {
       const validatedData = insertUserGroupSchema.parse(req.body);
       const newGroup = await storage.createUserGroup(validatedData);
@@ -2635,7 +2880,7 @@ export async function registerRoutes(
   });
 
   // Update user group
-  app.patch("/api/user-groups/:id", async (req, res) => {
+  app.patch("/api/user-groups/:id", requireAdmin, async (req, res) => {
     try {
       const updatedGroup = await storage.updateUserGroup(parseInt(req.params.id), req.body);
       
@@ -2654,7 +2899,7 @@ export async function registerRoutes(
   });
 
   // Delete user group
-  app.delete("/api/user-groups/:id", async (req, res) => {
+  app.delete("/api/user-groups/:id", requireAdmin, async (req, res) => {
     try {
       const group = await storage.getUserGroup(parseInt(req.params.id));
       
@@ -2710,7 +2955,7 @@ export async function registerRoutes(
   });
 
   // Create employee type
-  app.post("/api/employee-types", async (req, res) => {
+  app.post("/api/employee-types", requireAdminOnly, async (req, res) => {
     try {
       const validated = insertEmployeeTypeSchema.parse(req.body);
       const newType = await storage.createEmployeeType(validated);
@@ -2725,7 +2970,7 @@ export async function registerRoutes(
   });
 
   // Update employee type
-  app.patch("/api/employee-types/:id", async (req, res) => {
+  app.patch("/api/employee-types/:id", requireAdminOnly, async (req, res) => {
     try {
       const updatedType = await storage.updateEmployeeType(parseInt(req.params.id), req.body);
       
@@ -2744,7 +2989,7 @@ export async function registerRoutes(
   });
 
   // Delete employee type
-  app.delete("/api/employee-types/:id", async (req, res) => {
+  app.delete("/api/employee-types/:id", requireAdminOnly, async (req, res) => {
     try {
       const type = await storage.getEmployeeType(parseInt(req.params.id));
       
@@ -2790,7 +3035,7 @@ export async function registerRoutes(
   });
 
   // Create leave rule
-  app.post("/api/leave-rules", async (req, res) => {
+  app.post("/api/leave-rules", requireAdminOnly, async (req, res) => {
     try {
       const validated = insertLeaveRuleSchema.parse(req.body);
       const newRule = await storage.createLeaveRule(validated);
@@ -2802,7 +3047,7 @@ export async function registerRoutes(
   });
 
   // Update leave rule
-  app.patch("/api/leave-rules/:id", async (req, res) => {
+  app.patch("/api/leave-rules/:id", requireAdminOnly, async (req, res) => {
     try {
       const updatedRule = await storage.updateLeaveRule(parseInt(req.params.id), req.body);
       
@@ -2818,7 +3063,7 @@ export async function registerRoutes(
   });
 
   // Delete leave rule
-  app.delete("/api/leave-rules/:id", async (req, res) => {
+  app.delete("/api/leave-rules/:id", requireAdmin, async (req, res) => {
     try {
       const rule = await storage.getLeaveRule(parseInt(req.params.id));
       
@@ -2848,7 +3093,7 @@ export async function registerRoutes(
   });
 
   // Create a new phase for a leave rule
-  app.post("/api/leave-rules/:id/phases", async (req, res) => {
+  app.post("/api/leave-rules/:id/phases", requireAdmin, async (req, res) => {
     try {
       const leaveRuleId = parseInt(req.params.id);
       const validated = insertLeaveRulePhaseSchema.parse({ ...req.body, leaveRuleId });
@@ -2861,7 +3106,7 @@ export async function registerRoutes(
   });
 
   // Update a leave rule phase
-  app.patch("/api/leave-rule-phases/:id", async (req, res) => {
+  app.patch("/api/leave-rule-phases/:id", requireAdminOnly, async (req, res) => {
     try {
       const updatedPhase = await storage.updateLeaveRulePhase(parseInt(req.params.id), req.body);
       
@@ -2877,7 +3122,7 @@ export async function registerRoutes(
   });
 
   // Delete a leave rule phase
-  app.delete("/api/leave-rule-phases/:id", async (req, res) => {
+  app.delete("/api/leave-rule-phases/:id", requireAdminOnly, async (req, res) => {
     try {
       await storage.deleteLeaveRulePhase(parseInt(req.params.id));
       return res.status(204).send();
@@ -2888,7 +3133,7 @@ export async function registerRoutes(
   });
 
   // Delete all phases for a leave rule (used when replacing phases)
-  app.delete("/api/leave-rules/:id/phases", async (req, res) => {
+  app.delete("/api/leave-rules/:id/phases", requireAdmin, async (req, res) => {
     try {
       await storage.deleteAllLeaveRulePhases(parseInt(req.params.id));
       return res.status(204).send();
@@ -2909,7 +3154,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/users/:id/contract-history", async (req, res) => {
+  app.post("/api/users/:id/contract-history", requireAdmin, async (req, res) => {
     try {
       const history = await storage.createContractHistory({
         userId: req.params.id,
@@ -2923,7 +3168,7 @@ export async function registerRoutes(
   });
 
   // Resend admin credentials email
-  app.post("/api/users/:id/resend-credentials", async (req, res) => {
+  app.post("/api/users/:id/resend-credentials", requireAdmin, async (req, res) => {
     try {
       const user = await storage.getUser(req.params.id);
       
@@ -3014,7 +3259,7 @@ export async function registerRoutes(
   });
 
   // Update grievance
-  app.patch("/api/grievances/:id", async (req, res) => {
+  app.patch("/api/grievances/:id", requireAdmin, async (req, res) => {
     try {
       const grievance = await storage.updateGrievance(parseInt(req.params.id), req.body);
       if (!grievance) {
@@ -3028,7 +3273,7 @@ export async function registerRoutes(
   });
 
   // Update grievance status (admin action)
-  app.patch("/api/grievances/:id/status", async (req, res) => {
+  app.patch("/api/grievances/:id/status", requireAdmin, async (req, res) => {
     try {
       const { status, adminNotes, resolution } = req.body;
       if (!status) {
@@ -3064,7 +3309,7 @@ export async function registerRoutes(
   });
 
   // Create public holiday
-  app.post("/api/public-holidays", async (req, res) => {
+  app.post("/api/public-holidays", requireAdminOnly, async (req, res) => {
     try {
       const holiday = await storage.createPublicHoliday(req.body);
       return res.status(201).json(holiday);
@@ -3075,7 +3320,7 @@ export async function registerRoutes(
   });
 
   // Update public holiday
-  app.patch("/api/public-holidays/:id", async (req, res) => {
+  app.patch("/api/public-holidays/:id", requireAdminOnly, async (req, res) => {
     try {
       const holiday = await storage.updatePublicHoliday(parseInt(req.params.id), req.body);
       if (!holiday) {
@@ -3089,7 +3334,7 @@ export async function registerRoutes(
   });
 
   // Delete public holiday
-  app.delete("/api/public-holidays/:id", async (req, res) => {
+  app.delete("/api/public-holidays/:id", requireAdminOnly, async (req, res) => {
     try {
       await storage.deletePublicHoliday(parseInt(req.params.id));
       return res.json({ success: true });
@@ -3132,7 +3377,7 @@ export async function registerRoutes(
   });
 
   // Create notification
-  app.post("/api/notifications", async (req, res) => {
+  app.post("/api/notifications", requireAdmin, async (req, res) => {
     try {
       const notification = await storage.createNotification(req.body);
       return res.status(201).json(notification);
@@ -3207,7 +3452,7 @@ export async function registerRoutes(
   });
 
   // Add a new face descriptor for a user
-  app.post("/api/face-descriptors", async (req, res) => {
+  app.post("/api/face-descriptors", requireAdmin, async (req, res) => {
     try {
       const { userId, descriptor, photoData, label } = req.body;
       if (!userId || !descriptor) {
@@ -3227,7 +3472,7 @@ export async function registerRoutes(
   });
 
   // Delete a face descriptor
-  app.delete("/api/face-descriptors/:id", async (req, res) => {
+  app.delete("/api/face-descriptors/:id", requireAdmin, async (req, res) => {
     try {
       await storage.deleteFaceDescriptor(parseInt(req.params.id));
       return res.json({ success: true });
@@ -3240,7 +3485,7 @@ export async function registerRoutes(
   // ===== BACKUP ROUTES =====
   
   // Export full database backup
-  app.get("/api/backup/export", async (req, res) => {
+  app.get("/api/backup/export", requireAdminOnly, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       const departments = await storage.getAllDepartments();
@@ -3294,7 +3539,7 @@ export async function registerRoutes(
   });
   
   // Import database backup
-  app.post("/api/backup/import", async (req, res) => {
+  app.post("/api/backup/import", requireAdminOnly, async (req, res) => {
     try {
       const { backup, options } = req.body;
       
@@ -3459,7 +3704,7 @@ export async function registerRoutes(
   });
   
   // Get backup info (for validation)
-  app.post("/api/backup/validate", async (req, res) => {
+  app.post("/api/backup/validate", requireAdminOnly, async (req, res) => {
     try {
       const { backup } = req.body;
       
@@ -3570,7 +3815,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/org-positions", async (req, res) => {
+  app.post("/api/org-positions", requireAdminOnly, async (req, res) => {
     try {
       const position = await storage.createOrgPosition(req.body);
       return res.status(201).json(position);
@@ -3580,7 +3825,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/org-positions/:id", async (req, res) => {
+  app.patch("/api/org-positions/:id", requireAdminOnly, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const position = await storage.updateOrgPosition(id, req.body);
@@ -3594,7 +3839,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/org-positions/:id", async (req, res) => {
+  app.delete("/api/org-positions/:id", requireAdminOnly, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteOrgPosition(id);
@@ -3616,7 +3861,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/companies", async (req, res) => {
+  app.post("/api/companies", requireAdminOnly, async (req, res) => {
     try {
       const { name, registrationNumber, description } = req.body;
       if (!name) return res.status(400).json({ error: "Company name is required" });
@@ -3629,7 +3874,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/companies/:id", async (req, res) => {
+  app.patch("/api/companies/:id", requireAdminOnly, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { name, registrationNumber, description } = req.body;
@@ -3643,7 +3888,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/companies/:id", async (req, res) => {
+  app.delete("/api/companies/:id", requireAdminOnly, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteCompany(id);
@@ -3666,7 +3911,7 @@ export async function registerRoutes(
   }
 
   // Admin: view current external API key
-  app.get("/api/admin/external-api-key", async (req, res) => {
+  app.get("/api/admin/external-api-key", requireAdminOnly, async (req, res) => {
     try {
       const key = await getOrCreateExternalApiKey();
       return res.json({ key });
@@ -3677,7 +3922,7 @@ export async function registerRoutes(
   });
 
   // Admin: regenerate external API key
-  app.post("/api/admin/external-api-key/regenerate", async (req, res) => {
+  app.post("/api/admin/external-api-key/regenerate", requireAdminOnly, async (req, res) => {
     try {
       const newKey = crypto.randomBytes(32).toString('hex');
       await storage.setSetting('external_api_key', newKey);

@@ -546,7 +546,7 @@ export default function AttendanceReports() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setLocation('/admin/dashboard')}
+              onClick={() => setLocation('/dashboard')}
               data-testid="button-back"
             >
               <ArrowLeft className="h-5 w-5" />

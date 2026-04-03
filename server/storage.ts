@@ -57,6 +57,8 @@ pool.on('error', (err) => {
 
 const db = drizzle(pool, { schema });
 
+export { pool };
+
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
@@ -223,12 +225,12 @@ export class DrizzleStorage implements IStorage {
   }
 
   async getUserByIdOrNationalId(idOrNationalId: string): Promise<User | undefined> {
-    // First try to find by company ID
+    // Try company ID, then national ID, then email
     let user = await this.getUser(idOrNationalId);
     if (user) return user;
-    
-    // Then try by national ID
     user = await this.getUserByNationalId(idOrNationalId);
+    if (user) return user;
+    user = await this.getUserByEmail(idOrNationalId);
     return user;
   }
 
@@ -444,10 +446,11 @@ export class DrizzleStorage implements IStorage {
       .orderBy(desc(schema.leaveRequests.createdAt));
   }
 
-  async updateManagerDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string, skipHR = false): Promise<LeaveRequest | undefined> {
+  async updateManagerDecision(id: number, approverId: string, decision: 'recommended' | 'not_recommended', notes?: string, skipHR = false): Promise<LeaveRequest | undefined> {
     const now = new Date();
-    const nextStatus = decision === 'approved' ? (skipHR ? 'pending_md' : 'pending_hr') : 'rejected';
-    
+    // Manager recommendation always forwards to HR (or MD if HR stage is skipped); manager cannot finalize
+    const nextStatus = skipHR ? 'pending_md' : 'pending_hr';
+
     const updateData: Record<string, unknown> = {
       status: nextStatus,
       managerApproverId: approverId,
@@ -455,16 +458,11 @@ export class DrizzleStorage implements IStorage {
       managerDecisionAt: now,
       updatedAt: now,
     };
-    
+
     if (notes) {
       updateData.managerNotes = notes;
     }
-    
-    if (decision === 'rejected') {
-      updateData.finalizedById = approverId;
-      updateData.finalizedAt = now;
-    }
-    
+
     const [updatedRequest] = await db
       .update(schema.leaveRequests)
       .set(updateData)

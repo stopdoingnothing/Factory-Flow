@@ -86,9 +86,9 @@ export default function ResetPassword() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              className="w-full" 
-              onClick={() => setLocation("/admin")}
+            <Button
+              className="w-full"
+              onClick={() => setLocation("/login")}
               data-testid="button-back-to-login"
             >
               Back to Login
@@ -113,9 +113,9 @@ export default function ResetPassword() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              className="w-full" 
-              onClick={() => setLocation("/admin")}
+            <Button
+              className="w-full"
+              onClick={() => setLocation("/login")}
               data-testid="button-go-to-login"
             >
               Go to Login

@@ -123,11 +123,11 @@ export function LeaveRequest() {
       setFileContents([]);
       setDateRange({ from: undefined, to: undefined });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         variant: "destructive",
         title: "Submission Failed",
-        description: "Could not submit leave request. Please try again.",
+        description: error.message || "Could not submit leave request. Please try again.",
       });
     },
   });
@@ -174,11 +174,7 @@ export function LeaveRequest() {
                   <UserCheck className="h-4 w-4 text-blue-600" />
                   <AlertDescription className="text-blue-800">
                     {manager ? (
-                      <>Your leave request will be reviewed by <strong>{manager.firstName} {manager.surname}</strong>
-                      {reportingPositionTitle && <span className="text-blue-600"> ({reportingPositionTitle})</span>}
-                      . They will be notified when you submit this request.</>
-                    ) : reportingPositionTitle ? (
-                      <>Your leave request will go to the <strong>{reportingPositionTitle}</strong> for review. No one currently holds that position, so it will also be sent to HR.</>
+                      <>Your leave request will be reviewed by <strong>{manager.firstName} {manager.surname}</strong>. They will be notified when you submit this request.</>
                     ) : (
                       <>Your leave request will be sent to your manager for review.</>
                     )}

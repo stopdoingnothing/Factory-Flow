@@ -22,7 +22,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, hasRole } = useAuth();
   
   const { data: companyNameSetting } = useQuery({
     queryKey: ['settings', 'company_name'],
@@ -42,8 +42,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { href: '/leave-request', label: 'Request Leave', icon: CalendarPlus },
     { href: '/attendance', label: 'Attendance', icon: Clock },
     { href: '/profile', label: 'My Profile', icon: UserCircle },
+    { href: '/grievances', label: 'Grievances', icon: MessageSquareWarning },
   ];
 
+  const hasManagerDashboard = hasRole('manager') || hasRole('hr') || hasRole('md') || hasRole('admin');
   const navItems = workerNav;
   
   const isAdminPage = location.startsWith('/admin');
@@ -130,14 +132,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <nav className="flex-1 p-4 space-y-2">
               {navItems.map((item) => (
                 <Link key={item.href} href={item.href} className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 ${
-                  location === item.href 
-                    ? 'bg-primary/10 text-primary font-medium border-l-4 border-primary' 
+                  location === item.href
+                    ? 'bg-primary/10 text-primary font-medium border-l-4 border-primary'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}>
                   <item.icon className="h-5 w-5" />
                   {item.label}
                 </Link>
               ))}
+              {hasManagerDashboard && (
+                <Link href="/admin/dashboard" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 border-t border-border mt-2 pt-4 ${
+                  location.startsWith('/admin')
+                    ? 'bg-primary/10 text-primary font-medium border-l-4 border-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}>
+                  <LogOut className="h-5 w-5 rotate-180" />
+                  Management
+                </Link>
+              )}
             </nav>
             <div className="p-4 border-t border-border">
               <Button 

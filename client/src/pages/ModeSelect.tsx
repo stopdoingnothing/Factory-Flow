@@ -211,13 +211,13 @@ export default function ModeSelect() {
         )}
 
         <div className="text-center mt-8">
-          <button 
-            onClick={() => setLocation('/admin')}
+          <button
+            onClick={() => setLocation('/login')}
             className="text-slate-500 hover:text-slate-700 text-sm flex items-center gap-2 mx-auto"
             data-testid="button-admin-settings"
           >
             <Settings className="w-4 h-4" />
-            Admin Settings
+            Staff Login
           </button>
         </div>
       </div>

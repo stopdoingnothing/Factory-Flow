@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { userApi, departmentApi, userGroupApi, leaveBalanceApi, employeeTypeApi, contractHistoryApi, faceDescriptorApi, orgPositionApi, companyApi } from '@/lib/api';
 import type { User, Department, UserGroup, LeaveBalance, EmployeeType, OrgPosition } from '@shared/schema';
 import { Plus, Pencil, Trash2, Mail, Camera, Loader2, CheckCircle2, UserCog, Shield, Check, X, Search, UserX, Network, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsUpDown, FileText, ClipboardList, AlertTriangle } from 'lucide-react';
+import { Checkbox } from "@/components/ui/checkbox";
 import jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/lib/auth-context';
@@ -23,6 +24,7 @@ import { formatDateForDisplay, getEmploymentDuration, generatePassword, isValidD
 export default function PersonnelSection() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const isAdminUser = !!user?.adminRole;
   const queryClient = useQueryClient();
 
   const { data: users = [] } = useQuery({
@@ -480,6 +482,11 @@ export default function PersonnelSection() {
 
   const filteredUsers = users
     .filter(u => {
+      // Non-admin managers see only their direct reports
+      if (!isAdminUser) return u.managerId === user?.id;
+      return true;
+    })
+    .filter(u => {
       if (employeeStatusFilter === 'active') return !u.terminationDate && !(u as any).excludeFromLeave;
       if (employeeStatusFilter === 'terminated') return !!u.terminationDate;
       return true;
@@ -897,30 +904,32 @@ export default function PersonnelSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-gray-900">Personnel</h1>
-        <p className="text-muted-foreground">Manage personnel access, IDs, and leave balances</p>
+        <h1 className="text-3xl font-heading font-bold text-gray-900">{isAdminUser ? 'Personnel' : 'My Team'}</h1>
+        <p className="text-muted-foreground">{isAdminUser ? 'Manage personnel access, IDs, and leave balances' : 'View your direct reports'}</p>
       </div>
       <Card>
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Personnel</CardTitle>
-              <CardDescription>Manage personnel access, IDs, and leave balances</CardDescription>
+              <CardTitle>{isAdminUser ? 'Personnel' : 'My Team'}</CardTitle>
+              <CardDescription>{isAdminUser ? 'Manage personnel access, IDs, and leave balances' : 'Your direct reports'}</CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={handleOpenCreateAdmin} variant="outline" className="btn-industrial">
-                <Shield className="mr-2 h-4 w-4" /> Add Admin
-              </Button>
-              <Button variant="outline" onClick={handleExportPdf} data-testid="button-export-pdf">
-                <FileText className="mr-2 h-4 w-4" /> Export PDF
-              </Button>
-              <Button variant="outline" onClick={handleExportMissingInfoPdf} data-testid="button-missing-info-report">
-                <ClipboardList className="mr-2 h-4 w-4" /> Missing Information
-              </Button>
-              <Button onClick={handleOpenCreate} className="btn-industrial bg-primary text-white">
-                <Plus className="mr-2 h-4 w-4" /> Add Person
-              </Button>
-            </div>
+            {isAdminUser && (
+              <div className="flex gap-2">
+                <Button onClick={handleOpenCreateAdmin} variant="outline" className="btn-industrial">
+                  <Shield className="mr-2 h-4 w-4" /> Add Admin
+                </Button>
+                <Button variant="outline" onClick={handleExportPdf} data-testid="button-export-pdf">
+                  <FileText className="mr-2 h-4 w-4" /> Export PDF
+                </Button>
+                <Button variant="outline" onClick={handleExportMissingInfoPdf} data-testid="button-missing-info-report">
+                  <ClipboardList className="mr-2 h-4 w-4" /> Missing Information
+                </Button>
+                <Button onClick={handleOpenCreate} className="btn-industrial bg-primary text-white">
+                  <Plus className="mr-2 h-4 w-4" /> Add Person
+                </Button>
+              </div>
+            )}
           </div>
           <div className="flex gap-4 mt-4">
             <div className="flex-1">
@@ -1074,40 +1083,44 @@ export default function PersonnelSection() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(emp)} title="Edit" data-testid={`button-edit-${emp.id}`}>
-                          <Pencil className="h-4 w-4 text-slate-500" />
-                        </Button>
-                        {!emp.terminationDate ? (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => {
-                              setTerminationUser(emp);
-                              setTerminationDate(new Date().toISOString().split('T')[0]);
-                              setIsTerminationDialogOpen(true);
-                            }}
-                            title="Terminate"
-                            data-testid={`button-terminate-${emp.id}`}
-                          >
-                            <UserX className="h-4 w-4 text-amber-600" />
-                          </Button>
-                        ) : (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => {
-                              updateUserMutation.mutate({ ...emp, terminationDate: null });
-                              toast({ title: "Personnel Reactivated", description: `${emp.firstName} is now active again.` });
-                            }}
-                            title="Reactivate"
-                            data-testid={`button-reactivate-${emp.id}`}
-                          >
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          </Button>
+                        {isAdminUser && (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(emp)} title="Edit" data-testid={`button-edit-${emp.id}`}>
+                              <Pencil className="h-4 w-4 text-slate-500" />
+                            </Button>
+                            {!emp.terminationDate ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setTerminationUser(emp);
+                                  setTerminationDate(new Date().toISOString().split('T')[0]);
+                                  setIsTerminationDialogOpen(true);
+                                }}
+                                title="Terminate"
+                                data-testid={`button-terminate-${emp.id}`}
+                              >
+                                <UserX className="h-4 w-4 text-amber-600" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  updateUserMutation.mutate({ ...emp, terminationDate: null });
+                                  toast({ title: "Personnel Reactivated", description: `${emp.firstName} is now active again.` });
+                                }}
+                                title="Reactivate"
+                                data-testid={`button-reactivate-${emp.id}`}
+                              >
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(emp.id)} title="Delete" data-testid={`button-delete-${emp.id}`}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </>
                         )}
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(emp.id)} title="Delete" data-testid={`button-delete-${emp.id}`}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
                       </TableCell>
                     </TableRow>
                     {isExpanded && (
@@ -1676,28 +1689,50 @@ export default function PersonnelSection() {
                       ))}
                   </SelectContent>
                 </Select>
+                {orgPositions.length > 0 && !currentUser.orgPositionId && !currentUser.managerId && currentUser.department && (
+                  <p className="text-xs text-amber-600 mt-1">No position or line manager selected — this employee will not appear on the org chart.</p>
+                )}
               </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="role" className="text-right">Role</Label>
-              <div className="col-span-3">
-                <Select 
-                  value={currentUser.role || 'worker'} 
-                  onValueChange={(value) => setCurrentUser({...currentUser, role: value})}
-                >
-                  <SelectTrigger data-testid="select-role">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="worker">Employee</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Managers can be assigned as supervisors to other employees.
-                </p>
+            {isAdminUser && (
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right pt-2">Roles</Label>
+                <div className="col-span-3 space-y-2">
+                  {([
+                    { value: 'employee', label: 'Employee', description: 'Dashboard, leave, attendance, profile, grievances' },
+                    { value: 'manager', label: 'Manager', description: 'My team view, leave recommendation' },
+                    { value: 'hr', label: 'HR', description: 'Personnel management, leave approvals, grievances admin' },
+                    { value: 'md', label: 'MD', description: 'Final leave approval (MD stage)' },
+                    { value: 'admin', label: 'Admin', description: 'Settings, backup, companies, leave rules, system config' },
+                  ] as const).map(({ value, label, description }) => {
+                    const currentRoles: string[] = (currentUser as any).roles || [];
+                    const checked = currentRoles.includes(value);
+                    return (
+                      <div key={value} className="flex items-start gap-3 p-2 rounded-md hover:bg-slate-50">
+                        <Checkbox
+                          id={`role-${value}`}
+                          checked={checked}
+                          onCheckedChange={(c) => {
+                            const next = c
+                              ? [...currentRoles, value]
+                              : currentRoles.filter((r: string) => r !== value);
+                            setCurrentUser({ ...currentUser, roles: next } as any);
+                          }}
+                          data-testid={`checkbox-role-${value}`}
+                        />
+                        <div>
+                          <label htmlFor={`role-${value}`} className="text-sm font-medium cursor-pointer">{label}</label>
+                          <p className="text-xs text-muted-foreground">{description}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {((currentUser as any).roles || []).length === 0 && (
+                    <p className="text-xs text-amber-600">At least one role must be assigned.</p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="reportsToPosition" className="text-right">Reports To</Label>
               <div className="col-span-3">

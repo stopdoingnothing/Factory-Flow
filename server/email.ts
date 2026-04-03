@@ -1,6 +1,6 @@
 import * as postmark from 'postmark';
 
-const POSTMARK_SERVER_TOKEN = process.env.POSTMARK_SERVER_TOKEN;
+const POSTMARK_SERVER_TOKEN = process.env.POSTMARK_API_KEY || process.env.POSTMARK_SERVER_TOKEN;
 
 let client: postmark.ServerClient | null = null;
 
@@ -25,6 +25,10 @@ export interface LeaveRequestEmailData {
   department?: string;
   requestId?: number;
   appUrl?: string;
+  requestedDays?: number;
+  totalDays?: number;
+  consumedDays?: number;
+  availableDays?: number;
 }
 
 export async function sendLeaveRequestNotification(
@@ -76,10 +80,42 @@ export async function sendLeaveRequestNotification(
             <td style="padding: 8px; border: 1px solid #ddd;"><strong>Reason:</strong></td>
             <td style="padding: 8px; border: 1px solid #ddd;">${data.reason}</td>
           </tr>
+          ${data.requestedDays !== undefined ? `
+          <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Working Days Requested:</strong></td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${data.requestedDays} day${data.requestedDays !== 1 ? 's' : ''}</td>
+          </tr>
+          ` : ''}
         </table>
+        ${data.totalDays !== undefined ? `
+        <div style="margin-top:16px; padding:12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px;">
+          <p style="margin:0 0 8px; font-weight:bold; color:#15803d; font-size:14px;">Leave Balance (${data.leaveType})</p>
+          <table style="width:100%; border-collapse:collapse; text-align:center;">
+            <tr>
+              <td style="padding:8px;">
+                <div style="font-size:11px; color:#666;">Total</div>
+                <div style="font-weight:bold; font-size:16px;">${data.totalDays}</div>
+              </td>
+              <td style="padding:8px;">
+                <div style="font-size:11px; color:#666;">Previously Consumed</div>
+                <div style="font-weight:bold; font-size:16px; color:#d97706;">${data.consumedDays ?? 0}</div>
+              </td>
+              <td style="padding:8px;">
+                <div style="font-size:11px; color:#666;">This Request</div>
+                <div style="font-weight:bold; font-size:16px; color:#2563eb;">${data.requestedDays ?? 0}</div>
+              </td>
+              <td style="padding:8px;">
+                <div style="font-size:11px; color:#666;">Remaining After</div>
+                <div style="font-weight:bold; font-size:16px; color:${(data.availableDays ?? 0) < 0 ? '#dc2626' : '#16a34a'};">${data.availableDays ?? 0}</div>
+              </td>
+            </tr>
+          </table>
+          ${(data.availableDays ?? 0) < 0 ? '<p style="margin:8px 0 0; color:#dc2626; font-size:12px; font-weight:bold;">Warning: This request exceeds the employee\'s available balance.</p>' : ''}
+        </div>
+        ` : ''}
         ${data.appUrl && data.requestId ? `
         <p style="margin-top: 20px;">
-          <a href="${data.appUrl}/admin?section=leave-requests&requestId=${data.requestId}" 
+          <a href="${data.appUrl}/admin?section=leave-requests&requestId=${data.requestId}"
              style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
             Review Leave Request
           </a>
@@ -97,7 +133,14 @@ Leave Type: ${data.leaveType}
 Start Date: ${data.startDate}
 End Date: ${data.endDate}
 Reason: ${data.reason}
-
+${data.requestedDays !== undefined ? `Working Days Requested: ${data.requestedDays}` : ''}
+${data.totalDays !== undefined ? `
+Leave Balance (${data.leaveType}):
+  Total:                ${data.totalDays}
+  Previously Consumed:  ${data.consumedDays ?? 0}
+  This Request:         ${data.requestedDays ?? 0}
+  Remaining After:      ${data.availableDays ?? 0}${(data.availableDays ?? 0) < 0 ? ' (EXCEEDS BALANCE)' : ''}
+` : ''}
 ${data.appUrl && data.requestId ? `Review this request: ${data.appUrl}/admin?section=leave-requests&requestId=${data.requestId}` : ''}
 
 Please log in to the AECE Checkpoint admin portal to review and approve/reject this request.
@@ -248,7 +291,7 @@ export async function sendAdminWelcomeEmail(
   }
 
   const fullName = `${data.firstName} ${data.surname}`;
-  const loginUrl = data.loginUrl || 'https://aece-checkpoint.replit.app';
+  const loginUrl = data.loginUrl || `${process.env.APP_URL || 'http://192.168.1.78:5000'}/login`;
 
   try {
     const result = await emailClient.sendEmail({

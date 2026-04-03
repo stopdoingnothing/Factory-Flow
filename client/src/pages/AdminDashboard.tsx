@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import Layout from '@/components/Layout';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Users, Settings, Camera, Building2, Loader2, CheckCircle2, Calendar, Clock, FileText, LayoutDashboard, LogOut, Network, MessageSquareWarning, CalendarDays, TrendingUp, Briefcase, Database } from 'lucide-react';
@@ -12,8 +11,9 @@ import { useAuth } from '@/lib/auth-context';
 import WebcamCapture from '@/components/WebcamCapture';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { loadFaceModels, extractFaceDescriptorFromBase64, descriptorToJson } from '@/lib/face-recognition';
-import { userApi, leaveRequestApi, grievanceApi } from '@/lib/api';
+import { userApi, leaveRequestApi, grievanceApi, settingsApi } from '@/lib/api';
 import type { LeaveRequest, Grievance } from '@shared/schema';
+import aeceLogo from '@assets/AECE_Logo_1765516911038.png';
 
 import DashboardSection from './admin/DashboardSection';
 import PersonnelSection from './admin/PersonnelSection';
@@ -27,13 +27,16 @@ import CompaniesSection from './admin/CompaniesSection';
 import SettingsSection from './admin/SettingsSection';
 import DatabaseBackupSection from './admin/DatabaseBackupSection';
 import { LeaveRequest as LeaveRequestForm } from './LeaveRequest';
+import MyAttendanceSection from './admin/MyAttendanceSection';
+import MyProfileSection from './admin/MyProfileSection';
+import EmployeeDashboardSection from './admin/EmployeeDashboardSection';
 
-type ActiveSection = 'dashboard' | 'employees' | 'leave-requests' | 'attendance' | 'departments' | 'employee-types' | 'leave-rules' | 'grievances' | 'holidays' | 'leave-calendar' | 'positions' | 'companies' | 'settings' | 'backup' | 'apply-leave' | 'employee-grievances';
+type ActiveSection = 'dashboard' | 'employees' | 'leave-requests' | 'attendance' | 'departments' | 'employee-types' | 'leave-rules' | 'grievances' | 'holidays' | 'leave-calendar' | 'positions' | 'companies' | 'settings' | 'backup' | 'apply-leave' | 'employee-grievances' | 'my-attendance' | 'profile';
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user, setUser, logout } = useAuth();
+  const { user, setUser, logout, hasRole } = useAuth();
   const queryClient = useQueryClient();
 
   const [activeSection, setActiveSection] = useState<ActiveSection>('dashboard');
@@ -47,6 +50,19 @@ export default function AdminDashboard() {
     queryKey: ['grievances'],
     queryFn: () => grievanceApi.getAll(),
   });
+
+  const { data: companyNameSetting } = useQuery({
+    queryKey: ['settings', 'company_name'],
+    queryFn: () => settingsApi.get('company_name'),
+  });
+
+  const { data: companyLogoSetting } = useQuery({
+    queryKey: ['settings', 'company_logo'],
+    queryFn: () => settingsApi.get('company_logo'),
+  });
+
+  const companyName = companyNameSetting?.value || 'AECE Checkpoint';
+  const companyLogo = companyLogoSetting?.value || aeceLogo;
 
   const pendingCounts = {
     total: leaveRequests.filter((r: LeaveRequest) => ['pending_manager', 'pending_hr', 'pending_md', 'pending'].includes(r.status)).length,
@@ -112,8 +128,33 @@ export default function AdminDashboard() {
     }
   };
 
+  const isManagement = hasRole('manager') || hasRole('hr') || hasRole('md') || hasRole('admin');
+
   return (
-    <Layout>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Top header bar */}
+      <header className="h-16 bg-sidebar text-sidebar-foreground flex items-center justify-between px-4 shadow-md z-50 shrink-0">
+        <div className="flex items-center gap-3">
+          <img src={companyLogo} alt={companyName} className="h-8" />
+          <span className="font-heading text-xl tracking-wider hidden md:block">{companyName.toUpperCase()}</span>
+        </div>
+        <div className="flex items-center gap-4">
+          {user && (
+            <div className="hidden md:flex items-center gap-3 text-sm">
+              <div className="text-right">
+                <div className="font-medium">{user.firstName} {user.surname}</div>
+                <div className="text-xs text-sidebar-foreground/60 capitalize">{((user as any).roles || []).join(', ')}</div>
+              </div>
+              <div className="h-10 w-10 rounded-full overflow-hidden border-2 border-primary">
+                <img src={user.photoUrl || 'https://github.com/shadcn.png'} alt="User" className="h-full w-full object-cover" />
+              </div>
+            </div>
+          )}
+          {user && <NotificationBell userId={user.id} />}
+          <ThemeToggle />
+        </div>
+      </header>
+
       <AlertDialog open={showPhotoSetup}>
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
@@ -209,220 +250,186 @@ export default function AdminDashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="flex gap-6">
-        <div className="w-64 shrink-0">
-          <div className="sticky top-4 space-y-1">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-heading font-bold text-gray-900 dark:text-gray-100">AECE Checkpoint</h2>
-              <div className="flex items-center gap-2">
-                {user && <NotificationBell userId={user.id} />}
-                <ThemeToggle />
-              </div>
-            </div>
-            <nav className="space-y-1">
-              <button
-                onClick={() => setActiveSection('dashboard')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  activeSection === 'dashboard' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                }`}
-                data-testid="nav-dashboard"
-              >
-                <LayoutDashboard className="h-4 w-4" /> Dashboard
-              </button>
+      <div className="flex flex-1 overflow-hidden">
+      {/* Sidebar */}
+      <aside className="hidden md:flex w-64 shrink-0 flex-col bg-card border-r border-border shadow-sm z-40 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-1">
+          {/* Dashboard — visible to all */}
+          <button
+            onClick={() => setActiveSection('dashboard')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'dashboard' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
+            data-testid="nav-dashboard"
+          >
+            <LayoutDashboard className="h-4 w-4" /> Dashboard
+          </button>
+
+          {/* Management section — manager, hr, md, admin only */}
+          {isManagement && (
+            <>
               <button
                 onClick={() => setActiveSection('employees')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  activeSection === 'employees' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'employees' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
                 data-testid="nav-employees"
               >
-                <Users className="h-4 w-4" /> Personnel
+                <Users className="h-4 w-4" /> {hasRole('admin') ? 'Personnel' : 'My Team'}
               </button>
               <button
-                onClick={() => setLocation('/admin/org-chart')}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-slate-100 text-slate-700"
+                onClick={() => setLocation('/org-chart')}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200"
                 data-testid="nav-org-chart"
               >
                 <Network className="h-4 w-4" /> Organization Chart
               </button>
-              <button
-                onClick={() => setActiveSection('positions')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  activeSection === 'positions' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                }`}
-                data-testid="nav-positions"
-              >
-                <Network className="h-4 w-4" /> Organisation Setup
-              </button>
+              {hasRole('admin') && (
+                <button
+                  onClick={() => setActiveSection('positions')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'positions' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
+                  data-testid="nav-positions"
+                >
+                  <Network className="h-4 w-4" /> Organisation Setup
+                </button>
+              )}
               <button
                 onClick={() => setActiveSection('leave-requests')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  activeSection === 'leave-requests' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'leave-requests' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
                 data-testid="nav-leave-requests"
               >
                 <FileText className="h-4 w-4" /> Leave Requests
                 {pendingCounts.total > 0 && (
-                  <Badge className="ml-auto bg-blue-500 text-white text-xs">
-                    {pendingCounts.total}
-                  </Badge>
+                  <Badge className="ml-auto bg-blue-500 text-white text-xs">{pendingCounts.total}</Badge>
                 )}
               </button>
               <button
                 onClick={() => setActiveSection('attendance')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  activeSection === 'attendance' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'attendance' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
                 data-testid="nav-attendance"
               >
                 <Clock className="h-4 w-4" /> Attendance
               </button>
               <button
-                onClick={() => setLocation('/admin/reports')}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-slate-100 text-slate-700"
+                onClick={() => setLocation('/reports')}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200"
                 data-testid="nav-reports"
               >
                 <TrendingUp className="h-4 w-4" /> Attendance Reports
               </button>
               <button
-                onClick={() => setActiveSection('companies')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  activeSection === 'companies' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                }`}
-                data-testid="nav-companies"
-              >
-                <Building2 className="h-4 w-4" /> Companies
-              </button>
-              <button
-                onClick={() => setActiveSection('leave-rules')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  activeSection === 'leave-rules' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                }`}
-                data-testid="nav-leave-rules"
-              >
-                <Calendar className="h-4 w-4" /> Leave Rules
-              </button>
-              <button
                 onClick={() => setActiveSection('leave-calendar')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  activeSection === 'leave-calendar' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'leave-calendar' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
                 data-testid="nav-leave-calendar-inline"
               >
                 <CalendarDays className="h-4 w-4" /> Leave Calendar
               </button>
+              {hasRole('admin') && (
+                <>
+                  <button
+                    onClick={() => setActiveSection('companies')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'companies' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
+                    data-testid="nav-companies"
+                  >
+                    <Building2 className="h-4 w-4" /> Companies
+                  </button>
+                  <button
+                    onClick={() => setActiveSection('leave-rules')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'leave-rules' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
+                    data-testid="nav-leave-rules"
+                  >
+                    <Calendar className="h-4 w-4" /> Leave Rules
+                  </button>
+                  <button
+                    onClick={() => setActiveSection('settings')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'settings' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
+                    data-testid="nav-settings"
+                  >
+                    <Settings className="h-4 w-4" /> Settings
+                  </button>
+                  <button
+                    onClick={() => setActiveSection('backup')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'backup' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
+                    data-testid="nav-backup"
+                  >
+                    <Database className="h-4 w-4" /> Database Backup
+                  </button>
+                </>
+              )}
+            </>
+          )}
+
+          {/* My Tools — employee role only */}
+          {hasRole('employee') && (
+            <div className="pt-3 mt-3 border-t">
+              <p className="px-3 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                <Briefcase className="h-3 w-3" /> My Tools
+              </p>
               <button
-                onClick={() => setActiveSection('settings')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  activeSection === 'settings' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                }`}
-                data-testid="nav-settings"
+                onClick={() => setActiveSection('apply-leave')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'apply-leave' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
+                data-testid="nav-apply-leave"
               >
-                <Settings className="h-4 w-4" /> Settings
+                <Calendar className="h-4 w-4" /> Apply for Leave
               </button>
               <button
-                onClick={() => setActiveSection('backup')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  activeSection === 'backup' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                }`}
-                data-testid="nav-backup"
+                onClick={() => setActiveSection('my-attendance')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'my-attendance' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
+                data-testid="nav-my-attendance"
               >
-                <Database className="h-4 w-4" /> Database Backup
+                <Clock className="h-4 w-4" /> My Attendance
               </button>
+              <button
+                onClick={() => setActiveSection('profile')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'profile' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
+                data-testid="nav-profile"
+              >
+                <Users className="h-4 w-4" /> My Profile
+              </button>
+              <button
+                onClick={() => setActiveSection('employee-grievances')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'employee-grievances' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
+                data-testid="nav-grievances"
+              >
+                <MessageSquareWarning className="h-4 w-4" /> Grievances
+                {openGrievanceCount > 0 && (
+                  <Badge className="ml-auto bg-red-500 text-white text-xs">{openGrievanceCount}</Badge>
+                )}
+              </button>
+            </div>
+          )}
+        </nav>
 
-              <div className="pt-3 mt-3 border-t">
-                <p className="px-3 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <Briefcase className="h-3 w-3" /> Employee Tools
-                </p>
-                <button
-                  onClick={() => setActiveSection('apply-leave')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                    activeSection === 'apply-leave' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                  }`}
-                  data-testid="nav-apply-leave"
-                >
-                  <Calendar className="h-4 w-4" /> Apply for Leave
-                </button>
-                <button
-                  onClick={() => setActiveSection('employee-grievances')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                    activeSection === 'employee-grievances' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700'
-                  }`}
-                  data-testid="nav-grievances"
-                >
-                  <MessageSquareWarning className="h-4 w-4" /> Grievances
-                  {openGrievanceCount > 0 && (
-                    <Badge className="ml-auto bg-red-500 text-white text-xs">
-                      {openGrievanceCount}
-                    </Badge>
-                  )}
-                </button>
-              </div>
-
-              <div className="pt-2 mt-1 border-t">
-                <button
-                  onClick={() => {
-                    logout();
-                    setLocation('/');
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-red-50 text-red-600"
-                  data-testid="nav-logout"
-                >
-                  <LogOut className="h-4 w-4" /> Logout
-                </button>
-              </div>
-            </nav>
-          </div>
+        <div className="p-4 border-t border-border">
+          <button
+            onClick={() => { logout(); setLocation('/'); }}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-red-50 text-red-600"
+            data-testid="nav-logout"
+          >
+            <LogOut className="h-4 w-4" /> Logout
+          </button>
         </div>
+      </aside>
 
-        <div className="flex-1 space-y-6">
-          {activeSection === 'dashboard' && (
-            <DashboardSection setActiveSection={setActiveSection} />
-          )}
-          {activeSection === 'employees' && (
-            <PersonnelSection />
-          )}
-          {activeSection === 'leave-requests' && (
-            <LeaveRequestsSection />
-          )}
-          {activeSection === 'attendance' && (
-            <AttendanceSection />
-          )}
-          {activeSection === 'departments' && (
-            <DepartmentsSection />
-          )}
-          {activeSection === 'employee-types' && (
-            <EmployeeTypesSection />
-          )}
-          {activeSection === 'leave-rules' && (
-            <LeaveRulesSection />
-          )}
-          {activeSection === 'grievances' && (
-            <GrievancesSection />
-          )}
-          {activeSection === 'leave-calendar' && (
-            <LeaveCalendarSection />
-          )}
-          {activeSection === 'positions' && (
-            <OrgPositionsSection />
-          )}
-          {activeSection === 'companies' && (
-            <CompaniesSection />
-          )}
-          {activeSection === 'settings' && (
-            <SettingsSection />
-          )}
-          {activeSection === 'backup' && (
-            <DatabaseBackupSection />
-          )}
-          {activeSection === 'apply-leave' && (
-            <LeaveRequestForm />
-          )}
-          {activeSection === 'employee-grievances' && (
-            <GrievancesSection />
-          )}
-        </div>
+      {/* Main content */}
+      <main className="flex-1 overflow-auto p-4 md:p-6">
+        {activeSection === 'dashboard' && (
+          hasRole('hr') || hasRole('admin')
+            ? <DashboardSection setActiveSection={setActiveSection} />
+            : <EmployeeDashboardSection setActiveSection={setActiveSection} />
+        )}
+        {activeSection === 'employees' && <PersonnelSection />}
+        {activeSection === 'leave-requests' && <LeaveRequestsSection />}
+        {activeSection === 'attendance' && <AttendanceSection />}
+        {activeSection === 'leave-rules' && <LeaveRulesSection />}
+        {activeSection === 'leave-calendar' && <LeaveCalendarSection />}
+        {activeSection === 'positions' && <OrgPositionsSection />}
+        {activeSection === 'companies' && <CompaniesSection />}
+        {activeSection === 'settings' && <SettingsSection />}
+        {activeSection === 'backup' && <DatabaseBackupSection />}
+        {activeSection === 'apply-leave' && <LeaveRequestForm />}
+        {activeSection === 'my-attendance' && <MyAttendanceSection />}
+        {activeSection === 'profile' && <MyProfileSection />}
+        {activeSection === 'employee-grievances' && <GrievancesSection />}
+        {activeSection === 'grievances' && <GrievancesSection />}
+      </main>
       </div>
-    </Layout>
+    </div>
   );
 }

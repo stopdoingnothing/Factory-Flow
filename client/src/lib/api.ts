@@ -8,13 +8,16 @@ const apiFetch: typeof fetch = (input, init) =>
 
 // Auth API
 export const authApi = {
-  async loginWorker(id: string): Promise<User> {
+  async loginWorker(id: string, password: string): Promise<User> {
     const res = await apiFetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, password }),
     });
-    if (!res.ok) throw new Error("Login failed");
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as any).error || "Login failed");
+    }
     return res.json();
   },
 
@@ -38,6 +41,19 @@ export const authApi = {
     return res.json();
   },
 
+  async managerApprovedLogin(employeeId: string, managerEmail: string, managerPassword: string): Promise<User> {
+    const res = await apiFetch(`${API_BASE}/auth/manager-approved-login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ employeeId, managerEmail, managerPassword }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as any).error || "Authorization failed");
+    }
+    return res.json();
+  },
+
   async me(): Promise<User | null> {
     const res = await apiFetch(`${API_BASE}/auth/me`);
     if (res.status === 401) return null;
@@ -57,6 +73,24 @@ export type FaceDescriptorUser = {
   email: string | null;
   role: string;
   faceDescriptor: string;
+};
+
+export type EmployeeSearchResult = {
+  id: string;
+  firstName: string;
+  surname: string;
+  department: string | null;
+  role: string;
+  photoUrl: string | null;
+};
+
+// Employee name search — used by manager-approval login flow (no auth required)
+export const userSearchApi = {
+  async searchByName(q: string): Promise<EmployeeSearchResult[]> {
+    const res = await apiFetch(`${API_BASE}/users/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) throw new Error("Search failed");
+    return res.json();
+  },
 };
 
 // Face Recognition API
@@ -98,9 +132,25 @@ export const userApi = {
     return res.json();
   },
 
+  // Used by tile mode kiosk — public endpoint, no session required
+  async getAllForKiosk(): Promise<User[]> {
+    const res = await apiFetch(`${API_BASE}/users/kiosk`);
+    if (!res.ok) throw new Error("Failed to fetch users");
+    return res.json();
+  },
+
   async getById(id: string): Promise<User> {
     const res = await apiFetch(`${API_BASE}/users/${id}`);
     if (!res.ok) throw new Error("Failed to fetch user");
+    return res.json();
+  },
+
+  async kioskLookup(id: string): Promise<{ id: string; firstName: string; surname: string; department: string | null }> {
+    const res = await apiFetch(`${API_BASE}/users/kiosk-lookup/${encodeURIComponent(id)}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as any).error || "Employee not found");
+    }
     return res.json();
   },
 
@@ -237,7 +287,10 @@ export const leaveRequestApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
     });
-    if (!res.ok) throw new Error("Failed to create leave request");
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error || "Failed to create leave request");
+    }
     return res.json();
   },
 

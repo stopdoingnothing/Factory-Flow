@@ -8,8 +8,8 @@ import {
   LogIn, LogOut, CheckCircle2, XCircle, Loader2, ScanFace, 
   User, ArrowLeft, RefreshCw, Clock, Smartphone
 } from 'lucide-react';
-import { loadFaceModels, extractFaceDescriptorFromBase64, compareFaceDescriptors, isFaceMatch } from '@/lib/face-recognition';
-import { userApi, attendanceApi, settingsApi } from '@/lib/api';
+import { loadFaceModels, detectFaceWithFeedback, findMatchesForUser } from '@/lib/face-recognition';
+import { userApi, attendanceApi, settingsApi, faceApi, type FaceDescriptorUser } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
 import InfringementReasonDialog from '@/components/InfringementReasonDialog';
 
@@ -114,8 +114,14 @@ export default function AttendanceKiosk() {
   const [error, setError] = useState('');
   const [detecting, setDetecting] = useState(false);
   const [workerId, setWorkerId] = useState('');
-  const [faceUsers, setFaceUsers] = useState<Array<{ user: any; descriptor: Float32Array }>>([]);
+  const faceUserMap = useRef<Map<string, { meta: FaceDescriptorUser; descriptors: FaceDescriptorUser[] }>>(new Map());
+  const [faceUserCount, setFaceUserCount] = useState(0);
+  const recentDescriptors = useRef<Float32Array[]>([]);
+  const [scanFeedback, setScanFeedback] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState('');
+  const noMatchFrames = useRef(0);
+  const capturedPhoto = useRef<string | null>(null);
+  const [noMatchFallback, setNoMatchFallback] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [infringementData, setInfringementData] = useState<{ recordId: number; type: 'late_arrival' | 'early_departure'; employeeName: string } | null>(null);
 
@@ -127,15 +133,16 @@ export default function AttendanceKiosk() {
   useEffect(() => {
     const init = async () => {
       await loadFaceModels();
-      const res = await fetch('/api/users/face-descriptors?includeAdmins=true');
-      const users = await res.json();
-      const usersWithDescriptors = users
-        .filter((u: any) => u.faceDescriptor)
-        .map((u: any) => ({
-          user: u,
-          descriptor: new Float32Array(JSON.parse(u.faceDescriptor))
-        }));
-      setFaceUsers(usersWithDescriptors);
+      const flatUsers = await faceApi.getAllFaceDescriptors(true);
+
+      const map = new Map<string, { meta: FaceDescriptorUser; descriptors: FaceDescriptorUser[] }>();
+      for (const u of flatUsers) {
+        if (!u.faceDescriptor) continue;
+        if (!map.has(u.id)) map.set(u.id, { meta: u, descriptors: [] });
+        map.get(u.id)!.descriptors.push(u);
+      }
+      faceUserMap.current = map;
+      setFaceUserCount(map.size);
       setModelsReady(true);
       setStatus('scanning');
     };
@@ -145,10 +152,11 @@ export default function AttendanceKiosk() {
   const recordAttendance = async (userId: string, method: 'face' | 'id') => {
     setStatus('recording');
     try {
-      let photoUrl = null;
-      if (webcamRef.current) {
+      let photoUrl = capturedPhoto.current ?? null;
+      if (!photoUrl && webcamRef.current) {
         photoUrl = webcamRef.current.getScreenshot();
       }
+      capturedPhoto.current = null;
       
       const record = await attendanceApi.create({
         userId,
@@ -183,6 +191,11 @@ export default function AttendanceKiosk() {
   };
 
   const resetKiosk = () => {
+    recentDescriptors.current = [];
+    noMatchFrames.current = 0;
+    capturedPhoto.current = null;
+    setScanFeedback('');
+    setNoMatchFallback(false);
     setStatus('scanning');
     setRecognizedWorker(null);
     setError('');
@@ -191,32 +204,70 @@ export default function AttendanceKiosk() {
   };
 
   const detectAndMatchFace = useCallback(async () => {
-    if (!modelsReady || detecting || status !== 'scanning' || !webcamRef.current) return;
-    
+    if (!modelsReady || detecting || status !== 'scanning') return;
+    if (!webcamRef.current?.video || webcamRef.current.video.readyState !== 4) return;
+
     setDetecting(true);
     try {
-      const screenshot = webcamRef.current.getScreenshot();
-      if (!screenshot) return;
+      const video = webcamRef.current.video;
+      const result = await detectFaceWithFeedback(video);
+      setScanFeedback(result.message);
 
-      const descriptor = await extractFaceDescriptorFromBase64(screenshot);
-      if (descriptor && faceUsers.length > 0) {
-        let bestMatch: { user: any; distance: number } | null = null;
-        
-        for (const { user, descriptor: storedDescriptor } of faceUsers) {
-          const distance = compareFaceDescriptors(descriptor, storedDescriptor);
-          if (distance !== Infinity && (!bestMatch || distance < bestMatch.distance)) {
-            bestMatch = { user, distance };
-          }
-        }
-        
-        // Use more lenient threshold (0.55) for better real-world recognition
-        if (bestMatch && isFaceMatch(bestMatch.distance, 0.55)) {
-          setRecognizedWorker({
-            id: bestMatch.user.id,
-            name: `${bestMatch.user.firstName} ${bestMatch.user.surname}`,
-            department: bestMatch.user.department || ''
-          });
-          setStatus('confirm-identity');
+      if (result.status !== 'face_detected' || !result.descriptor) {
+        recentDescriptors.current = [];
+        return;
+      }
+
+      // Rolling 5-frame average
+      recentDescriptors.current.push(result.descriptor);
+      if (recentDescriptors.current.length > 5) recentDescriptors.current.shift();
+
+      const avgDescriptor = new Float32Array(128);
+      for (let i = 0; i < 128; i++) {
+        let s = 0;
+        for (const d of recentDescriptors.current) s += d[i];
+        avgDescriptor[i] = s / recentDescriptors.current.length;
+      }
+      const queryDescriptor = recentDescriptors.current.length >= 2 ? avgDescriptor : result.descriptor;
+
+      const MATCH_THRESHOLD = 0.6;
+      const MIN_GAP = 0.1;
+
+      // Per-user matching — find each user's best distance across all their descriptors
+      const userMatches: { meta: FaceDescriptorUser; bestDistance: number }[] = [];
+      for (const [, { meta, descriptors }] of faceUserMap.current) {
+        const { bestDistance } = findMatchesForUser(queryDescriptor, descriptors, 1.0);
+        if (bestDistance < Infinity) userMatches.push({ meta, bestDistance });
+      }
+      userMatches.sort((a, b) => a.bestDistance - b.bestDistance);
+
+      const top = userMatches[0] ?? null;
+      const second = userMatches[1] ?? null;
+
+      const hasClearMatch =
+        top !== null &&
+        top.bestDistance < MATCH_THRESHOLD &&
+        (!second || second.bestDistance - top.bestDistance >= MIN_GAP);
+
+      if (hasClearMatch) {
+        recentDescriptors.current = [];
+        noMatchFrames.current = 0;
+        setRecognizedWorker({
+          id: top.meta.id,
+          name: `${top.meta.firstName} ${top.meta.surname}`,
+          department: '',
+        });
+        setStatus('confirm-identity');
+      } else if (faceUserMap.current.size > 0) {
+        // Face was clearly visible but didn't match anyone — count consecutive misses
+        noMatchFrames.current += 1;
+        const NO_MATCH_LIMIT = 3;
+        if (noMatchFrames.current >= NO_MATCH_LIMIT) {
+          noMatchFrames.current = 0;
+          recentDescriptors.current = [];
+          capturedPhoto.current = webcamRef.current?.getScreenshot() ?? null;
+          setNoMatchFallback(true);
+          setStatus('id-input');
         }
       }
     } catch (err) {
@@ -224,7 +275,7 @@ export default function AttendanceKiosk() {
     } finally {
       setDetecting(false);
     }
-  }, [modelsReady, detecting, status, faceUsers]);
+  }, [modelsReady, detecting, status]);
 
   useEffect(() => {
     if (status !== 'scanning' || !modelsReady) return;
@@ -236,14 +287,9 @@ export default function AttendanceKiosk() {
   const handleIdSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workerId.trim()) return;
-    
+
     try {
-      const user = await userApi.getById(workerId.trim());
-      if (!user) {
-        setError('Employee not found');
-        return;
-      }
-      
+      const user = await userApi.kioskLookup(workerId.trim());
       setRecognizedWorker({
         id: user.id,
         name: `${user.firstName} ${user.surname}`,
@@ -359,6 +405,11 @@ export default function AttendanceKiosk() {
                 <div className="text-center">
                   <User className="w-16 h-16 mx-auto text-slate-400 mb-4" />
                   <h2 className="font-oswald text-2xl font-bold text-slate-800">Enter Employee ID</h2>
+                  {noMatchFallback && (
+                    <p className="text-sm text-amber-600 mt-1">
+                      Face not recognised — please enter your ID to clock {subMode === 'clock-in' ? 'in' : 'out'}
+                    </p>
+                  )}
                 </div>
                 
                 <form onSubmit={handleIdSubmit} className="space-y-4">
@@ -385,6 +436,9 @@ export default function AttendanceKiosk() {
                         setStatus('scanning');
                         setWorkerId('');
                         setError('');
+                        setNoMatchFallback(false);
+                        capturedPhoto.current = null;
+                        noMatchFrames.current = 0;
                       }}
                       data-testid="button-use-face"
                     >
@@ -461,9 +515,9 @@ export default function AttendanceKiosk() {
                         <>
                           <ScanFace className="w-6 h-6 animate-pulse" />
                           <span>
-                            {faceUsers.length === 0 
+                            {faceUserCount === 0
                               ? 'No faces registered - Use ID instead'
-                              : 'Look at the camera'}
+                              : scanFeedback || 'Look at the camera'}
                           </span>
                         </>
                       )}

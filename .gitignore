@@ -33,3 +33,6 @@ data/
 
 # Internal specs and documentation
 specs/
+
+# Claude Code project settings
+.claude/

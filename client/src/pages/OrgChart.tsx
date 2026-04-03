@@ -664,33 +664,52 @@ export default function OrgChart() {
         
         const managerChildren = childPositions.filter(cp => !isWorkerPosition(cp.id));
         const workerChildren = childPositions.filter(cp => isWorkerPosition(cp.id));
-        
+
         const children: TreeNode[] = managerChildren.map(cp => buildPositionSubtree(cp.id));
-        
-        if (workerChildren.length > 0) {
-          const groupsByDept = new Map<string, { id: string; name: string; photoUrl: string | null }[]>();
-          workerChildren.forEach(wp => {
-            const wPos = positionMap.get(wp.id)!;
-            const wUsers = getUsersForPosition(wp.id);
-            const dept = wPos.department || wPos.title || 'Staff';
-            if (!groupsByDept.has(dept)) groupsByDept.set(dept, []);
-            if (wUsers.length > 0) {
-              wUsers.forEach(wUser => {
-                groupsByDept.get(dept)!.push({
-                  id: wUser.id,
-                  name: `${wUser.firstName} ${wUser.surname}`,
-                  photoUrl: wUser.photoUrl,
-                });
-              });
-            } else {
+
+        // Collect all worker entries for department groups:
+        // 1. Workers assigned to child worker positions via orgPositionId
+        // 2. Workers who report to this position's occupant via managerId but have no orgPositionId
+        const groupsByDept = new Map<string, { id: string; name: string; photoUrl: string | null }[]>();
+
+        workerChildren.forEach(wp => {
+          const wPos = positionMap.get(wp.id)!;
+          const wUsers = getUsersForPosition(wp.id);
+          const dept = wPos.department || wPos.title || 'Staff';
+          if (!groupsByDept.has(dept)) groupsByDept.set(dept, []);
+          if (wUsers.length > 0) {
+            wUsers.forEach(wUser => {
               groupsByDept.get(dept)!.push({
-                id: `vacant-${wp.id}`,
-                name: `VACANT - ${wPos.title}`,
-                photoUrl: null,
+                id: wUser.id,
+                name: `${wUser.firstName} ${wUser.surname}`,
+                photoUrl: wUser.photoUrl,
               });
-            }
-          });
-          
+            });
+          } else {
+            groupsByDept.get(dept)!.push({
+              id: `vacant-${wp.id}`,
+              name: `VACANT - ${wPos.title}`,
+              photoUrl: null,
+            });
+          }
+        });
+
+        // Include employees who report to this position's occupant via managerId but have no orgPositionId
+        if (primaryUser) {
+          activeUsers
+            .filter(u => u.managerId === primaryUser.id && !u.orgPositionId)
+            .forEach(w => {
+              const dept = w.department || 'Staff';
+              if (!groupsByDept.has(dept)) groupsByDept.set(dept, []);
+              groupsByDept.get(dept)!.push({
+                id: w.id,
+                name: `${w.firstName} ${w.surname}`,
+                photoUrl: w.photoUrl,
+              });
+            });
+        }
+
+        if (groupsByDept.size > 0) {
           Array.from(groupsByDept.entries())
             .sort(([a], [b]) => a.localeCompare(b))
             .forEach(([dept, workers]) => {
@@ -1027,6 +1046,17 @@ export default function OrgChart() {
     }
   }, [activeUsers, orgPositions]);
 
+  const unassignedEmployees = useMemo(() => {
+    if (orgPositions.length === 0) return [];
+    const positionIds = new Set(orgPositions.map(p => p.id));
+    const managerIds = new Set(activeUsers.map(u => u.id));
+    return activeUsers.filter(u => {
+      const hasPosition = u.orgPositionId && positionIds.has(u.orgPositionId);
+      const hasManager = u.managerId && managerIds.has(u.managerId);
+      return !hasPosition && !hasManager;
+    });
+  }, [activeUsers, orgPositions]);
+
   const totalManagers = activeUsers.filter(u => u.role === 'manager').length;
   const totalWorkers = activeUsers.filter(u => u.role === 'worker').length;
 
@@ -1064,7 +1094,7 @@ export default function OrgChart() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => setLocation('/admin/dashboard')}
+                onClick={() => setLocation('/dashboard')}
                 data-testid="button-back"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -1254,6 +1284,28 @@ export default function OrgChart() {
               <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-lg font-medium">No employees found</p>
               <p className="text-sm text-muted-foreground">Add employees to see the organization chart</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {unassignedEmployees.length > 0 && (
+          <Card className="mt-4 border-amber-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-amber-700 flex items-center gap-2">
+                <UserIcon className="h-4 w-4" />
+                {unassignedEmployees.length} employee{unassignedEmployees.length !== 1 ? 's' : ''} not assigned to a position
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">These employees will not appear in the org chart until assigned to a position in Personnel.</p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {unassignedEmployees.map(u => (
+                  <div key={u.id} className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded px-2 py-1 text-xs text-amber-800">
+                    <span className="font-medium">{u.firstName} {u.surname}</span>
+                    {u.department && <span className="text-amber-600">({u.department})</span>}
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         )}
