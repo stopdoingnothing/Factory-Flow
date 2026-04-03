@@ -38,7 +38,7 @@ services:
     volumes:
       # Backups also land on the host, in a separate directory from live data.
       - ./data/backups:/backups
-    # Runs pg_dump every hour. Keeps the last 7 days of dumps (168 files max).
+    # Runs pg_dump every 6 hours (4x/day). Keeps the last 90 days of dumps (360 files max).
     # Each dump is named with a timestamp for easy point-in-time recovery.
     entrypoint: >
       sh -c "
@@ -46,10 +46,10 @@ services:
           FILENAME=/backups/factoryflow_$$(date +%Y%m%d_%H%M%S).sql.gz
           echo \"[backup] dumping to $$FILENAME\"
           pg_dump -h db -U factoryflow factoryflow | gzip > $$FILENAME
-          # Delete dumps older than 7 days
-          find /backups -name 'factoryflow_*.sql.gz' -mtime +7 -delete
-          echo \"[backup] done. sleeping 1h\"
-          sleep 3600
+          # Delete dumps older than 90 days
+          find /backups -name 'factoryflow_*.sql.gz' -mtime +90 -delete
+          echo \"[backup] done. sleeping 6h\"
+          sleep 21600
         done
       "
     depends_on:

@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Switch } from "@/components/ui/switch";
 import { userApi, departmentApi, userGroupApi, leaveBalanceApi, employeeTypeApi, contractHistoryApi, faceDescriptorApi, orgPositionApi, companyApi } from '@/lib/api';
 import type { User, Department, UserGroup, LeaveBalance, EmployeeType, OrgPosition } from '@shared/schema';
@@ -221,21 +222,41 @@ export default function PersonnelSection() {
       toast({ variant: "destructive", title: "Error", description: "First name, surname, and ID are required" });
       return;
     }
-    
-    const role = currentUser.role || 'worker';
-    
+
+    if (!currentUser.role) {
+      toast({ variant: "destructive", title: "Error", description: "Role is required" });
+      return;
+    }
+
+    const role = currentUser.role;
+
     if (role === 'worker' && !currentUser.department) {
       toast({ variant: "destructive", title: "Error", description: "Department is required for employees" });
       return;
     }
-    
+
+    if (!currentUser.managerId) {
+      toast({ variant: "destructive", title: "Error", description: "A line manager (Reports To) is required" });
+      return;
+    }
+
+    if (!currentUser.startDate) {
+      toast({ variant: "destructive", title: "Error", description: "Start date is required" });
+      return;
+    }
+
     if (currentUser.userGroupId && !currentUser.email) {
       toast({ variant: "destructive", title: "Error", description: "Email is required for admin users" });
       return;
     }
-    
+
     if (currentUser.userGroupId && !isEditing && !currentUser.password) {
       toast({ variant: "destructive", title: "Error", description: "Password is required for new admin users" });
+      return;
+    }
+
+    if (isAdminUser && ((currentUser as any).roles || []).length === 0) {
+      toast({ variant: "destructive", title: "Error", description: "At least one role must be assigned" });
       return;
     }
 
@@ -251,9 +272,9 @@ export default function PersonnelSection() {
       startDate: currentUser.startDate || null,
       userGroupId: currentUser.userGroupId || null,
       managerId: currentUser.managerId || null,
-      secondManagerId: currentUser.secondManagerId || null,
+      secondManagerId: null,
       orgPositionId: currentUser.orgPositionId || null,
-      reportsToPositionId: currentUser.reportsToPositionId || null,
+      reportsToPositionId: null,
       exclude: currentUser.exclude || false,
       excludeFromLeave: (currentUser as any).excludeFromLeave || false,
       attendanceRequired: currentUser.attendanceRequired !== false,
@@ -375,7 +396,7 @@ export default function PersonnelSection() {
     const nextNum = maxNum + 1;
     const nextId = `AECE${String(nextNum).padStart(4, '0')}`;
 
-    setCurrentUser({ id: nextId });
+    setCurrentUser({ id: nextId, role: 'worker' });
     setIsEditing(false);
     setIsUserDialogOpen(true);
     setFaceExtracted(false);
@@ -944,17 +965,16 @@ export default function PersonnelSection() {
                 />
               </div>
             </div>
-            <Select value={employeeDepartmentFilter || 'all'} onValueChange={(v) => setEmployeeDepartmentFilter(v === 'all' ? '' : v)}>
-              <SelectTrigger className="w-40" data-testid="employee-dept-filter">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((d: Department) => (
-                  <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={employeeDepartmentFilter || 'all'}
+              onValueChange={(v) => setEmployeeDepartmentFilter(v === 'all' ? '' : v)}
+              options={[
+                { value: 'all', label: 'All Departments' },
+                ...departments.map((d: Department) => ({ value: d.name, label: d.name })),
+              ]}
+              placeholder="Department"
+              className="w-40"
+            />
             <Select value={employeeStatusFilter} onValueChange={(v: 'all' | 'active' | 'terminated') => setEmployeeStatusFilter(v)}>
               <SelectTrigger className="w-32" data-testid="employee-status-filter">
                 <SelectValue placeholder="Status" />
@@ -1142,26 +1162,18 @@ export default function PersonnelSection() {
                                   <p className="font-medium">{employeeTypes.find(t => t.id === emp.employeeTypeId)?.name || '-'}</p>
                                 </div>
                               )}
-                              {(emp.reportsToPositionId || emp.managerId) && (
+                              {(emp.managerId || emp.reportsToPositionId) && (
                                 <div>
                                   <p className="text-xs text-muted-foreground">Reports To</p>
                                   <p className="font-medium">
-                                    {emp.reportsToPositionId
-                                      ? (orgPositions.find(p => p.id === emp.reportsToPositionId)?.title || '-')
-                                      : (() => {
-                                          const manager = users.find(u => u.id === emp.managerId);
-                                          return manager ? `${manager.firstName} ${manager.surname}` : '-';
-                                        })()}
-                                  </p>
-                                </div>
-                              )}
-                              {emp.secondManagerId && (
-                                <div>
-                                  <p className="text-xs text-muted-foreground">2nd Manager</p>
-                                  <p className="font-medium">
                                     {(() => {
-                                      const manager = users.find(u => u.id === emp.secondManagerId);
-                                      return manager ? `${manager.firstName} ${manager.surname}` : '-';
+                                      if (emp.managerId) {
+                                        const manager = users.find(u => u.id === emp.managerId);
+                                        return manager ? `${manager.firstName} ${manager.surname}` : '-';
+                                      }
+                                      // legacy: resolve position to the person holding it
+                                      const holder = users.find(u => u.orgPositionId === emp.reportsToPositionId);
+                                      return holder ? `${holder.firstName} ${holder.surname}` : '-';
                                     })()}
                                   </p>
                                 </div>
@@ -1639,8 +1651,8 @@ export default function PersonnelSection() {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="dept" className="text-right">Department</Label>
               <div className="col-span-3">
-                <Select 
-                  value={currentUser.department || ''} 
+                <SearchableSelect
+                  value={currentUser.department || ''}
                   onValueChange={(value) => {
                     const updates: any = { department: value };
                     if (currentUser.orgPositionId) {
@@ -1651,18 +1663,9 @@ export default function PersonnelSection() {
                     }
                     setCurrentUser({...currentUser, ...updates});
                   }}
-                >
-                  <SelectTrigger data-testid="select-department">
-                    <SelectValue placeholder="Select a department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept.id} value={dept.name} data-testid={`option-dept-${dept.id}`}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={departments.map(dept => ({ value: dept.name, label: dept.name }))}
+                  placeholder="Select a department"
+                />
                 {departments.length === 0 && (
                   <p className="text-xs text-amber-600 mt-1">No departments found. Please add them in the Departments section.</p>
                 )}
@@ -1671,27 +1674,15 @@ export default function PersonnelSection() {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="orgPosition" className="text-right">Position</Label>
               <div className="col-span-3">
-                <Select 
-                  value={currentUser.orgPositionId?.toString() || ''} 
+                <SearchableSelect
+                  value={currentUser.orgPositionId?.toString() || ''}
                   onValueChange={(value) => setCurrentUser({...currentUser, orgPositionId: value ? parseInt(value) : undefined})}
+                  options={orgPositions
+                    .filter(p => p.department === currentUser.department)
+                    .map(pos => ({ value: pos.id.toString(), label: pos.title }))}
+                  placeholder={currentUser.department ? "Select a position" : "Select department first"}
                   disabled={!currentUser.department}
-                >
-                  <SelectTrigger data-testid="select-position">
-                    <SelectValue placeholder={currentUser.department ? "Select a position" : "Select department first"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {orgPositions
-                      .filter(p => p.department === currentUser.department)
-                      .map((pos) => (
-                        <SelectItem key={pos.id} value={pos.id.toString()}>
-                          {pos.title}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                {orgPositions.length > 0 && !currentUser.orgPositionId && !currentUser.managerId && currentUser.department && (
-                  <p className="text-xs text-amber-600 mt-1">No position or line manager selected — this employee will not appear on the org chart.</p>
-                )}
+                />
               </div>
             </div>
             {isAdminUser && (
@@ -1701,8 +1692,7 @@ export default function PersonnelSection() {
                   {([
                     { value: 'employee', label: 'Employee', description: 'Dashboard, leave, attendance, profile, grievances' },
                     { value: 'manager', label: 'Manager', description: 'My team view, leave recommendation' },
-                    { value: 'hr', label: 'HR', description: 'Personnel management, leave approvals, grievances admin' },
-                    { value: 'md', label: 'MD', description: 'Final leave approval (MD stage)' },
+                    { value: 'hr', label: 'HR', description: 'Personnel management, final leave approvals, grievances admin' },
                     { value: 'admin', label: 'Admin', description: 'Settings, backup, companies, leave rules, system config' },
                   ] as const).map(({ value, label, description }) => {
                     const currentRoles: string[] = (currentUser as any).roles || [];
@@ -1734,103 +1724,54 @@ export default function PersonnelSection() {
               </div>
             )}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="reportsToPosition" className="text-right">Reports To</Label>
+              <Label htmlFor="managerId" className="text-right">Reports To</Label>
               <div className="col-span-3">
-                <Select 
-                  value={currentUser.reportsToPositionId?.toString() || 'none'} 
-                  onValueChange={(value) => setCurrentUser({...currentUser, reportsToPositionId: value === 'none' ? undefined : parseInt(value)})}
-                >
-                  <SelectTrigger data-testid="select-reports-to-position">
-                    <SelectValue placeholder="Select a position (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No Reporting Position</SelectItem>
-                    {orgPositions
-                      .filter(p => p.id !== currentUser.orgPositionId)
-                      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.title.localeCompare(b.title))
-                      .map((pos) => (
-                        <SelectItem key={pos.id} value={pos.id.toString()} data-testid={`option-reports-to-${pos.id}`}>
-                          {pos.title}{pos.department && pos.department !== pos.title ? ` (${pos.department})` : ''}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Select the position this employee reports to. If that position changes hands, no update is needed.
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="secondManager" className="text-right">2nd Manager</Label>
-              <div className="col-span-3">
-                <Select 
-                  value={currentUser.secondManagerId || 'none'} 
-                  onValueChange={(value) => setCurrentUser({...currentUser, secondManagerId: value === 'none' ? undefined : value})}
-                >
-                  <SelectTrigger data-testid="select-second-manager">
-                    <SelectValue placeholder="Select a second manager (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No Second Manager</SelectItem>
-                    {users
-                      .filter(u => u.id !== currentUser.id && u.role === 'manager' && u.id !== currentUser.managerId)
-                      .map((mgr) => (
-                        <SelectItem key={mgr.id} value={mgr.id} data-testid={`option-second-manager-${mgr.id}`}>
-                          {mgr.firstName} {mgr.surname} {mgr.department ? `(${mgr.department})` : ''}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Optional second manager for shared reporting (e.g. employee reports to two department managers).
-                </p>
+                <SearchableSelect
+                  value={currentUser.managerId || 'none'}
+                  onValueChange={(value) => setCurrentUser({...currentUser, managerId: value === 'none' ? undefined : value, reportsToPositionId: undefined})}
+                  options={[
+                    { value: 'none', label: 'No Manager' },
+                    ...users
+                      .filter(u => u.id !== currentUser.id)
+                      .sort((a, b) => `${a.firstName} ${a.surname}`.localeCompare(`${b.firstName} ${b.surname}`))
+                      .map(u => ({ value: u.id, label: `${u.firstName} ${u.surname}${u.department ? ` (${u.department})` : ''}` })),
+                  ]}
+                  placeholder="Select a line manager"
+                  searchPlaceholder="Search employees..."
+                />
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="employeeType" className="text-right">Employment Type</Label>
               <div className="col-span-3">
-                <Select 
-                  value={currentUser.employeeTypeId?.toString() || ''} 
+                <SearchableSelect
+                  value={currentUser.employeeTypeId?.toString() || ''}
                   onValueChange={(value) => {
                     const typeId = parseInt(value);
                     const type = employeeTypes.find(t => t.id === typeId);
                     setCurrentUser({
-                      ...currentUser, 
+                      ...currentUser,
                       employeeTypeId: typeId,
                       contractEndDate: type?.isPermanent === 'yes' ? null : currentUser.contractEndDate
                     });
                   }}
-                >
-                  <SelectTrigger data-testid="select-employee-type">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employeeTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={employeeTypes.map(type => ({ value: type.id.toString(), label: type.name }))}
+                  placeholder="Select type"
+                />
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="company" className="text-right">Company</Label>
               <div className="col-span-3">
-                <Select
+                <SearchableSelect
                   value={currentUser.companyId?.toString() || 'none'}
                   onValueChange={(value) => setCurrentUser({ ...currentUser, companyId: value === 'none' ? undefined : parseInt(value) })}
-                >
-                  <SelectTrigger data-testid="select-company">
-                    <SelectValue placeholder="Select company (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— No company —</SelectItem>
-                    {companies.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: 'none', label: '— No company —' },
+                    ...companies.map((c: any) => ({ value: c.id.toString(), label: c.name })),
+                  ]}
+                  placeholder="Select company (optional)"
+                />
                 <p className="text-xs text-muted-foreground mt-1">Payroll company this employee belongs to.</p>
               </div>
             </div>

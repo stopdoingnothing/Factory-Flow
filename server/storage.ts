@@ -3,7 +3,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { eq, and, desc, gte, lte, inArray } from "drizzle-orm";
 import * as schema from "@shared/schema";
-import { calculateBceaEntitlements } from "./bcea";
+import { calculateFirstMonthAccrual } from "./bcea";
 import type {
   User,
   InsertUser,
@@ -250,7 +250,7 @@ export class DrizzleStorage implements IStorage {
     if (user.role === 'worker') {
       // Calculate pro-rated entitlements based on start date (SA BCEA)
       const ent = user.startDate
-        ? calculateBceaEntitlements(user.startDate)
+        ? calculateFirstMonthAccrual(user.startDate)
         : { annualLeave: 21, sickLeave: 30, familyResponsibility: 3 };
 
       const { annualLeave, sickLeave, familyResponsibility } = ent;
@@ -446,10 +446,10 @@ export class DrizzleStorage implements IStorage {
       .orderBy(desc(schema.leaveRequests.createdAt));
   }
 
-  async updateManagerDecision(id: number, approverId: string, decision: 'recommended' | 'not_recommended', notes?: string, skipHR = false): Promise<LeaveRequest | undefined> {
+  async updateManagerDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string, skipHR = false): Promise<LeaveRequest | undefined> {
     const now = new Date();
-    // Manager recommendation always forwards to HR (or MD if HR stage is skipped); manager cannot finalize
-    const nextStatus = skipHR ? 'pending_md' : 'pending_hr';
+    // Both recommend and not-recommend forward to HR for final decision
+    const nextStatus = 'pending_hr';
 
     const updateData: Record<string, unknown> = {
       status: nextStatus,
@@ -473,7 +473,8 @@ export class DrizzleStorage implements IStorage {
 
   async updateHRDecision(id: number, approverId: string, decision: 'approved' | 'rejected', notes?: string): Promise<LeaveRequest | undefined> {
     const now = new Date();
-    const nextStatus = decision === 'approved' ? 'pending_md' : 'rejected';
+    // HR is the final approver — no MD stage
+    const nextStatus = decision === 'approved' ? 'approved' : 'rejected';
     
     const updateData: Record<string, unknown> = {
       status: nextStatus,
@@ -487,11 +488,9 @@ export class DrizzleStorage implements IStorage {
       updateData.hrNotes = notes;
     }
     
-    if (decision === 'rejected') {
-      updateData.finalizedById = approverId;
-      updateData.finalizedAt = now;
-    }
-    
+    updateData.finalizedById = approverId;
+    updateData.finalizedAt = now;
+
     const [updatedRequest] = await db
       .update(schema.leaveRequests)
       .set(updateData)

@@ -51,7 +51,7 @@ import { storage, pool } from "./storage";
 import { z } from "zod";
 import { insertUserSchema, insertLeaveRequestSchema, insertAttendanceRecordSchema, insertDepartmentSchema, insertUserGroupSchema, insertEmployeeTypeSchema, insertLeaveRuleSchema, insertLeaveRulePhaseSchema, insertGrievanceSchema } from "@shared/schema";
 import { sendLeaveRequestNotification, sendLateAttendanceNotification, sendAdminWelcomeEmail, sendLeaveStatusNotification, sendPasswordResetEmail, sendAdminCredentialsEmail, sendManagerMissedClockOutAlert, sendLeaveStageNotification, sendLeaveEscalationReminder, sendAWOLAlert } from "./email";
-import { calculateBceaEntitlements, getCarryOverExpiryDate } from "./bcea";
+import { calculateBceaEntitlements, calculateFirstMonthAccrual, getCarryOverExpiryDate } from "./bcea";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 
@@ -115,9 +115,54 @@ async function decrementPending(request: { userId: string; leaveType: string; st
   const balances = await storage.getLeaveBalances(request.userId);
   const balance = balances.find(b => b.leaveType === request.leaveType);
   if (balance) {
+    // Restore carry-over first (reverse of the deduction-first rule on creation).
+    const restoredCarryOver = Math.min(days, (balance.pending ?? 0));
     await storage.updateLeaveBalance(balance.id, {
       pending: Math.max(0, (balance.pending ?? 0) - days),
+      carryOverDays: (balance.carryOverDays ?? 0) + restoredCarryOver,
     });
+  }
+}
+
+/**
+ * Incrementally settle approved leave requests whose dates have now passed.
+ * For each unsettled (settledAt IS NULL) approved non-historic request with endDate < today:
+ *   - Move working days from pending → taken on the leave balance
+ *   - Stamp settledAt so it is never processed again
+ * O(unsettled requests) — after first run the set is empty for most users.
+ */
+export async function settlePastApprovedLeave(userId: string): Promise<void> {
+  const today = new Date().toISOString().split('T')[0];
+  const allRequests = await storage.getLeaveRequests(userId);
+  const unsettled = allRequests.filter(
+    r => !r.isHistoric &&
+         r.status === 'approved' &&
+         r.endDate < today &&
+         !(r as any).settledAt
+  );
+  if (!unsettled.length) return;
+
+  const employee = await storage.getUser(userId);
+  const religion = (employee as any)?.religion ?? null;
+  const balances = await storage.getLeaveBalances(userId);
+
+  for (const req of unsettled) {
+    const days = await countWorkingDays(req.startDate, req.endDate, religion);
+    const balance = balances.find(b => b.leaveType === req.leaveType);
+    if (balance) {
+      await storage.updateLeaveBalance(balance.id, {
+        pending: Math.max(0, Math.round((balance.pending - days) * 10) / 10),
+        taken:   Math.round((balance.taken + days) * 10) / 10,
+      });
+      // Update local cache so subsequent iterations in this loop use fresh values
+      balance.pending = Math.max(0, Math.round((balance.pending - days) * 10) / 10);
+      balance.taken   = Math.round((balance.taken + days) * 10) / 10;
+    }
+    // Stamp as settled so this request is never processed again
+    await pool.query(
+      'UPDATE leave_requests SET settled_at = NOW() WHERE id = $1',
+      [req.id]
+    );
   }
 }
 
@@ -817,7 +862,7 @@ export async function registerRoutes(
       // Auto-provision mandatory BCEA leave balances if the employee has a start date
       if (newUser.startDate && newUser.excludeFromLeave !== true) {
         try {
-          const ent = calculateBceaEntitlements(newUser.startDate);
+          const ent = calculateFirstMonthAccrual(newUser.startDate);
           await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Annual Leave',          total: ent.annualLeave,          taken: 0, pending: 0 });
           await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Sick Leave',             total: ent.sickLeave,            taken: 0, pending: 0 });
           await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Family Responsibility',  total: ent.familyResponsibility,  taken: 0, pending: 0 });
@@ -956,57 +1001,24 @@ export async function registerRoutes(
       const userId = req.params.userId;
       const user = await storage.getUser(userId);
 
-      // Auto-recalculate BCEA entitlements for all employees with a start date (skip contractors/system accounts)
+      // Forfeit any expired annual leave carry-over (grace window check only — accrual is handled by the month-end cron)
       if (user && user.startDate && !user.terminationDate && !user.excludeFromLeave) {
-        const entitlements = calculateBceaEntitlements(user.startDate);
         const existingBalances = await storage.getLeaveBalances(userId);
-        const graceMonthsSetting = await storage.getSetting('leave_carry_over_grace_months');
-        const carryOverGraceMonths = graceMonthsSetting ? parseInt(graceMonthsSetting.value, 10) || 6 : 6;
-
-        const upsertAnnualBalance = async (newTotal: number) => {
-          const existing = existingBalances.find(b => b.leaveType === 'Annual Leave');
+        const annualBalance = existingBalances.find(b => b.leaveType === 'Annual Leave');
+        if (annualBalance) {
+          const currentCarryOver = annualBalance.carryOverDays || 0;
+          const carryOverExpiry = (annualBalance as any).carryOverExpiry as string | null;
           const todayStr = new Date().toISOString().split('T')[0];
-          if (existing) {
-            const currentCarryOver = existing.carryOverDays || 0;
-            const carryOverExpiry = (existing as any).carryOverExpiry as string | null;
-
-            // Forfeit carry-over if the grace window has passed
-            if (currentCarryOver > 0 && carryOverExpiry && todayStr > carryOverExpiry) {
-              const safeTaken = existing.taken + existing.pending;
-              const safeTotal = Math.max(newTotal, safeTaken);
-              await storage.updateLeaveBalance(existing.id, { total: safeTotal, carryOverDays: 0, carryOverExpiry: null } as any);
-              return;
-            }
-
-            const purePrev = existing.total - currentCarryOver;
-            const cycleReset = purePrev > newTotal + 5;
-            if (cycleReset) {
-              const unusedDays = Math.max(0, Math.round((existing.total - existing.taken - existing.pending) * 10) / 10);
-              const expiry = getCarryOverExpiryDate(user.startDate!, carryOverGraceMonths);
-              await storage.updateLeaveBalance(existing.id, { total: newTotal + unusedDays, carryOverDays: unusedDays, carryOverExpiry: expiry } as any);
-            } else if (Math.abs((existing.total - currentCarryOver) - newTotal) >= 0.05) {
-              await storage.updateLeaveBalance(existing.id, { total: newTotal + currentCarryOver });
-            }
-          } else {
-            await storage.createLeaveBalance({ userId, leaveType: 'Annual Leave', total: newTotal, taken: 0, pending: 0, carryOverDays: 0 });
+          if (currentCarryOver > 0 && carryOverExpiry && todayStr > carryOverExpiry) {
+            const safeTaken = annualBalance.taken + annualBalance.pending;
+            const safeTotal = Math.max(annualBalance.total - currentCarryOver, safeTaken);
+            await storage.updateLeaveBalance(annualBalance.id, { total: safeTotal, carryOverDays: 0, carryOverExpiry: null } as any);
           }
-        };
-
-        const upsert = async (leaveType: string, newTotal: number) => {
-          const existing = existingBalances.find(b => b.leaveType === leaveType);
-          if (existing) {
-            if (Math.abs((existing.total ?? 0) - newTotal) >= 0.05) {
-              await storage.updateLeaveBalance(existing.id, { total: newTotal });
-            }
-          } else {
-            await storage.createLeaveBalance({ userId, leaveType, total: newTotal, taken: 0, pending: 0, carryOverDays: 0 });
-          }
-        };
-
-        await upsertAnnualBalance(entitlements.annualLeave);
-        await upsert('Sick Leave', entitlements.sickLeave);
-        await upsert('Family Responsibility', entitlements.familyResponsibility);
+        }
       }
+
+      // Settle past approved leave: move pending → taken for any approved request whose dates have passed
+      await settlePastApprovedLeave(userId);
 
       const balances = await storage.getLeaveBalances(userId);
       return res.json(balances);
@@ -1257,8 +1269,32 @@ export async function registerRoutes(
   // Get all leave requests (or by user)
   app.get("/api/leave-requests", async (req, res) => {
     try {
-      const userId = req.query.userId as string | undefined;
-      const requests = await storage.getLeaveRequests(userId);
+      const sessionUserId = req.session.userId!;
+      const sessionRoles: string[] = req.session.userRoles || [];
+      const isHrOrAdmin = sessionRoles.includes('hr') || sessionRoles.includes('admin');
+      const isManagerOnly = sessionRoles.includes('manager') && !isHrOrAdmin;
+
+      // HR / admin see everything
+      if (isHrOrAdmin) {
+        const requests = await storage.getLeaveRequests();
+        return res.json(requests);
+      }
+
+      // Manager (without HR/admin): only direct reports + own requests
+      if (isManagerOnly) {
+        const allUsers = await storage.getAllUsers();
+        const directReportIds = new Set(
+          allUsers.filter(u => u.managerId === sessionUserId).map(u => u.id)
+        );
+        const allRequests = await storage.getLeaveRequests();
+        const filtered = allRequests.filter(
+          r => r.userId === sessionUserId || directReportIds.has(r.userId)
+        );
+        return res.json(filtered);
+      }
+
+      // Everyone else: own requests only
+      const requests = await storage.getLeaveRequests(sessionUserId);
       return res.json(requests);
     } catch (error) {
       console.error("Get leave requests error:", error);
@@ -1322,7 +1358,9 @@ export async function registerRoutes(
           consumedByRequests += await countWorkingDays(r.startDate, r.endDate, user?.religion ?? null);
         }
         totalConsumed = (balance.taken ?? 0) + consumedByRequests;
-        available = (balance.total ?? 0) + (balance.carryOverDays ?? 0) - totalConsumed;
+        // balance.total already includes carryOverDays (stored as entitlement + carryOver).
+        // Do NOT add carryOverDays again — it would double-count.
+        available = (balance.total ?? 0) - totalConsumed;
         if (available < requestedDays) {
           return res.status(400).json({
             error: `Insufficient ${validatedData.leaveType} balance. Available: ${available.toFixed(1)} day(s), requested: ${requestedDays} day(s)`,
@@ -1428,11 +1466,14 @@ export async function registerRoutes(
       };
       const newRequest = await storage.createLeaveRequest(requestWithStatus);
 
-      // Soft-reserve the requested days in pending balance (see decisions.md DEC-001)
+      // Soft-reserve the requested days in pending balance (see decisions.md DEC-001).
+      // Deduct from carry-over first — carry-over minimum is 0.
       const pendingBalance = balances.find(b => b.leaveType === validatedData.leaveType);
       if (pendingBalance) {
+        const carryConsumed = Math.min(requestedDays, pendingBalance.carryOverDays ?? 0);
         await storage.updateLeaveBalance(pendingBalance.id, {
           pending: (pendingBalance.pending ?? 0) + requestedDays,
+          carryOverDays: Math.max(0, (pendingBalance.carryOverDays ?? 0) - carryConsumed),
         });
       }
 
@@ -1457,7 +1498,7 @@ export async function registerRoutes(
           requestId: newRequest.id,
           appUrl: appUrl,
           requestedDays,
-          totalDays: balance?.total ?? undefined,
+          totalDays: balance ? (balance.total ?? 0) : undefined,
           consumedDays: totalConsumed,
           availableDays: available !== undefined ? available - requestedDays : undefined,
         };
@@ -1573,8 +1614,8 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Approver ID is required" });
       }
       
-      if (!['recommended', 'not_recommended'].includes(decision)) {
-        return res.status(400).json({ error: "Decision must be 'recommended' or 'not_recommended'" });
+      if (!['approved', 'rejected'].includes(decision)) {
+        return res.status(400).json({ error: "Decision must be 'approved' or 'rejected'" });
       }
 
       const requestId = parseInt(req.params.id);
@@ -1585,16 +1626,21 @@ export async function registerRoutes(
       }
 
       if (request.status !== 'pending_manager') {
-        return res.status(400).json({ error: "Leave request is not awaiting manager recommendation" });
+        return res.status(400).json({ error: "Leave request is not awaiting manager approval" });
       }
 
-      // Read approval hierarchy setting: if HR stage is disabled, manager recommendation goes straight to MD
-      const hrStageSetting = await storage.getSetting('leave_require_hr_stage');
-      const skipHR = hrStageSetting?.value === 'false';
+      // Enforce reporting-line: only the employee's direct manager may approve
+      const sessionRoles: string[] = req.session?.userRoles || [];
+      const isHrOrAdmin = sessionRoles.includes('hr') || sessionRoles.includes('admin');
+      if (!isHrOrAdmin) {
+        const employee = await storage.getUser(request.userId);
+        if (!employee || employee.managerId !== approverId) {
+          return res.status(403).json({ error: "You are not the reporting manager for this employee" });
+        }
+      }
 
-      const updatedRequest = await storage.updateManagerDecision(requestId, approverId, decision, notes, skipHR);
+      const updatedRequest = await storage.updateManagerDecision(requestId, approverId, decision, notes);
 
-      // Send notification to next stage (HR or MD) — always forwarded regardless of recommendation
       try {
         const senderEmail = (await storage.getSetting('sender_email'))?.value || 'noreply@aece.co.za';
         const employee = await storage.getUser(request.userId);
@@ -1604,21 +1650,20 @@ export async function registerRoutes(
           startDate: request.startDate,
           endDate: request.endDate,
         };
-        const adminEmailSetting = await storage.getSetting('admin_email');
-        const nextStage = skipHR ? 'pending_md' : 'pending_hr';
-        const recipientName = skipHR ? 'Management' : 'HR';
-        const recommendationLabel = decision === 'not_recommended' ? '[NOT RECOMMENDED] ' : '';
-        const nextEmails = adminEmailSetting?.value?.split('\n').map((e: string) => e.trim()).filter(Boolean) || [];
-        for (const email of nextEmails) {
-          await sendLeaveStageNotification(email, senderEmail, {
-            recipientName,
+
+        // Both recommend and not-recommend forward to HR — notify all HR users
+        const allUsers = await storage.getAllUsers();
+        const hrUsers = allUsers.filter(u => Array.isArray((u as any).roles) && (u as any).roles.includes('hr') && u.email);
+        for (const hrUser of hrUsers) {
+          await sendLeaveStageNotification(hrUser.email!, senderEmail, {
+            recipientName: `${hrUser.firstName} ${hrUser.surname}`,
             ...emailData,
-            newStage: nextStage,
-            notes: notes ? `${recommendationLabel}${notes}` : (decision === 'not_recommended' ? '[NOT RECOMMENDED]' : undefined),
+            newStage: 'pending_hr',
+            notes: decision === 'rejected' ? `[NOT RECOMMENDED] ${notes || ''}`.trim() : (notes || undefined),
           });
         }
       } catch (emailError) {
-        console.error('Failed to send manager recommendation notification:', emailError);
+        console.error('Failed to send manager decision notification:', emailError);
       }
 
       return res.json(updatedRequest);
@@ -1652,6 +1697,12 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Leave request is not awaiting HR approval" });
       }
 
+      // Enforce HR role — only hr/admin may approve at this stage
+      const hrSessionRoles: string[] = req.session?.userRoles || [];
+      if (!hrSessionRoles.includes('hr') && !hrSessionRoles.includes('admin')) {
+        return res.status(403).json({ error: "Only HR or admin users may approve at this stage" });
+      }
+
       // Block HR approval if a medical certificate is required but not yet uploaded (P3.1)
       if (decision === 'approved' && request.requiresMedCert) {
         const hasDocs = request.documents && request.documents.length > 0;
@@ -1665,38 +1716,22 @@ export async function registerRoutes(
 
       const updatedRequest = await storage.updateHRDecision(requestId, approverId, decision, notes);
 
+      const employee = await storage.getUser(request.userId);
       if (decision === 'rejected') {
-        const employee = await storage.getUser(request.userId);
         await decrementPending(request, (employee as any)?.religion ?? null);
       }
 
-      // Send notifications after HR decision
+      // Notify employee of final HR decision
       try {
         const senderEmail = (await storage.getSetting('sender_email'))?.value || 'noreply@aece.co.za';
-        const employee = await storage.getUser(request.userId);
-        const emailData = {
-          employeeName: employee ? `${employee.firstName} ${employee.surname}` : request.userId,
-          leaveType: request.leaveType,
-          startDate: request.startDate,
-          endDate: request.endDate,
-        };
-        if (decision === 'approved') {
-          // Notify admin_email (MD) that request is now pending MD approval
-          const adminEmailSetting = await storage.getSetting('admin_email');
-          const mdEmails = adminEmailSetting?.value?.split('\n').map((e: string) => e.trim()).filter(Boolean) || [];
-          for (const mdEmail of mdEmails) {
-            await sendLeaveStageNotification(mdEmail, senderEmail, {
-              recipientName: 'Management',
-              ...emailData,
-              newStage: 'pending_md',
-              notes: notes || undefined,
-            });
-          }
-        } else if (decision === 'rejected' && employee?.email) {
+        if (employee?.email) {
           await sendLeaveStageNotification(employee.email, senderEmail, {
             recipientName: employee.firstName,
-            ...emailData,
-            newStage: 'rejected',
+            employeeName: `${employee.firstName} ${employee.surname}`,
+            leaveType: request.leaveType,
+            startDate: request.startDate,
+            endDate: request.endDate,
+            newStage: decision === 'approved' ? 'approved' : 'rejected',
             notes: notes || undefined,
           });
         }
@@ -3479,6 +3514,170 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Delete face descriptor error:", error);
       return res.status(500).json({ error: "Failed to delete face descriptor" });
+    }
+  });
+
+  // ===== BOOTSTRAP RESTORE (unauthenticated, only when DB has no users) =====
+
+  app.post("/api/backup/bootstrap-validate", async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      if (users.length > 0) {
+        return res.status(403).json({ error: "Bootstrap restore is only available on an empty database", valid: false });
+      }
+      const { backup } = req.body;
+      if (!backup || !backup.data) {
+        return res.status(400).json({ error: "Invalid backup file format", valid: false });
+      }
+      return res.json({
+        valid: true,
+        version: backup.version || "unknown",
+        exportedAt: backup.exportedAt || "unknown",
+        counts: {
+          departments: backup.data.departments?.length || 0,
+          userGroups: backup.data.userGroups?.length || 0,
+          employeeTypes: backup.data.employeeTypes?.length || 0,
+          companies: backup.data.companies?.length || 0,
+          orgPositions: backup.data.orgPositions?.length || 0,
+          users: backup.data.users?.length || 0,
+          leaveBalances: backup.data.leaveBalances?.length || 0,
+          leaveRequests: backup.data.leaveRequests?.length || 0,
+          leaveRules: backup.data.leaveRules?.length || 0,
+          leaveRulePhases: backup.data.leaveRulePhases?.length || 0,
+          attendanceRecords: backup.data.attendanceRecords?.length || 0,
+          contractHistory: backup.data.contractHistory?.length || 0,
+          grievances: backup.data.grievances?.length || 0,
+          publicHolidays: backup.data.publicHolidays?.length || 0,
+          notifications: backup.data.notifications?.length || 0,
+          settings: backup.data.settings?.length || 0,
+          faceDescriptors: backup.data.faceDescriptors?.length || 0,
+        }
+      });
+    } catch (error) {
+      console.error("Bootstrap validate error:", error);
+      return res.status(400).json({ error: "Invalid backup file", valid: false });
+    }
+  });
+
+  app.post("/api/backup/bootstrap-import", async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      if (users.length > 0) {
+        return res.status(403).json({ error: "Bootstrap restore is only available on an empty database" });
+      }
+      const { backup } = req.body;
+      if (!backup || !backup.data) {
+        return res.status(400).json({ error: "Invalid backup file format" });
+      }
+
+      const importedCounts: Record<string, number> = {};
+
+      if (backup.data.departments?.length) {
+        for (const dept of backup.data.departments) {
+          try { const e = await storage.getDepartment(dept.id); if (!e) await storage.createDepartment({ name: dept.name, description: dept.description }); } catch (e) {}
+        }
+        importedCounts.departments = backup.data.departments.length;
+      }
+      if (backup.data.userGroups?.length) {
+        for (const group of backup.data.userGroups) {
+          try { const e = await storage.getUserGroup(group.id); if (!e) await storage.createUserGroup({ name: group.name, description: group.description }); } catch (e) {}
+        }
+        importedCounts.userGroups = backup.data.userGroups.length;
+      }
+      if (backup.data.employeeTypes?.length) {
+        for (const type of backup.data.employeeTypes) {
+          try { const e = await storage.getEmployeeType(type.id); if (!e) await storage.createEmployeeType({ name: type.name, description: type.description, leaveLabel: type.leaveLabel, hasLeaveEntitlement: type.hasLeaveEntitlement, isDefault: type.isDefault, isPermanent: type.isPermanent }); } catch (e) {}
+        }
+        importedCounts.employeeTypes = backup.data.employeeTypes.length;
+      }
+      if (backup.data.companies?.length) {
+        const existing = await storage.getAllCompanies();
+        const existingNames = new Set(existing.map((c: any) => c.name));
+        for (const company of backup.data.companies) {
+          try { if (!existingNames.has(company.name)) await storage.createCompany({ name: company.name, registrationNumber: company.registrationNumber, description: company.description }); } catch (e) {}
+        }
+        importedCounts.companies = backup.data.companies.length;
+      }
+      if (backup.data.orgPositions?.length) {
+        const sorted = [...backup.data.orgPositions].sort((a: any, b: any) => a.id - b.id);
+        const existing = await storage.getAllOrgPositions();
+        const existingIds = new Set(existing.map((p: any) => p.id));
+        for (const pos of sorted) {
+          try { if (!existingIds.has(pos.id)) await storage.createOrgPosition({ title: pos.title, department: pos.department, parentPositionId: pos.parentPositionId, sortOrder: pos.sortOrder, isOutsourced: pos.isOutsourced, tier: pos.tier }); } catch (e) {}
+        }
+        importedCounts.orgPositions = backup.data.orgPositions.length;
+      }
+      if (backup.data.users?.length) {
+        for (const user of backup.data.users) {
+          try { const e = await storage.getUser(user.id); if (!e) await storage.createUser(user); } catch (e) {}
+        }
+        importedCounts.users = backup.data.users.length;
+      }
+      if (backup.data.leaveBalances?.length) {
+        for (const balance of backup.data.leaveBalances) {
+          try { await storage.createLeaveBalance({ userId: balance.userId, leaveType: balance.leaveType, total: balance.total, taken: balance.taken, pending: balance.pending, carryOverDays: balance.carryOverDays ?? 0 }); } catch (e) {}
+        }
+        importedCounts.leaveBalances = backup.data.leaveBalances.length;
+      }
+      if (backup.data.leaveRequests?.length) {
+        for (const request of backup.data.leaveRequests) {
+          try { await storage.createLeaveRequest(request); } catch (e) {}
+        }
+        importedCounts.leaveRequests = backup.data.leaveRequests.length;
+      }
+      if (backup.data.leaveRules?.length) {
+        for (const rule of backup.data.leaveRules) {
+          try { await storage.createLeaveRule(rule); } catch (e) {}
+        }
+        importedCounts.leaveRules = backup.data.leaveRules.length;
+      }
+      if (backup.data.leaveRulePhases?.length) {
+        for (const phase of backup.data.leaveRulePhases) {
+          try { await storage.createLeaveRulePhase(phase); } catch (e) {}
+        }
+        importedCounts.leaveRulePhases = backup.data.leaveRulePhases.length;
+      }
+      if (backup.data.attendanceRecords?.length) {
+        for (const record of backup.data.attendanceRecords) {
+          try { await storage.createAttendanceRecord(record); } catch (e) {}
+        }
+        importedCounts.attendanceRecords = backup.data.attendanceRecords.length;
+      }
+      if (backup.data.contractHistory?.length) {
+        for (const entry of backup.data.contractHistory) {
+          try { await storage.createContractHistory(entry); } catch (e) {}
+        }
+        importedCounts.contractHistory = backup.data.contractHistory.length;
+      }
+      if (backup.data.grievances?.length) {
+        for (const grievance of backup.data.grievances) {
+          try { await storage.createGrievance(grievance); } catch (e) {}
+        }
+        importedCounts.grievances = backup.data.grievances.length;
+      }
+      if (backup.data.publicHolidays?.length) {
+        for (const holiday of backup.data.publicHolidays) {
+          try { await storage.createPublicHoliday(holiday); } catch (e) {}
+        }
+        importedCounts.publicHolidays = backup.data.publicHolidays.length;
+      }
+      if (backup.data.settings?.length) {
+        for (const setting of backup.data.settings) {
+          try { await storage.upsertSetting(setting.key, setting.value); } catch (e) {}
+        }
+        importedCounts.settings = backup.data.settings.length;
+      }
+      if (backup.data.faceDescriptors?.length) {
+        for (const fd of backup.data.faceDescriptors) {
+          try { await storage.createFaceDescriptor({ userId: fd.userId, descriptor: fd.descriptor, photoData: fd.photoData ?? null, label: fd.label ?? null }); } catch (e) {}
+        }
+        importedCounts.faceDescriptors = backup.data.faceDescriptors.length;
+      }
+
+      return res.json({ success: true, message: "Bootstrap restore completed", importedCounts });
+    } catch (error) {
+      console.error("Bootstrap import error:", error);
+      return res.status(500).json({ error: "Bootstrap restore failed" });
     }
   });
 

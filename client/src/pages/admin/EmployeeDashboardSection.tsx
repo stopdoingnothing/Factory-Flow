@@ -164,8 +164,9 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {balances.map((balance: any) => {
-          const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
           const carryOver = balance.carryOverDays as number | undefined;
+          // balance.total = entitlement + carryOver (stored together). Do NOT add carryOver again.
+          const available = Math.round(((balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0)) * 10) / 10;
           const carryOverExpiry = balance.carryOverExpiry as string | null | undefined;
           const today = new Date().toISOString().split('T')[0];
           const expiringSoon = carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
@@ -182,19 +183,15 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
               <CardContent>
                 <div className="text-3xl font-bold font-heading text-foreground">{available}</div>
                 <p className="text-xs text-muted-foreground mb-4">days available</p>
-                <Progress value={(available / balance.total) * 100} className="h-2" />
-                <div className="mt-2 text-xs text-right text-muted-foreground">
-                  {balance.total} total entitlement
+                <Progress value={Math.min(100, (available / (balance.total ?? 1)) * 100)} className="h-2" />
+                <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+                  <span>{Math.round(((balance.total ?? 0) - (carryOver ?? 0)) * 10) / 10} entitlement{carryOver && carryOver > 0 ? ` + ${carryOver} carry-over` : ''}</span>
+                  <span>{balance.taken ?? 0} taken{(balance.pending ?? 0) > 0 ? `, ${balance.pending} pending` : ''}</span>
                 </div>
-                {carryOver && carryOver > 0 && (
-                  <div className="mt-1 text-xs text-blue-600">
-                    +{carryOver} carried over
-                    {carryOverExpiry && (
-                      <span className={expiringSoon ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
-                        {' '}· {expiringSoon ? '⚠ expires ' : 'use by '}
-                        {new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                      </span>
-                    )}
+                {carryOver && carryOver > 0 && carryOverExpiry && (
+                  <div className={`mt-1 text-xs ${expiringSoon ? 'text-orange-600 font-medium' : 'text-blue-600'}`}>
+                    {expiringSoon ? '⚠ Carry-over expires ' : 'Carry-over use by '}
+                    {new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </div>
                 )}
               </CardContent>

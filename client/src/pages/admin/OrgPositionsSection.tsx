@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -521,33 +522,29 @@ export default function OrgPositionsSection() {
             </div>
             <div>
               <Label htmlFor="pos-department">Department</Label>
-              <Select value={positionForm.department || "__none__"} onValueChange={(v) => setPositionForm(f => ({ ...f, department: v === '__none__' ? '' : v }))}>
-                <SelectTrigger data-testid="select-position-department">
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">No Department</SelectItem>
-                  {departments.map(d => (
-                    <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={positionForm.department || "__none__"}
+                onValueChange={(v) => setPositionForm(f => ({ ...f, department: v === '__none__' ? '' : v }))}
+                options={[
+                  { value: '__none__', label: 'No Department' },
+                  ...departments.map(d => ({ value: d.name, label: d.name })),
+                ]}
+                placeholder="Select department"
+              />
             </div>
             <div>
               <Label htmlFor="pos-parent">Parent Position</Label>
-              <Select value={positionForm.parentPositionId || "__none__"} onValueChange={(v) => setPositionForm(f => ({ ...f, parentPositionId: v === '__none__' ? '' : v }))}>
-                <SelectTrigger data-testid="select-position-parent">
-                  <SelectValue placeholder="None (Root Position)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">None (Root Position)</SelectItem>
-                  {orgPositions
+              <SearchableSelect
+                value={positionForm.parentPositionId || "__none__"}
+                onValueChange={(v) => setPositionForm(f => ({ ...f, parentPositionId: v === '__none__' ? '' : v }))}
+                options={[
+                  { value: '__none__', label: 'None (Root Position)' },
+                  ...orgPositions
                     .filter(p => !editingPosition || p.id !== editingPosition.id)
-                    .map(p => (
-                      <SelectItem key={p.id} value={String(p.id)}>{p.title}{p.department ? ` (${p.department})` : ''}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                    .map(p => ({ value: String(p.id), label: `${p.title}${p.department ? ` (${p.department})` : ''}` })),
+                ]}
+                placeholder="None (Root Position)"
+              />
             </div>
             <div>
               <p className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded p-2">

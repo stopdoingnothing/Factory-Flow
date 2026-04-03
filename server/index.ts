@@ -2,12 +2,12 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pg from "pg";
-import { registerRoutes, runEscalationReminders } from "./routes";
+import { registerRoutes, runEscalationReminders, settlePastApprovedLeave } from "./routes";
 import { applyCustomLeaveRules } from "./custom-leave-rules";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { storage } from "./storage";
-import { calculateBceaEntitlements } from "./bcea";
+import { calculateMonthEndAccrual, getCarryOverExpiryDate } from "./bcea";
 
 const app = express();
 const httpServer = createServer(app);
@@ -115,11 +115,7 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
-      // Run BCEA leave recalculation in background after startup
-      recalculateBceaLeaveBalances().catch(err =>
-        console.error('[startup] BCEA recalculation failed:', err)
-      );
-      // Apply custom leave rules after BCEA recalc
+      // Apply custom leave rules on startup
       applyCustomLeaveRules(storage)
         .then(n => { if (n > 0) log(`[startup] Custom leave rules: updated ${n} balance record(s)`); })
         .catch(err => console.error('[startup] Custom leave rule engine failed:', err));
@@ -130,38 +126,88 @@ app.use((req, res, next) => {
           .then(n => { if (n > 0) log(`[escalation] Sent ${n} reminder(s)`); })
           .catch(err => console.error('[escalation] Failed:', err));
       }, EIGHT_HOURS);
+      // Month-end leave accrual: runs once daily; fires the accrual only on the last day of the month
+      const ONE_DAY = 24 * 60 * 60 * 1000;
+      setInterval(() => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        if (tomorrow.getDate() === 1) {
+          log('[month-end-accrual] Last day of month detected — running accrual');
+          runMonthEndLeaveAccrual()
+            .catch(err => console.error('[month-end-accrual] Failed:', err));
+        }
+      }, ONE_DAY);
     },
   );
 })();
 
-// Recalculate annual/sick/family leave totals for all active employees (workers and managers) using SA BCEA rules.
-// Runs silently in the background on startup so stored balances are always current.
-async function recalculateBceaLeaveBalances() {
+/**
+ * Month-end leave accrual — runs on the last calendar day of each month.
+ * For every active employee:
+ *   1. Add this month's annual leave increment to their balance total.
+ *   2. Add any sick leave increment (probationary threshold or month-6 grant).
+ *   3. Add the family responsibility grant at month 4.
+ *   4. On an annual cycle boundary (month 12, 24, …), record unused annual leave
+ *      as carry-over with the configured expiry date.
+ *   5. Settle any approved leave requests whose dates have now passed (pending → taken).
+ */
+async function runMonthEndLeaveAccrual() {
   const allUsers = await storage.getAllUsers();
   const workers = allUsers.filter(u => u.startDate && !u.terminationDate && !u.excludeFromLeave);
-  let updated = 0;
+  const graceMonthsSetting = await storage.getSetting('leave_carry_over_grace_months');
+  const graceMonths = graceMonthsSetting ? parseInt(graceMonthsSetting.value, 10) || 6 : 6;
+  let processed = 0;
+
   for (const user of workers) {
     try {
-      const ent = calculateBceaEntitlements(user.startDate!);
       const balances = await storage.getLeaveBalances(user.id);
-      const upsert = async (leaveType: string, newTotal: number) => {
-        const existing = balances.find(b => b.leaveType === leaveType);
-        if (existing) {
-          if (Math.abs((existing.total ?? 0) - newTotal) >= 0.05) {
-            await storage.updateLeaveBalance(existing.id, { total: newTotal });
-            updated++;
+      const sickBalance = balances.find(b => b.leaveType === 'Sick Leave');
+      const accrual = calculateMonthEndAccrual(user.startDate!, sickBalance?.total ?? 0);
+
+      // ── Annual leave ─────────────────────────────────────────────────────────
+      const annualBalance = balances.find(b => b.leaveType === 'Annual Leave');
+      if (annualBalance) {
+        const newTotal = Math.round((annualBalance.total + accrual.annualLeave) * 100) / 100;
+        const update: Record<string, unknown> = { total: newTotal };
+
+        // Year-end: stamp unused days as carry-over with expiry date
+        if (accrual.isAnnualCycleEnd) {
+          const available = Math.max(0, Math.round((annualBalance.total - annualBalance.taken - annualBalance.pending) * 10) / 10);
+          if (available > 0) {
+            update.carryOverDays = available;
+            update.carryOverExpiry = getCarryOverExpiryDate(user.startDate!, graceMonths);
           }
-        } else {
-          await storage.createLeaveBalance({ userId: user.id, leaveType, total: newTotal, taken: 0, pending: 0 });
-          updated++;
         }
-      };
-      await upsert('Annual Leave', ent.annualLeave);
-      await upsert('Sick Leave', ent.sickLeave);
-      await upsert('Family Responsibility', ent.familyResponsibility);
+        await storage.updateLeaveBalance(annualBalance.id, update as any);
+      } else {
+        await storage.createLeaveBalance({ userId: user.id, leaveType: 'Annual Leave', total: accrual.annualLeave, taken: 0, pending: 0 });
+      }
+
+      // ── Sick leave ───────────────────────────────────────────────────────────
+      if (accrual.sickLeave > 0) {
+        if (sickBalance) {
+          await storage.updateLeaveBalance(sickBalance.id, { total: sickBalance.total + accrual.sickLeave });
+        } else {
+          await storage.createLeaveBalance({ userId: user.id, leaveType: 'Sick Leave', total: accrual.sickLeave, taken: 0, pending: 0 });
+        }
+      }
+
+      // ── Family responsibility ────────────────────────────────────────────────
+      if (accrual.familyResponsibility > 0) {
+        const familyBalance = balances.find(b => b.leaveType === 'Family Responsibility');
+        if (familyBalance) {
+          await storage.updateLeaveBalance(familyBalance.id, { total: familyBalance.total + accrual.familyResponsibility });
+        } else {
+          await storage.createLeaveBalance({ userId: user.id, leaveType: 'Family Responsibility', total: accrual.familyResponsibility, taken: 0, pending: 0 });
+        }
+      }
+
+      // ── Settle past approved leave ───────────────────────────────────────────
+      await settlePastApprovedLeave(user.id);
+      processed++;
     } catch (err) {
-      console.error(`[startup] BCEA recalc failed for user ${user.id}:`, err);
+      console.error(`[month-end-accrual] Failed for user ${user.id}:`, err);
     }
   }
-  if (updated > 0) log(`[startup] BCEA leave recalculation: updated ${updated} balance records for ${workers.length} workers`);
+  log(`[month-end-accrual] Processed ${processed} of ${workers.length} employees`);
 }

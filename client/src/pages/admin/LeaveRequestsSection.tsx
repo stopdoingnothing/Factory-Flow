@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -15,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/lib/auth-context';
 import { leaveRequestApi, leaveBalanceApi, userApi, publicHolidayApi } from '@/lib/api';
 import type { LeaveRequest, LeaveBalance } from '@shared/schema';
-import { FileText, Check, X, Trash2, ChevronDown, ChevronRight, Loader2, Plus, Pencil, BookOpen, Lock, CalendarIcon, Users } from 'lucide-react';
+import { FileText, Check, X, Trash2, Loader2, Plus, Pencil, BookOpen, Lock, CalendarIcon, Users } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
 import { formatLeaveStatus, canTakeAction } from './utils';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -24,14 +25,13 @@ import { cn } from "@/lib/utils";
 
 export default function LeaveRequestsSection() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const queryClient = useQueryClient();
 
   // State
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [selectedLeaveRequest, setSelectedLeaveRequest] = useState<LeaveRequest | null>(null);
   const [adminNotes, setAdminNotes] = useState('');
-  const [expandedLeaveBalanceEmployees, setExpandedLeaveBalanceEmployees] = useState<Set<string>>(new Set());
 
   // Historic leave entry state
   const [isHistoricDialogOpen, setIsHistoricDialogOpen] = useState(false);
@@ -99,18 +99,18 @@ export default function LeaveRequestsSection() {
 
   // Mutations
   const managerDecisionMutation = useMutation({
-    mutationFn: ({ id, decision, notes }: { id: number; decision: 'approved' | 'rejected'; notes?: string }) => 
+    mutationFn: ({ id, decision, notes }: { id: number; decision: 'approved' | 'rejected'; notes?: string }) =>
       leaveRequestApi.managerDecision(id, user?.id || '', decision, notes),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
       queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
       setAdminNotes('');
       setIsReviewDialogOpen(false);
-      toast({ 
-        title: variables.decision === 'approved' ? "Request Approved" : "Request Rejected", 
-        description: variables.decision === 'approved' 
-          ? "Leave request has been approved and forwarded to HR for review." 
-          : "Leave request has been rejected and the employee will be notified."
+      toast({
+        title: variables.decision === 'approved' ? "Leave Recommended" : "Leave Not Recommended",
+        description: variables.decision === 'approved'
+          ? "You have recommended this leave request. The employee will be notified."
+          : "You have not recommended this leave request. The employee will be notified."
       });
     },
     onError: (error: any) => {
@@ -119,38 +119,18 @@ export default function LeaveRequestsSection() {
   });
 
   const hrDecisionMutation = useMutation({
-    mutationFn: ({ id, decision, notes }: { id: number; decision: 'approved' | 'rejected'; notes?: string }) => 
+    mutationFn: ({ id, decision, notes }: { id: number; decision: 'approved' | 'rejected'; notes?: string }) =>
       leaveRequestApi.hrDecision(id, user?.id || '', decision, notes),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
       queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
       setAdminNotes('');
       setIsReviewDialogOpen(false);
-      toast({ 
-        title: variables.decision === 'approved' ? "Request Approved" : "Request Rejected", 
-        description: variables.decision === 'approved' 
-          ? "Leave request has been approved and forwarded to MD for final approval." 
-          : "Leave request has been rejected and the employee will be notified."
-      });
-    },
-    onError: (error: any) => {
-      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to process decision" });
-    },
-  });
-
-  const mdDecisionMutation = useMutation({
-    mutationFn: ({ id, decision, notes, bypassHR }: { id: number; decision: 'approved' | 'rejected'; notes?: string; bypassHR?: boolean }) => 
-      leaveRequestApi.mdDecision(id, user?.id || '', decision, notes, bypassHR),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
-      setAdminNotes('');
-      setIsReviewDialogOpen(false);
-      toast({ 
-        title: variables.decision === 'approved' ? "Request Approved" : "Request Rejected", 
-        description: variables.decision === 'approved' 
-          ? "Leave request has been fully approved and the employee will be notified." 
-          : "Leave request has been rejected and the employee will be notified."
+      toast({
+        title: variables.decision === 'approved' ? "Leave Approved" : "Leave Rejected",
+        description: variables.decision === 'approved'
+          ? "Leave request has been approved. The employee will be notified."
+          : "Leave request has been rejected. The employee will be notified."
       });
     },
     onError: (error: any) => {
@@ -249,17 +229,6 @@ export default function LeaveRequestsSection() {
     }
   };
 
-  const toggleLeaveBalanceEmployeeExpanded = (userId: string) => {
-    setExpandedLeaveBalanceEmployees(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(userId)) {
-        newSet.delete(userId);
-      } else {
-        newSet.add(userId);
-      }
-      return newSet;
-    });
-  };
 
   const [historicShowCurrentOnly, setHistoricShowCurrentOnly] = useState(true);
 
@@ -270,8 +239,15 @@ export default function LeaveRequestsSection() {
         return emp && !emp.terminationDate;
       })
     : historicRequestsAll;
-  const activeRequests = (leaveRequests as any[]).filter((r: any) => !r.isHistoric);
-  const isAdmin = user?.role === 'manager' || user?.role === 'maintainer';
+  const isHrOrAdmin = hasRole('hr') || hasRole('admin');
+  const isManagerOnly = hasRole('manager') && !isHrOrAdmin;
+  const isAdmin = isHrOrAdmin || isManagerOnly;
+  const activeRequests = (leaveRequests as any[]).filter((r: any) => {
+    if (r.isHistoric) return false;
+    // Managers only see requests they can act on (pending their recommendation)
+    if (isManagerOnly && r.userId !== user?.id) return r.status === 'pending_manager';
+    return true;
+  });
 
   return (
     <div className="space-y-4">
@@ -347,44 +323,46 @@ export default function LeaveRequestsSection() {
                         >
                           <FileText className="h-4 w-4 text-blue-500" />
                         </Button>
-                        {actionInfo.canAct && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                if (actionInfo.role === 'manager') {
-                                  managerDecisionMutation.mutate({ id: request.id, decision: 'recommended' });
-                                } else if (actionInfo.role === 'hr') {
-                                  hrDecisionMutation.mutate({ id: request.id, decision: 'approved' });
-                                } else if (actionInfo.role === 'md') {
-                                  mdDecisionMutation.mutate({ id: request.id, decision: 'approved' });
-                                }
-                              }}
-                              data-testid={`button-approve-${request.id}`}
-                              title={actionInfo.role === 'manager' ? 'Recommend' : `Approve (${actionInfo.stage})`}
-                            >
-                              <Check className="h-4 w-4 text-green-500" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                if (actionInfo.role === 'manager') {
-                                  managerDecisionMutation.mutate({ id: request.id, decision: 'not_recommended' });
-                                } else if (actionInfo.role === 'hr') {
-                                  hrDecisionMutation.mutate({ id: request.id, decision: 'rejected' });
-                                } else if (actionInfo.role === 'md') {
-                                  mdDecisionMutation.mutate({ id: request.id, decision: 'rejected' });
-                                }
-                              }}
-                              data-testid={`button-reject-${request.id}`}
-                              title={actionInfo.role === 'manager' ? 'Not Recommended' : 'Reject'}
-                            >
-                              <X className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </>
-                        )}
+                        {actionInfo.canAct && (() => {
+                          const canActHere =
+                            (actionInfo.role === 'manager' && (hasRole('manager') || isHrOrAdmin)) ||
+                            (actionInfo.role === 'hr' && isHrOrAdmin);
+                          if (!canActHere) return null;
+                          return (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  if (actionInfo.role === 'manager') {
+                                    managerDecisionMutation.mutate({ id: request.id, decision: 'approved' });
+                                  } else if (actionInfo.role === 'hr') {
+                                    hrDecisionMutation.mutate({ id: request.id, decision: 'approved' });
+                                  }
+                                }}
+                                data-testid={`button-approve-${request.id}`}
+                                title={actionInfo.role === 'manager' ? 'Recommend' : 'Approve'}
+                              >
+                                <Check className="h-4 w-4 text-green-500" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  if (actionInfo.role === 'manager') {
+                                    managerDecisionMutation.mutate({ id: request.id, decision: 'rejected' });
+                                  } else if (actionInfo.role === 'hr') {
+                                    hrDecisionMutation.mutate({ id: request.id, decision: 'rejected' });
+                                  }
+                                }}
+                                data-testid={`button-reject-${request.id}`}
+                                title={actionInfo.role === 'manager' ? 'Not Recommend' : 'Reject'}
+                              >
+                                <X className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </>
+                          );
+                        })()}
                         <Button 
                           variant="ghost" 
                           size="icon"
@@ -413,7 +391,7 @@ export default function LeaveRequestsSection() {
       <Card>
         <CardHeader>
           <CardTitle>Leave Balances</CardTitle>
-          <CardDescription>View and manage employee leave balances - click employee name to expand</CardDescription>
+          <CardDescription>Entitlement per leave type for each employee. Available = Entitlement + Carry Over − Taken − Pending.</CardDescription>
         </CardHeader>
         <CardContent>
           {leaveBalances.length === 0 ? (
@@ -424,79 +402,77 @@ export default function LeaveRequestsSection() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-8"></TableHead>
                   <TableHead>Employee</TableHead>
-                  <TableHead>Total Days</TableHead>
-                  <TableHead>Taken</TableHead>
-                  <TableHead>Pending</TableHead>
-                  <TableHead>Available</TableHead>
+                  <TableHead>Leave Type</TableHead>
+                  <TableHead className="text-right">Entitlement</TableHead>
+                  <TableHead className="text-right">Carry Over</TableHead>
+                  <TableHead className="text-right">Taken</TableHead>
+                  <TableHead className="text-right">Pending</TableHead>
+                  <TableHead className="text-right">Available</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(() => {
+                  // Group balances by employee so we can span the name cell
                   const employeeBalances = new Map<string, LeaveBalance[]>();
                   leaveBalances.forEach((balance: LeaveBalance) => {
                     const existing = employeeBalances.get(balance.userId) || [];
                     existing.push(balance);
                     employeeBalances.set(balance.userId, existing);
                   });
-                  
-                  return Array.from(employeeBalances.entries()).map(([userId, balances]) => {
+
+                  return Array.from(employeeBalances.entries()).flatMap(([userId, balances]) => {
                     const employee = users.find(u => u.id === userId);
-                    const isExpanded = expandedLeaveBalanceEmployees.has(userId);
-                    const totalDays = balances.reduce((sum, b) => sum + b.total, 0);
-                    const totalTaken = balances.reduce((sum, b) => sum + b.taken, 0);
-                    const totalPending = balances.reduce((sum, b) => sum + b.pending, 0);
-                    const totalAvailable = totalDays - totalTaken - totalPending;
-                    
-                    return (
-                      <React.Fragment key={userId}>
-                        <TableRow 
-                          className="cursor-pointer hover:bg-slate-50"
-                          onClick={() => toggleLeaveBalanceEmployeeExpanded(userId)}
-                          data-testid={`row-balance-employee-${userId}`}
-                        >
-                          <TableCell>
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    const employeeName = employee ? `${employee.firstName} ${employee.surname}` : userId;
+                    const today = new Date().toISOString().split('T')[0];
+
+                    return balances.map((balance, idx) => {
+                      const carryOver = (balance as any).carryOverDays as number ?? 0;
+                      const carryOverExpiry = (balance as any).carryOverExpiry as string | null ?? null;
+                      // balance.total = pure entitlement + carryOver (stored together).
+                      // Derive pure entitlement for display; available = total - taken - pending (no double-count).
+                      const total = balance.total ?? 0;
+                      const pureEntitlement = Math.round((total - carryOver) * 10) / 10;
+                      const taken = balance.taken ?? 0;
+                      const pending = balance.pending ?? 0;
+                      const available = Math.round((total - taken - pending) * 10) / 10;
+                      const expiringSoon = carryOver > 0 && carryOverExpiry && carryOverExpiry > today
+                        && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
+
+                      return (
+                        <TableRow key={balance.id} data-testid={`row-balance-detail-${balance.id}`}
+                          className={idx === 0 ? 'border-t-2 border-t-slate-200' : ''}>
+                          <TableCell className="font-medium align-top">
+                            {idx === 0 ? employeeName : ''}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground capitalize">
+                            {balance.leaveType}
+                          </TableCell>
+                          <TableCell className="text-right">{pureEntitlement}</TableCell>
+                          <TableCell className="text-right">
+                            {carryOver > 0 ? (
+                              <span className={`text-blue-600 font-medium${expiringSoon ? ' text-orange-600' : ''}`}>
+                                +{carryOver}
+                                {carryOverExpiry && (
+                                  <span className="block text-[10px] font-normal text-muted-foreground">
+                                    {expiringSoon ? '⚠ ' : ''}expires {new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                  </span>
+                                )}
+                              </span>
                             ) : (
-                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {employee ? `${employee.firstName} ${employee.surname}` : userId}
-                          </TableCell>
-                          <TableCell>{totalDays}</TableCell>
-                          <TableCell>{totalTaken}</TableCell>
-                          <TableCell>{totalPending}</TableCell>
-                          <TableCell>
-                            <Badge variant={totalAvailable > 0 ? 'default' : 'destructive'}>
-                              {totalAvailable}
+                          <TableCell className="text-right">{taken > 0 ? taken : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-right">{pending > 0 ? pending : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={available > 0 ? 'outline' : 'destructive'} className="text-xs font-semibold">
+                              {available}
                             </Badge>
                           </TableCell>
                         </TableRow>
-                        
-                        {isExpanded && balances.map((balance) => {
-                          const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
-                          return (
-                            <TableRow key={balance.id} className="bg-slate-50/50" data-testid={`row-balance-detail-${balance.id}`}>
-                              <TableCell></TableCell>
-                              <TableCell className="pl-8 text-muted-foreground capitalize">
-                                {balance.leaveType.replace('_', ' ')}
-                              </TableCell>
-                              <TableCell>{balance.total}</TableCell>
-                              <TableCell>{balance.taken}</TableCell>
-                              <TableCell>{balance.pending}</TableCell>
-                              <TableCell>
-                                <Badge variant={available > 0 ? 'outline' : 'destructive'} className="text-xs">
-                                  {available}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </React.Fragment>
-                    );
+                      );
+                    });
                   });
                 })()}
               </TableBody>
@@ -735,16 +711,16 @@ export default function LeaveRequestsSection() {
                     <Label className="text-muted-foreground text-sm">Approval History</Label>
 
                     {selectedLeaveRequest.managerDecision && (
-                      <div className={`p-3 rounded-lg border ${selectedLeaveRequest.managerDecision === 'not_recommended' ? 'bg-red-50 border-red-300' : 'bg-purple-50 border-purple-200'}`}>
+                      <div className={`p-3 rounded-lg border ${selectedLeaveRequest.managerDecision === 'rejected' ? 'bg-red-50 border-red-300' : 'bg-purple-50 border-purple-200'}`}>
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className={`text-xs ${selectedLeaveRequest.managerDecision === 'not_recommended' ? 'bg-red-100 text-red-700 border-red-300' : 'bg-purple-100 text-purple-700 border-purple-300'}`}>Manager Recommendation</Badge>
+                          <Badge variant="outline" className={`text-xs ${selectedLeaveRequest.managerDecision === 'rejected' ? 'bg-red-100 text-red-700 border-red-300' : 'bg-purple-100 text-purple-700 border-purple-300'}`}>Manager Recommendation</Badge>
                           <span className="text-xs text-muted-foreground">
-                            {selectedLeaveRequest.managerDecision === 'recommended' ? '✓ Recommended' : '✗ Not Recommended'}
+                            {selectedLeaveRequest.managerDecision === 'approved' ? '✓ Recommended' : '✗ Not Recommended'}
                             {selectedLeaveRequest.managerDecisionAt && ` on ${format(new Date(selectedLeaveRequest.managerDecisionAt), 'd MMM yyyy')}`}
                           </span>
                         </div>
                         {selectedLeaveRequest.managerNotes && (
-                          <p className={`text-sm ${selectedLeaveRequest.managerDecision === 'not_recommended' ? 'text-red-800' : 'text-purple-800'}`}>{selectedLeaveRequest.managerNotes}</p>
+                          <p className={`text-sm ${selectedLeaveRequest.managerDecision === 'rejected' ? 'text-red-800' : 'text-purple-800'}`}>{selectedLeaveRequest.managerNotes}</p>
                         )}
                         {selectedLeaveRequest.managerApproverId && (
                           <p className="text-xs text-muted-foreground mt-1">
@@ -898,7 +874,7 @@ export default function LeaveRequestsSection() {
                         </Label>
                         <p className="text-xs text-muted-foreground mb-1">
                           {actionInfo.role === 'manager'
-                            ? 'Provide your recommendation. If not recommending, explain the reason clearly for HR review.'
+                            ? 'Justification is required if you are not recommending this leave.'
                             : actionInfo.role === 'hr'
                             ? 'Review manager recommendation and add HR assessment for MD'
                             : 'Review all previous comments and provide final decision notes'}
@@ -906,32 +882,28 @@ export default function LeaveRequestsSection() {
                         <Textarea
                           id="adminNotes"
                           placeholder={actionInfo.role === 'manager'
-                            ? "Describe workload impact, team availability, or reasons for your recommendation..."
+                            ? "Optional for recommendation. Required if not recommending — describe reason clearly."
                             : actionInfo.role === 'hr'
                             ? "HR assessment: Leave balance verification, policy compliance, any concerns?"
                             : "Final review: Overall assessment considering all previous comments"}
-                          className={`mt-1 min-h-[80px] ${!adminNotes.trim() ? 'border-red-300' : ''}`}
+                          className="mt-1 min-h-[80px]"
                           value={adminNotes}
                           onChange={(e) => setAdminNotes(e.target.value)}
                           data-testid="input-admin-notes"
                         />
-                        {!adminNotes.trim() && (
-                          <p className="text-xs text-red-500 mt-1">Comments are required before making a decision</p>
-                        )}
                       </div>
                       <div className="flex justify-end gap-2 pt-4 border-t">
                         <Button
                           variant="outline"
-                          disabled={!adminNotes.trim()}
                           onClick={() => {
                             if (!adminNotes.trim()) {
-                              toast({ variant: "destructive", title: "Comments Required", description: "Please add comments before proceeding" });
+                              toast({ variant: "destructive", title: "Justification Required", description: "A reason must be provided when not recommending or rejecting a leave request." });
                               return;
                             }
                             if (actionInfo.role === 'manager') {
                               managerDecisionMutation.mutate({
                                 id: selectedLeaveRequest.id,
-                                decision: 'not_recommended',
+                                decision: 'rejected',
                                 notes: adminNotes
                               });
                             } else if (actionInfo.role === 'hr') {
@@ -940,8 +912,8 @@ export default function LeaveRequestsSection() {
                                 decision: 'rejected',
                                 notes: adminNotes
                               });
-                            } else if (actionInfo.role === 'md') {
-                              mdDecisionMutation.mutate({
+                            } else if (actionInfo.role === 'hr') {
+                              hrDecisionMutation.mutate({
                                 id: selectedLeaveRequest.id,
                                 decision: 'rejected',
                                 notes: adminNotes
@@ -950,19 +922,14 @@ export default function LeaveRequestsSection() {
                           }}
                           className="text-red-600 border-red-200 hover:bg-red-50"
                         >
-                          <X className="mr-2 h-4 w-4" /> {actionInfo.role === 'manager' ? 'Not Recommended' : 'Reject'}
+                          <X className="mr-2 h-4 w-4" /> {actionInfo.role === 'manager' ? 'Not Recommend' : 'Reject'}
                         </Button>
                         <Button
-                          disabled={!adminNotes.trim()}
                           onClick={() => {
-                            if (!adminNotes.trim()) {
-                              toast({ variant: "destructive", title: "Comments Required", description: "Please add comments before proceeding" });
-                              return;
-                            }
                             if (actionInfo.role === 'manager') {
                               managerDecisionMutation.mutate({
                                 id: selectedLeaveRequest.id,
-                                decision: 'recommended',
+                                decision: 'approved',
                                 notes: adminNotes
                               });
                             } else if (actionInfo.role === 'hr') {
@@ -971,38 +938,12 @@ export default function LeaveRequestsSection() {
                                 decision: 'approved',
                                 notes: adminNotes
                               });
-                            } else if (actionInfo.role === 'md') {
-                              mdDecisionMutation.mutate({
-                                id: selectedLeaveRequest.id,
-                                decision: 'approved',
-                                notes: adminNotes
-                              });
                             }
                           }}
                           className="bg-green-600 hover:bg-green-700"
                         >
-                          <Check className="mr-2 h-4 w-4" /> {actionInfo.role === 'manager' ? 'Recommend & Forward' : actionInfo.role === 'md' ? 'Approve (Final)' : 'Approve & Forward'}
+                          <Check className="mr-2 h-4 w-4" /> {actionInfo.role === 'manager' ? 'Recommend' : 'Approve'}
                         </Button>
-                        {actionInfo.role === 'md' && selectedLeaveRequest.status === 'pending_hr' && (
-                          <Button 
-                            disabled={!adminNotes.trim()}
-                            onClick={() => {
-                              if (!adminNotes.trim()) {
-                                toast({ variant: "destructive", title: "Comments Required", description: "Please add comments before approving" });
-                                return;
-                              }
-                              mdDecisionMutation.mutate({ 
-                                id: selectedLeaveRequest.id, 
-                                decision: 'approved',
-                                notes: adminNotes,
-                                bypassHR: true
-                              });
-                            }}
-                            className="bg-purple-600 hover:bg-purple-700"
-                          >
-                            <Check className="mr-2 h-4 w-4" /> Bypass HR & Approve
-                          </Button>
-                        )}
                       </div>
                       
                       {selectedLeaveRequest.status !== 'cancelled' && selectedLeaveRequest.status !== 'rejected' && (
@@ -1060,19 +1001,16 @@ export default function LeaveRequestsSection() {
 
             <div className="space-y-1">
               <Label htmlFor="h-employee">Employee <span className="text-red-500">*</span></Label>
-              <Select value={historicForm.userId} onValueChange={v => setHistoricForm(f => ({ ...f, userId: v }))}>
-                <SelectTrigger id="h-employee" data-testid="select-historic-employee">
-                  <SelectValue placeholder="Select employee..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {users
-                    .filter((u: any) => !u.terminationDate && !u.excludeFromLeave)
-                    .sort((a: any, b: any) => `${a.firstName} ${a.surname}`.localeCompare(`${b.firstName} ${b.surname}`))
-                    .map((u: any) => (
-                      <SelectItem key={u.id} value={u.id}>{u.firstName} {u.surname}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={historicForm.userId}
+                onValueChange={v => setHistoricForm(f => ({ ...f, userId: v }))}
+                options={users
+                  .filter((u: any) => !u.terminationDate && !u.excludeFromLeave)
+                  .sort((a: any, b: any) => `${a.firstName} ${a.surname}`.localeCompare(`${b.firstName} ${b.surname}`))
+                  .map((u: any) => ({ value: u.id, label: `${u.firstName} ${u.surname}` }))}
+                placeholder="Select employee..."
+                searchPlaceholder="Search employees..."
+              />
             </div>
 
             <div className="space-y-1">

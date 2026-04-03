@@ -31,7 +31,7 @@ import MyAttendanceSection from './admin/MyAttendanceSection';
 import MyProfileSection from './admin/MyProfileSection';
 import EmployeeDashboardSection from './admin/EmployeeDashboardSection';
 
-type ActiveSection = 'dashboard' | 'employees' | 'leave-requests' | 'attendance' | 'departments' | 'employee-types' | 'leave-rules' | 'grievances' | 'holidays' | 'leave-calendar' | 'positions' | 'companies' | 'settings' | 'backup' | 'apply-leave' | 'employee-grievances' | 'my-attendance' | 'profile';
+type ActiveSection = 'dashboard' | 'admin-insights' | 'employees' | 'leave-requests' | 'attendance' | 'departments' | 'employee-types' | 'leave-rules' | 'grievances' | 'holidays' | 'leave-calendar' | 'positions' | 'companies' | 'settings' | 'backup' | 'apply-leave' | 'employee-grievances' | 'my-attendance' | 'profile';
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -65,7 +65,7 @@ export default function AdminDashboard() {
   const companyLogo = companyLogoSetting?.value || aeceLogo;
 
   const pendingCounts = {
-    total: leaveRequests.filter((r: LeaveRequest) => ['pending_manager', 'pending_hr', 'pending_md', 'pending'].includes(r.status)).length,
+    total: leaveRequests.filter((r: LeaveRequest) => ['pending_manager', 'pending_hr', 'pending'].includes(r.status)).length,
   };
 
   const openGrievanceCount = grievances.filter((g: Grievance) => g.status === 'submitted' || g.status === 'in_review').length;
@@ -128,7 +128,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const isManagement = hasRole('manager') || hasRole('hr') || hasRole('md') || hasRole('admin');
+  const isManagement = hasRole('manager') || hasRole('hr') || hasRole('admin');
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -266,6 +266,15 @@ export default function AdminDashboard() {
           {/* Management section — manager, hr, md, admin only */}
           {isManagement && (
             <>
+              {(hasRole('hr') || hasRole('admin')) && (
+                <button
+                  onClick={() => setActiveSection('admin-insights')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'admin-insights' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
+                  data-testid="nav-admin-insights"
+                >
+                  <TrendingUp className="h-4 w-4" /> Admin Insights
+                </button>
+              )}
               <button
                 onClick={() => setActiveSection('employees')}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'employees' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
@@ -409,11 +418,8 @@ export default function AdminDashboard() {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto p-4 md:p-6">
-        {activeSection === 'dashboard' && (
-          hasRole('hr') || hasRole('admin')
-            ? <DashboardSection setActiveSection={setActiveSection} />
-            : <EmployeeDashboardSection setActiveSection={setActiveSection} />
-        )}
+        {activeSection === 'dashboard' && <EmployeeDashboardSection setActiveSection={setActiveSection} />}
+        {activeSection === 'admin-insights' && <DashboardSection setActiveSection={setActiveSection} />}
         {activeSection === 'employees' && <PersonnelSection />}
         {activeSection === 'leave-requests' && <LeaveRequestsSection />}
         {activeSection === 'attendance' && <AttendanceSection />}

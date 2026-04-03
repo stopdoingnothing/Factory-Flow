@@ -51,11 +51,11 @@ export const getEmploymentDuration = (startDateStr: string | null | undefined): 
 export const formatLeaveStatus = (status: string): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; color?: string } => {
   switch (status) {
     case 'pending_manager':
-      return { label: 'Pending Manager', variant: 'secondary' };
+      return { label: 'Awaiting Recommendation', variant: 'secondary' };
     case 'pending_hr':
       return { label: 'Pending HR', variant: 'secondary' };
     case 'pending_md':
-      return { label: 'Pending MD', variant: 'secondary' };
+      return { label: 'Pending HR', variant: 'secondary' }; // legacy — treat as pending_hr
     case 'approved':
       return { label: 'Approved', variant: 'default' };
     case 'rejected':
@@ -69,14 +69,12 @@ export const formatLeaveStatus = (status: string): { label: string; variant: 'de
   }
 };
 
-export const canTakeAction = (request: LeaveRequest): { canAct: boolean; role: 'manager' | 'hr' | 'md' | null; stage: string } => {
+export const canTakeAction = (request: LeaveRequest): { canAct: boolean; role: 'manager' | 'hr' | null; stage: string } => {
   const status = request.status;
   if (status === 'pending_manager') {
     return { canAct: true, role: 'manager', stage: 'Manager Review' };
-  } else if (status === 'pending_hr') {
-    return { canAct: true, role: 'hr', stage: 'HR Review' };
-  } else if (status === 'pending_md') {
-    return { canAct: true, role: 'md', stage: 'MD Approval' };
+  } else if (status === 'pending_hr' || status === 'pending_md') {
+    return { canAct: true, role: 'hr', stage: 'HR Approval' };
   }
   return { canAct: false, role: null, stage: '' };
 };

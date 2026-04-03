@@ -232,6 +232,9 @@ export const leaveRequests = pgTable("leave_requests", {
   authorizedBy: text("authorized_by"), // Name of the person who authorized in the old system
   referenceNumber: text("reference_number"), // Reference number from the physical leave book
   
+  // Set when an approved request's dates have passed and pending days have been moved to taken
+  settledAt: timestamp("settled_at"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

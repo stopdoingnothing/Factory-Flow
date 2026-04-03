@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -506,45 +507,35 @@ export default function MaintainerDashboard() {
               </div>
               <div className="space-y-2">
                 <Label>Department</Label>
-                <Select value={formData.department} onValueChange={(v) => setFormData({ ...formData, department: v })}>
-                  <SelectTrigger data-testid="select-department">
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept.id} value={dept.name}>{dept.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={formData.department}
+                  onValueChange={(v) => setFormData({ ...formData, department: v })}
+                  options={departments.map(dept => ({ value: dept.name, label: dept.name }))}
+                  placeholder="Select department"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Employee Type</Label>
-                <Select value={formData.employeeTypeId} onValueChange={(v) => setFormData({ ...formData, employeeTypeId: v })}>
-                  <SelectTrigger data-testid="select-employee-type">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employeeTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>{type.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={formData.employeeTypeId}
+                  onValueChange={(v) => setFormData({ ...formData, employeeTypeId: v })}
+                  options={employeeTypes.map(type => ({ value: type.id.toString(), label: type.name }))}
+                  placeholder="Select type"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Reports To (Position)</Label>
-                <Select value={formData.reportsToPositionId || 'none'} onValueChange={(v) => setFormData({ ...formData, reportsToPositionId: v === 'none' ? '' : v })}>
-                  <SelectTrigger data-testid="select-reports-to-position">
-                    <SelectValue placeholder="Select reporting position (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No Reporting Position</SelectItem>
-                    {orgPositions
+                <SearchableSelect
+                  value={formData.reportsToPositionId || 'none'}
+                  onValueChange={(v) => setFormData({ ...formData, reportsToPositionId: v === 'none' ? '' : v })}
+                  options={[
+                    { value: 'none', label: 'No Reporting Position' },
+                    ...orgPositions
                       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.title.localeCompare(b.title))
-                      .map((pos) => (
-                        <SelectItem key={pos.id} value={pos.id.toString()}>{pos.title}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                      .map(pos => ({ value: pos.id.toString(), label: pos.title })),
+                  ]}
+                  placeholder="Select reporting position (optional)"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Start Date</Label>

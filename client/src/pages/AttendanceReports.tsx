@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { attendanceApi, userApi, departmentApi, settingsApi, publicHolidayApi } from '@/lib/api';
 import type { User, AttendanceRecord, Department, PublicHoliday } from '@shared/schema';
 import {
@@ -802,17 +803,16 @@ export default function AttendanceReports() {
                     data-testid="input-search-reports"
                   />
                 </div>
-                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                  <SelectTrigger className="w-40" data-testid="select-department">
-                    <SelectValue placeholder="Department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {departments.map(d => (
-                      <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={selectedDepartment}
+                  onValueChange={setSelectedDepartment}
+                  options={[
+                    { value: 'all', label: 'All Departments' },
+                    ...departments.map(d => ({ value: d.name, label: d.name })),
+                  ]}
+                  placeholder="Department"
+                  className="w-40"
+                />
                 <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
                   <SelectTrigger className="w-40" data-testid="select-sort">
                     <SelectValue placeholder="Sort by" />

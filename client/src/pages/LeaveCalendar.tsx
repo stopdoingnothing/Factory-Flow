@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useAuth } from '@/lib/auth-context';
 import { leaveRequestApi, userApi, departmentApi } from '@/lib/api';
 import type { LeaveRequest, User, Department } from '@shared/schema';
@@ -102,17 +103,16 @@ export default function LeaveCalendar() {
           </div>
           
           <div className="flex items-center gap-4">
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="w-48" data-testid="select-department-filter">
-                <SelectValue placeholder="Filter by department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((dept: Department) => (
-                  <SelectItem key={dept.id} value={dept.name}>{dept.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={selectedDepartment}
+              onValueChange={setSelectedDepartment}
+              options={[
+                { value: 'all', label: 'All Departments' },
+                ...departments.map((dept: Department) => ({ value: dept.name, label: dept.name })),
+              ]}
+              placeholder="Filter by department"
+              className="w-48"
+            />
           </div>
         </div>
 
