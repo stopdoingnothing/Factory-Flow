@@ -61,7 +61,8 @@ export default function AdminDashboard() {
   const [adminFaceDescriptor, setAdminFaceDescriptor] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && user.role === 'manager' && !user.faceDescriptor && !sessionStorage.getItem('photoSetupSkipped')) {
+    const skipped = localStorage.getItem(`photoSetupSkipped_${user?.id}`);
+    if (user && user.role === 'manager' && !user.faceDescriptor && !user.photoUrl && !skipped) {
       setShowPhotoSetup(true);
     }
   }, [user]);
@@ -198,7 +199,7 @@ export default function AdminDashboard() {
                 <Button
                   variant="ghost"
                   className="w-full text-slate-500"
-                  onClick={() => { sessionStorage.setItem('photoSetupSkipped', '1'); setShowPhotoSetup(false); }}
+                  onClick={() => { localStorage.setItem(`photoSetupSkipped_${user?.id}`, '1'); setShowPhotoSetup(false); }}
                 >
                   Skip for now
                 </Button>
