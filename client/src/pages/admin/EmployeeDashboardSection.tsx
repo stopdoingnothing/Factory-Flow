@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 import { leaveBalanceApi, leaveRequestApi, userApi, attendanceApi } from '@/lib/api';
 import { useToast } from "@/hooks/use-toast";
 import { Clock, Calendar, AlertCircle, CheckCircle2, FileText, Eye, X, XCircle, LogIn, LogOut } from 'lucide-react';
-import { formatLeaveDays } from './utils';
+import { formatLeaveDays, groupLeaveBalances } from './utils';
 import { format } from 'date-fns';
 import type { LeaveRequest } from '@shared/schema';
 
@@ -145,10 +145,10 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
         </Card>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {balances.map((balance: any) => {
+      {(() => {
+        const { standard, other } = groupLeaveBalances(balances);
+        const renderCard = (balance: any) => {
           const carryOver = balance.carryOverDays as number | undefined;
-          // balance.total = entitlement + carryOver (stored together). Do NOT add carryOver again.
           const available = Math.round(((balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0)) * 10) / 10;
           const carryOverExpiry = balance.carryOverExpiry as string | null | undefined;
           const today = new Date().toISOString().split('T')[0];
@@ -180,8 +180,28 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
               </CardContent>
             </Card>
           );
-        })}
-      </div>
+        };
+        return (
+          <div className="space-y-4">
+            {standard.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Standard</p>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {standard.map(renderCard)}
+                </div>
+              </div>
+            )}
+            {other.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Other</p>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  {other.map(renderCard)}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-2 shadow-sm border-t-4 border-t-secondary">
