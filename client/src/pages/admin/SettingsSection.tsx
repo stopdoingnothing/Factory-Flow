@@ -20,7 +20,7 @@ import {
   settingsApi, userApi, userGroupApi, backupApi, leaveBalanceApi 
 } from '@/lib/api';
 import type { User, UserGroup } from '@shared/schema';
-import { generatePassword } from './utils';
+import { generatePassword, isManagerOrAbove } from './utils';
 
 export default function SettingsSection() {
   const { toast } = useToast();
@@ -829,7 +829,7 @@ export default function SettingsSection() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.filter(u => u.role === 'manager').map((admin) => {
+                {users.filter(u => isManagerOrAbove(u)).map((admin) => {
                   const group = userGroups.find(g => g.id === admin.userGroupId);
                   return (
                     <TableRow key={admin.id} data-testid={`row-admin-${admin.id}`}>

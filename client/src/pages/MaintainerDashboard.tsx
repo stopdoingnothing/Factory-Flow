@@ -151,7 +151,7 @@ export default function MaintainerDashboard() {
       mobile: employee.mobile || '',
       homeAddress: employee.homeAddress || '',
       gender: employee.gender || '',
-      role: employee.role,
+      role: Array.isArray((employee as any).roles) && (employee as any).roles.includes('manager') ? 'manager' : (employee.role || 'worker'),
       department: employee.department || '',
       employeeTypeId: employee.employeeTypeId?.toString() || '',
       nationalId: employee.nationalId || '',
@@ -236,6 +236,7 @@ export default function MaintainerDashboard() {
       homeAddress: formData.homeAddress || null,
       gender: formData.gender || null,
       role: formData.role as 'worker' | 'manager',
+      roles: formData.role === 'manager' ? ['employee', 'manager'] : ['employee'],
       department: formData.department || null,
       employeeTypeId: formData.employeeTypeId ? parseInt(formData.employeeTypeId) : null,
       nationalId: formData.nationalId || null,
@@ -268,7 +269,7 @@ export default function MaintainerDashboard() {
     (u.nationalId && u.nationalId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const managers = users.filter(u => u.role === 'manager');
+  const managers = users.filter(u => Array.isArray((u as any).roles) && (u as any).roles.includes('manager'));
 
   if (!user) {
     setLocation('/login');

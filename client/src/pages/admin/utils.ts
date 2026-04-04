@@ -1,5 +1,21 @@
 import type { LeaveRequest } from '@shared/schema';
 
+/** Check if a user object has a specific role in their roles[] array */
+export const userHasRole = (user: any, role: string): boolean =>
+  Array.isArray(user?.roles) && user.roles.includes(role);
+
+/** Check if a user is a manager (has 'manager', 'admin', or 'hr' role) */
+export const isManagerOrAbove = (user: any): boolean =>
+  userHasRole(user, 'manager') || userHasRole(user, 'admin') || userHasRole(user, 'hr');
+
+/** Display label for a user's primary role */
+export const getRoleLabel = (user: any): string => {
+  if (userHasRole(user, 'admin')) return 'Admin';
+  if (userHasRole(user, 'hr')) return 'HR';
+  if (userHasRole(user, 'manager')) return 'Manager';
+  return 'Employee';
+};
+
 export const formatDateForDisplay = (isoDate: string | null | undefined): string => {
   if (!isoDate) return '';
   const dateOnly = isoDate.split('T')[0];

@@ -220,7 +220,7 @@ export default function AttendanceReports() {
   };
 
   const activeUsers = useMemo(() => {
-    return users.filter(u => !u.terminationDate && !u.exclude && u.attendanceRequired !== false && (u.role === 'worker' || u.role === 'manager'));
+    return users.filter(u => !u.terminationDate && !u.exclude && u.attendanceRequired !== false);
   }, [users]);
 
   const summaries = useMemo(() => {

@@ -20,7 +20,7 @@ import { useAuth } from '@/lib/auth-context';
 import WebcamCapture from '@/components/WebcamCapture';
 import MultiAngleFaceCapture from '@/components/MultiAngleFaceCapture';
 import { loadFaceModels, extractFaceDescriptorFromBase64, descriptorToJson } from '@/lib/face-recognition';
-import { formatDateForDisplay, getEmploymentDuration, generatePassword, isValidDateFormat, parseDateFromDisplay, formatLeaveDays } from './utils';
+import { formatDateForDisplay, getEmploymentDuration, generatePassword, isValidDateFormat, parseDateFromDisplay, formatLeaveDays, userHasRole, getRoleLabel, isManagerOrAbove } from './utils';
 
 export default function PersonnelSection() {
   const { toast } = useToast();
@@ -559,7 +559,7 @@ export default function PersonnelSection() {
           return dir * (aBalance - bBalance);
         }
         case 'role':
-          return dir * (a.role || '').localeCompare(b.role || '');
+          return dir * getRoleLabel(a).localeCompare(getRoleLabel(b));
         default:
           return 0;
       }
@@ -681,7 +681,7 @@ export default function PersonnelSection() {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7.5);
       pdf.text(trunc(emp.department || '-', 25), col.dept, y + 4);
-      pdf.text(trunc(emp.role === 'worker' ? 'Employee' : (emp.role || '-'), 12), col.role, y + 4);
+      pdf.text(trunc(getRoleLabel(emp), 12), col.role, y + 4);
       pdf.text(emp.startDate ? formatDateForDisplay(emp.startDate) : '-', col.start, y + 4);
       pdf.text(getEmploymentDuration(emp.startDate), col.tenure, y + 4);
       pdf.setTextColor(empBalances.length > 0 && totalAvailable <= 0 ? 185 : 0, 0, 0);
@@ -1109,8 +1109,8 @@ export default function PersonnelSection() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={emp.role === 'manager' ? 'default' : 'secondary'}>
-                          {emp.role}
+                        <Badge variant={userHasRole(emp, 'manager') ? 'default' : 'secondary'}>
+                          {getRoleLabel(emp)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
@@ -1405,7 +1405,7 @@ export default function PersonnelSection() {
             <div>
               <p className="text-sm font-medium mb-2 text-amber-600">Low Leave Balance Alerts</p>
               <div className="space-y-2">
-                {users.filter(u => u.role === 'worker').map(emp => {
+                {users.filter(u => !isManagerOrAbove(u)).map(emp => {
                   const empBalances = leaveBalances.filter((b: LeaveBalance) => b.userId === emp.id);
                   const lowBalances = empBalances.filter((b: LeaveBalance) => ((b.total ?? 0) - (b.taken ?? 0) - (b.pending ?? 0)) <= 2 && (b.total ?? 0) > 0);
                   if (lowBalances.length === 0) return null;
@@ -1422,7 +1422,7 @@ export default function PersonnelSection() {
                     </div>
                   );
                 }).filter(Boolean)}
-                {users.filter(u => u.role === 'worker').every(emp => {
+                {users.filter(u => !isManagerOrAbove(u)).every(emp => {
                   const empBalances = leaveBalances.filter((b: LeaveBalance) => b.userId === emp.id);
                   return empBalances.every((b: LeaveBalance) => ((b.total ?? 0) - (b.taken ?? 0) - (b.pending ?? 0)) > 2 || (b.total ?? 0) === 0);
                 }) && (

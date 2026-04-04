@@ -80,7 +80,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const skipped = localStorage.getItem(`photoSetupSkipped_${user?.id}`);
-    if (user && user.role === 'manager' && !user.faceDescriptor && !user.photoUrl && !skipped) {
+    if (user && ((user as any).roles || []).some((r: string) => ['manager', 'admin', 'hr'].includes(r)) && !user.faceDescriptor && !user.photoUrl && !skipped) {
       setShowPhotoSetup(true);
     }
   }, [user]);

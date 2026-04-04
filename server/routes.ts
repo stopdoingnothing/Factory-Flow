@@ -10,6 +10,13 @@ declare module "express-session" {
   }
 }
 
+// Strip password from user objects before sending to client
+function stripPassword(user: any) {
+  if (!user) return user;
+  const { password, ...safe } = user;
+  return safe;
+}
+
 // Endpoints that don't require a session.
 // Paths are relative to the /api mount point (i.e. without the /api prefix).
 //   - auth routes (login, logout, me, reset)
@@ -356,7 +363,7 @@ export async function registerRoutes(
       req.session.destroy(() => {});
       return res.status(401).json({ error: "Not authenticated" });
     }
-    return res.json(user);
+    return res.json(stripPassword(user));
   });
 
   app.post("/api/auth/logout", (req, res) => {
@@ -406,7 +413,7 @@ export async function registerRoutes(
         req.session.userRoles = user.roles || ['employee'];
         req.session.save(err => {
           if (err) { console.error("Session save failed (worker login):", err); return res.status(500).json({ error: "Session save failed" }); }
-          return res.json(user);
+          return res.json(stripPassword(user));
         });
       });
     } catch (error) {
@@ -443,7 +450,7 @@ export async function registerRoutes(
         req.session.userRoles = user.roles || ['employee'];
         req.session.save(err => {
           if (err) return res.status(500).json({ error: "Session save failed" });
-          return res.json(user);
+          return res.json(stripPassword(user));
         });
       });
     } catch (error) {
@@ -485,7 +492,7 @@ export async function registerRoutes(
         req.session.userRoles = user.roles || ['employee'];
         req.session.save(err => {
           if (err) { console.error("Session save failed (admin login):", err); return res.status(500).json({ error: "Session save failed" }); }
-          return res.json(user);
+          return res.json(stripPassword(user));
         });
       });
     } catch (error) {
@@ -547,7 +554,7 @@ export async function registerRoutes(
         req.session.userRoles = employee.roles || ['employee'];
         req.session.save(err => {
           if (err) { console.error("Session save failed (manager approved login):", err); return res.status(500).json({ error: "Session save failed" }); }
-          return res.json(employee);
+          return res.json(stripPassword(employee));
         });
       });
     } catch (error) {
@@ -696,7 +703,7 @@ export async function registerRoutes(
   });
 
   // Get all users — hr/admin see everyone; managers see their direct reports; workers see themselves
-  // ?view=org-chart returns all active users with only the fields needed for the org chart
+  // Passwords are NEVER sent to the client.
   app.get("/api/users", async (req, res) => {
     try {
       const sessionUserId = req.session.userId!;
@@ -705,21 +712,8 @@ export async function registerRoutes(
       const isManager = sessionRoles.includes('manager') && !isHrOrAdmin;
       const allUsers = await storage.getAllUsers();
 
-      // Org chart view: any authenticated user can see the structure
-      if (req.query.view === 'org-chart') {
-        const orgChartUsers = allUsers
-          .filter(u => !u.terminationDate)
-          .map(u => ({
-            id: u.id, firstName: u.firstName, surname: u.surname, nickname: u.nickname,
-            role: u.role, department: u.department, photoUrl: u.photoUrl,
-            managerId: u.managerId, orgPositionId: u.orgPositionId,
-            reportsToPositionId: u.reportsToPositionId, companyId: u.companyId,
-          }));
-        return res.json(orgChartUsers);
-      }
-
       if (isHrOrAdmin) {
-        return res.json(allUsers);
+        return res.json(allUsers.map(stripPassword));
       }
 
       if (isManager) {
@@ -728,15 +722,36 @@ export async function registerRoutes(
             .filter(u => u.id === sessionUserId || u.managerId === sessionUserId)
             .map(u => u.id)
         );
-        return res.json(allUsers.filter(u => visibleIds.has(u.id)));
+        return res.json(allUsers.filter(u => visibleIds.has(u.id)).map(stripPassword));
       }
 
       // Employees: only see themselves
       const filteredUsers = allUsers.filter(u => u.id === sessionUserId);
-      return res.json(filteredUsers);
+      return res.json(filteredUsers.map(stripPassword));
     } catch (error) {
       console.error("Get users error:", error);
       return res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Org chart: returns all active users with only the fields needed for rendering
+  // Available to any authenticated user — no sensitive data exposed
+  app.get("/api/users/org-chart", async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const orgChartUsers = allUsers
+        .filter(u => !u.terminationDate)
+        .map(u => ({
+          id: u.id, firstName: u.firstName, surname: u.surname, nickname: u.nickname,
+          role: u.role, roles: u.roles, department: u.department, photoUrl: u.photoUrl,
+          managerId: u.managerId, orgPositionId: u.orgPositionId,
+          reportsToPositionId: u.reportsToPositionId, companyId: u.companyId,
+          exclude: u.exclude,
+        }));
+      return res.json(orgChartUsers);
+    } catch (error) {
+      console.error("Org chart users error:", error);
+      return res.status(500).json({ error: "Failed to fetch org chart users" });
     }
   });
 
@@ -746,7 +761,7 @@ export async function registerRoutes(
       const allUsers = await storage.getAllUsers();
       const kioskUsers = allUsers.filter(u =>
         !u.terminationDate && !u.exclude && u.attendanceRequired !== false &&
-        (u.role === 'worker' || u.role === 'manager')
+        !((u.roles || []).some((r: string) => ['admin', 'hr'].includes(r)))
       );
       return res.json(kioskUsers);
     } catch (error) {
@@ -825,7 +840,7 @@ export async function registerRoutes(
       
       // Filter users who have at least one face descriptor (in user record or face_descriptors table)
       const usersWithFaces = users
-        .filter(u => (u.faceDescriptor || additionalDescriptorsMap.has(u.id)) && !u.terminationDate && !u.exclude && (u.role === 'worker' ? u.attendanceRequired !== false : true) && (u.role === 'worker' || (includeAdmins && u.role === 'manager')))
+        .filter(u => (u.faceDescriptor || additionalDescriptorsMap.has(u.id)) && !u.terminationDate && !u.exclude && u.attendanceRequired !== false)
         .flatMap(u => {
           const results = [];
           // Include the main face descriptor
@@ -869,7 +884,7 @@ export async function registerRoutes(
         return res.status(404).json({ error: "User not found" });
       }
 
-      return res.json(user);
+      return res.json(stripPassword(user));
     } catch (error) {
       console.error("Get user error:", error);
       return res.status(500).json({ error: "Failed to fetch user" });
@@ -2624,7 +2639,8 @@ export async function registerRoutes(
         const allWorkers = await storage.getAllUsers();
         const yesterdayStr = yesterday.toISOString().split('T')[0];
         const activeWorkers = allWorkers.filter((u: any) =>
-          u.role === 'worker' &&
+          u.attendanceRequired !== false &&
+          !((u.roles || []).some((r: string) => ['admin', 'hr'].includes(r))) &&
           !u.terminationDate &&
           !u.excludeFromLeave &&
           (!u.startDate || u.startDate <= yesterdayStr)
@@ -4096,7 +4112,7 @@ export async function registerRoutes(
       const todayDateStr = today.toISOString().split('T')[0];
       // Active employees (not terminated, not excluded, and already started)
       const activeEmployees = users.filter((u: any) => !u.terminationDate && !u.exclude && (!u.startDate || u.startDate <= todayDateStr));
-      const eligibleForAttendance = activeEmployees.filter((u: any) => u.attendanceRequired !== false && (u.role === 'worker' || u.role === 'manager'));
+      const eligibleForAttendance = activeEmployees.filter((u: any) => u.attendanceRequired !== false && !((u.roles || []).some((r: string) => ['admin', 'hr'].includes(r))));
       
       // Clocked in today
       const clockedInUsers = new Set<string>();

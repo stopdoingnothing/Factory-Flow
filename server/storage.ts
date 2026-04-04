@@ -615,7 +615,7 @@ export class DrizzleStorage implements IStorage {
     const results: { user: User; lastClockIn: AttendanceRecord }[] = [];
 
     for (const user of allUsers) {
-      if (user.role !== 'worker') continue;
+      if ((user.roles || []).some((r: string) => ['admin', 'hr'].includes(r))) continue;
       
       const lastRecord = await this.getLatestAttendance(user.id);
       if (!lastRecord) continue;

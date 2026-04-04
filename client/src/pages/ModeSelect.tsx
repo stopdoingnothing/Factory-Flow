@@ -67,7 +67,7 @@ function RestoreModal({ onClose }: { onClose: () => void }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login failed');
-      if (data.user?.role !== 'admin') {
+      if (!Array.isArray(data.user?.roles) || !data.user.roles.includes('admin')) {
         await api('/api/auth/logout', { method: 'POST' });
         throw new Error('Only admin accounts can restore backups');
       }

@@ -11,7 +11,7 @@ import { ArrowLeft, User, Mail, Phone, MapPin, Building2, Calendar, Clock } from
 import { userApi, leaveBalanceApi, attendanceApi } from "@/lib/api";
 import { format } from "date-fns";
 import type { LeaveBalance, AttendanceRecord } from "@shared/schema";
-import { groupLeaveBalances } from './admin/utils';
+import { groupLeaveBalances, userHasRole, getRoleLabel } from './admin/utils';
 
 export default function EmployeeProfile() {
   const { user } = useAuth();
@@ -89,8 +89,8 @@ export default function EmployeeProfile() {
                   </p>
                 )}
                 <div className="mt-2 flex flex-wrap justify-center md:justify-start gap-2">
-                  <Badge variant={displayUser.role === 'manager' ? 'default' : 'secondary'}>
-                    {displayUser.role === 'manager' ? 'Manager' : 'Employee'}
+                  <Badge variant={userHasRole(displayUser, 'manager') || userHasRole(displayUser, 'admin') || userHasRole(displayUser, 'hr') ? 'default' : 'secondary'}>
+                    {getRoleLabel(displayUser)}
                   </Badge>
                   {departmentName && (
                     <Badge variant="outline">{departmentName}</Badge>

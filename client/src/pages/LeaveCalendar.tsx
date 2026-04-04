@@ -76,7 +76,7 @@ export default function LeaveCalendar() {
   const goToNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
   const goToToday = () => setCurrentMonth(new Date());
 
-  if (!user || user.role !== 'manager') {
+  if (!user || !((user as any).roles || []).some((r: string) => ['manager', 'admin', 'hr'].includes(r))) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="w-96">

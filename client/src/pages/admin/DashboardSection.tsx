@@ -28,7 +28,7 @@ import type {
   AttendanceRecord 
 } from '@shared/schema';
 import { useAuth } from '@/lib/auth-context';
-import { formatLeaveStatus, canTakeAction } from './utils';
+import { formatLeaveStatus, canTakeAction, userHasRole, isManagerOrAbove } from './utils';
 
 interface DashboardSectionProps {
   setActiveSection: (section: any) => void;
@@ -153,7 +153,7 @@ export default function DashboardSection({
               <div>
                 <p className="text-2xl font-bold">{activeEmployees.length}</p>
                 <p className="text-sm text-muted-foreground">Total Personnel</p>
-                <p className="text-xs text-muted-foreground">{users.filter((u: any) => u.role === 'worker' && !u.terminationDate).length} workers · {users.filter((u: any) => u.role === 'manager' && !u.terminationDate).length} managers</p>
+                <p className="text-xs text-muted-foreground">{users.filter((u: any) => !isManagerOrAbove(u) && !u.terminationDate).length} workers · {users.filter((u: any) => isManagerOrAbove(u) && !u.terminationDate).length} managers</p>
               </div>
             </div>
           </CardContent>
@@ -393,7 +393,7 @@ export default function DashboardSection({
                 </div>
               );
             }).filter(Boolean)}
-            {users.filter(u => u.role === 'worker').every(emp => {
+            {users.filter(u => !isManagerOrAbove(u)).every(emp => {
               const empBalances = leaveBalances.filter((b: LeaveBalance) => b.userId === emp.id);
               return empBalances.every((b: LeaveBalance) => ((b.total ?? 0) - (b.taken ?? 0) - (b.pending ?? 0)) > 2 || (b.total ?? 0) === 0);
             }) && (

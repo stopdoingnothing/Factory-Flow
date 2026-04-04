@@ -133,8 +133,8 @@ export const userApi = {
   },
 
   async getForOrgChart(): Promise<User[]> {
-    const res = await apiFetch(`${API_BASE}/users?view=org-chart`);
-    if (!res.ok) throw new Error("Failed to fetch users");
+    const res = await apiFetch(`${API_BASE}/users/org-chart`);
+    if (!res.ok) throw new Error("Failed to fetch org chart users");
     return res.json();
   },
 

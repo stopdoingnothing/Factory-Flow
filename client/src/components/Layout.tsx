@@ -56,7 +56,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="flex items-center gap-3">
           <img src={companyLogo} alt={companyName} className="h-8" />
           <span className="font-heading text-xl tracking-wider hidden md:block">
-            {user?.role === 'manager' ? `${companyName.toUpperCase()} ADMIN` : companyName.toUpperCase()}
+            {(hasRole('manager') || hasRole('admin') || hasRole('hr')) ? `${companyName.toUpperCase()} ADMIN` : companyName.toUpperCase()}
           </span>
         </div>
 
