@@ -865,15 +865,13 @@ export async function registerRoutes(
       // (sick leave accrues per 26 days worked; FRL unlocks at 4 months).
       if (newUser.startDate && newUser.excludeFromLeave !== true) {
         try {
-          const startDay = new Date(newUser.startDate + 'T00:00:00');
-          const daysInMonth = new Date(startDay.getFullYear(), startDay.getMonth() + 1, 0).getDate();
-          const daysRemaining = daysInMonth - startDay.getDate() + 1;
-          const tiers = await storage.getAllAccrualRateTiers();
-          const { rate } = determineAccrualRate(0, (newUser as any).annualLeaveOverrideDays ?? null, tiers);
-          const firstMonthAnnual = rate * (daysRemaining / daysInMonth);
-          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Annual Leave',          total: firstMonthAnnual, taken: 0, pending: 0 });
-          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Sick Leave',             total: 0,                taken: 0, pending: 0 });
-          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Family Responsibility',  total: 0,                taken: 0, pending: 0 });
+          // Create skeleton balance rows at zero — backfillUserAccrual() below
+          // calculates and credits all completed months including the start month.
+          // Do NOT pre-credit any amount here; doing so would double-count
+          // the start month when the backfill also processes it.
+          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Annual Leave',          total: 0, taken: 0, pending: 0 });
+          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Sick Leave',             total: 0, taken: 0, pending: 0 });
+          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Family Responsibility',  total: 0, taken: 0, pending: 0 });
           // Provision statutory event-based leave entitlements
           for (const [leaveType, days] of Object.entries(STATUTORY_LEAVE_ENTITLEMENTS)) {
             await storage.createLeaveBalance({ userId: newUser.id, leaveType, total: days, taken: 0, pending: 0 });
