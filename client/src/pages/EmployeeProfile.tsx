@@ -172,7 +172,7 @@ export default function EmployeeProfile() {
                             <span className="text-gray-500 text-sm"> / {balance.total} days</span>
                           </div>
                         </div>
-                        {carryOver && carryOver > 0 && (
+                        {!!carryOver && carryOver > 0 && (
                           <p className="text-xs text-amber-600">
                             +{carryOver} carried over
                             {carryOverExpiry && ` (expires ${new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})`}

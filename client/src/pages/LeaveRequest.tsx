@@ -10,12 +10,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { CalendarIcon, Upload, X, CheckCircle2, FileText, UserCheck, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/lib/auth-context';
 import { leaveRequestApi, userApi, orgPositionApi, leaveBalanceApi } from '@/lib/api';
+import { formatLeaveDays } from './admin/utils';
 import type { OrgPosition, LeaveBalance } from '@shared/schema';
 
 export function LeaveRequest() {
@@ -226,7 +228,7 @@ export function LeaveRequest() {
                       </Label>
                       {leaveType && leaveType !== 'Unpaid Leave' && availableDays !== null && (
                         <Badge variant={availableDays > 0 ? "secondary" : "destructive"} className="text-xs">
-                          {availableDays} day{availableDays !== 1 ? 's' : ''} available
+                          {formatLeaveDays(availableDays)} day{availableDays !== 1 ? 's' : ''} available
                         </Badge>
                       )}
                     </div>
@@ -388,6 +390,61 @@ export function LeaveRequest() {
             </CardContent>
           </Card>
       </div>
+
+      {/* Leave Balance Summary */}
+      {leaveBalances.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-4">Your Leave Balances</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {leaveBalances.map((balance) => {
+              const available = Math.max(0, balance.total - balance.taken - balance.pending);
+              const pct = balance.total > 0 ? (available / balance.total) * 100 : 0;
+              const carryOver = (balance as any).carryOverDays as number | undefined;
+              const carryOverExpiry = (balance as any).carryOverExpiry as string | null | undefined;
+              const today = new Date().toISOString().split('T')[0];
+              const expiringSoon = !!carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today &&
+                new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
+              const isSelected = balance.leaveType === leaveType;
+              return (
+                <Card
+                  key={balance.id}
+                  className={cn(
+                    "relative overflow-hidden cursor-pointer transition-all",
+                    isSelected ? "ring-2 ring-primary border-primary" : "hover:border-primary/40"
+                  )}
+                  onClick={() => { setLeaveType(balance.leaveType); setFieldErrors(e => ({ ...e, leaveType: false })); }}
+                >
+                  <CardHeader className="pb-1 pt-4 px-4">
+                    <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground leading-tight">
+                      {balance.leaveType}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-4 pb-4">
+                    <div className="text-2xl font-bold font-heading">{formatLeaveDays(available)}</div>
+                    <p className="text-xs text-muted-foreground mb-3">days available</p>
+                    <Progress value={pct} className="h-1.5" />
+                    <div className="mt-1.5 text-xs text-right text-muted-foreground">{formatLeaveDays(balance.total)} total</div>
+                    {!!carryOver && carryOver > 0 && (
+                      <div className={cn("mt-1 text-xs", expiringSoon ? "text-orange-600 font-medium" : "text-blue-600")}>
+                        +{formatLeaveDays(carryOver)} carried over
+                        {carryOverExpiry && (
+                          <span className="ml-1">
+                            · {expiringSoon ? '⚠ expires ' : 'use by '}
+                            {new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {balance.pending > 0 && (
+                      <div className="mt-1 text-xs text-amber-600">{formatLeaveDays(balance.pending)} pending</div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

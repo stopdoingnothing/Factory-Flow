@@ -175,7 +175,7 @@ export default function Dashboard() {
             const carryOver = (balance as any).carryOverDays as number | undefined;
             const carryOverExpiry = (balance as any).carryOverExpiry as string | null | undefined;
             const today = new Date().toISOString().split('T')[0];
-            const expiringSoon = carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
+            const expiringSoon = !!carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
             return (
               <Card key={balance.id} className="industrial-card relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -193,7 +193,7 @@ export default function Dashboard() {
                   <div className="mt-2 text-xs text-right text-muted-foreground">
                     {balance.total} total entitlement
                   </div>
-                  {carryOver && carryOver > 0 && (
+                  {!!carryOver && carryOver > 0 && (
                     <div className="mt-1 text-xs text-blue-600">
                       +{carryOver} carried over
                       {carryOverExpiry && (
