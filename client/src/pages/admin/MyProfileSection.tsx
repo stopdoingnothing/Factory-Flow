@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User, Mail, Phone, MapPin, Building2, Calendar, Clock, Users } from "lucide-react";
 import { userApi, leaveBalanceApi, attendanceApi } from "@/lib/api";
-import { formatLeaveDays } from './utils';
+import { formatLeaveDays, groupLeaveBalances, userHasRole } from './utils';
 import { format } from "date-fns";
 import type { LeaveBalance, AttendanceRecord } from "@shared/schema";
 
@@ -73,7 +73,7 @@ export default function MyProfileSection() {
               <div className="mt-2 flex flex-wrap justify-center md:justify-start gap-2">
                 {((displayUser as any).roles?.length
                   ? (displayUser as any).roles
-                  : [(displayUser as any).role === 'manager' ? 'manager' : 'employee']
+                  : [userHasRole(displayUser, 'manager') ? 'manager' : 'employee']
                 ).map((r: string) => (
                   <Badge key={r} variant="secondary" className="capitalize">{r}</Badge>
                 ))}
@@ -144,8 +144,8 @@ export default function MyProfileSection() {
           </CardHeader>
           <CardContent>
             {leaveBalances && leaveBalances.length > 0 ? (
-              <div className="space-y-4">
-                {leaveBalances.map((balance: LeaveBalance) => {
+              (() => {
+                const renderBalance = (balance: LeaveBalance) => {
                   const carryOver = (balance as any).carryOverDays as number | undefined;
                   const carryOverExpiry = (balance as any).carryOverExpiry as string | null | undefined;
                   const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
@@ -166,8 +166,25 @@ export default function MyProfileSection() {
                       )}
                     </div>
                   );
-                })}
-              </div>
+                };
+                const { standard, other } = groupLeaveBalances(leaveBalances as LeaveBalance[]);
+                return (
+                  <div className="space-y-4">
+                    {standard.length > 0 && (
+                      <div className="space-y-3">
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Standard</p>
+                        {standard.map(renderBalance)}
+                      </div>
+                    )}
+                    {other.length > 0 && (
+                      <div className="space-y-3">
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Other</p>
+                        {other.map(renderBalance)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
             ) : (
               <p className="text-gray-500">No leave balances found.</p>
             )}

@@ -12,6 +12,7 @@ import type { User, Department, OrgPosition } from '@shared/schema';
 import * as d3 from 'd3-hierarchy';
 import { jsPDF } from 'jspdf';
 import { useToast } from '@/hooks/use-toast';
+import { userHasRole } from '@/pages/admin/utils';
 
 interface WorkerData {
   id: string;
@@ -594,8 +595,8 @@ export default function OrgChart() {
 
 
   const { data: users = [], isLoading: usersLoading, isError: usersError } = useQuery<User[]>({
-    queryKey: ['users'],
-    queryFn: userApi.getAll,
+    queryKey: ['users', 'org-chart'],
+    queryFn: userApi.getForOrgChart,
   });
 
   const { data: departments = [], isLoading: deptsLoading, isError: deptsError } = useQuery<Department[]>({
@@ -641,10 +642,10 @@ export default function OrgChart() {
         const hasChildren = orgPositions.some(p => p.parentPositionId === posId);
         if (hasChildren) return false;
         const assignedUsers = getUsersForPosition(posId);
-        if (assignedUsers.length === 1 && assignedUsers[0].role === 'manager') return false;
+        if (assignedUsers.length === 1 && userHasRole(assignedUsers[0], 'manager')) return false;
         if (assignedUsers.length > 1) return true;
         if (assignedUsers.length === 0) return true;
-        return assignedUsers[0].role === 'worker';
+        return !userHasRole(assignedUsers[0], 'manager');
       };
 
       const buildPositionSubtree = (posId: number): TreeNode => {
@@ -833,8 +834,8 @@ export default function OrgChart() {
       if (!user) return null;
       
       const directReports = activeUsers.filter(u => u.managerId === userId);
-      const managerReports = directReports.filter(u => u.role === 'manager');
-      const workerReports = directReports.filter(u => u.role === 'worker');
+      const managerReports = directReports.filter(u => userHasRole(u, 'manager'));
+      const workerReports = directReports.filter(u => !userHasRole(u, 'manager'));
       
       const managersByDept = new Map<string, User[]>();
       managerReports.forEach(m => {
@@ -877,8 +878,8 @@ export default function OrgChart() {
           
           const mgrNodeHeight = DEPT_HEADER_HEIGHT + managerEntries.length * WORKER_ROW_HEIGHT + 4;
           
-          const sharedWorkers = activeUsers.filter(u => 
-            u.role === 'worker' && 
+          const sharedWorkers = activeUsers.filter(u =>
+            !userHasRole(u, 'manager') &&
             managerIds.has(u.managerId || '')
           );
           
@@ -959,7 +960,7 @@ export default function OrgChart() {
           id: user.id,
           userId: user.id,
           name: `${user.firstName} ${user.surname}`,
-          role: user.role,
+          role: userHasRole(user, 'manager') ? 'manager' : 'employee',
           department: user.department,
           photoUrl: user.photoUrl,
           kind: 'manager' as const,
@@ -979,8 +980,8 @@ export default function OrgChart() {
       tree.data.isRoot = true;
       rootNode = tree;
     } else {
-      const managerRoots = roots.filter(r => r.role === 'manager').sort((a, b) => (a.department || '').localeCompare(b.department || ''));
-      const workerRoots = roots.filter(r => r.role === 'worker').sort((a, b) => (a.department || '').localeCompare(b.department || ''));
+      const managerRoots = roots.filter(r => userHasRole(r, 'manager')).sort((a, b) => (a.department || '').localeCompare(b.department || ''));
+      const workerRoots = roots.filter(r => !userHasRole(r, 'manager')).sort((a, b) => (a.department || '').localeCompare(b.department || ''));
       const sortedRoots = [...managerRoots, ...workerRoots];
       
       rootNode = {
@@ -1050,8 +1051,8 @@ export default function OrgChart() {
     });
   }, [activeUsers, orgPositions]);
 
-  const totalManagers = activeUsers.filter(u => u.role === 'manager').length;
-  const totalWorkers = activeUsers.filter(u => u.role === 'worker').length;
+  const totalManagers = activeUsers.filter(u => userHasRole(u, 'manager')).length;
+  const totalWorkers = activeUsers.filter(u => !userHasRole(u, 'manager')).length;
 
   const uniqueDepartments = useMemo(() => {
     const depts = new Set<string>();
@@ -1074,7 +1075,7 @@ export default function OrgChart() {
     setZoom(Math.max(0.4, Math.min(fitScale, 2)));
   };
 
-  if (!user || user.role !== 'manager') {
+  if (!user || !((user as any).roles || []).some((r: string) => ['manager', 'admin', 'hr'].includes(r))) {
     return null;
   }
 
