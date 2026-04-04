@@ -9,13 +9,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { CalendarIcon, Upload, X, CheckCircle2, FileText, UserCheck, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/lib/auth-context';
-import { leaveRequestApi, userApi, orgPositionApi } from '@/lib/api';
-import type { OrgPosition } from '@shared/schema';
+import { leaveRequestApi, userApi, orgPositionApi, leaveBalanceApi } from '@/lib/api';
+import type { OrgPosition, LeaveBalance } from '@shared/schema';
 
 export function LeaveRequest() {
   const { toast } = useToast();
@@ -30,6 +31,7 @@ export function LeaveRequest() {
   const [comments, setComments] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [fileContents, setFileContents] = useState<{name: string; data: string}[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<{ leaveType?: boolean; date?: boolean; reason?: boolean }>({});
   
   // Fetch org positions and all users to resolve position-based reporting
   const { data: orgPositions = [] } = useQuery<OrgPosition[]>({
@@ -42,6 +44,18 @@ export function LeaveRequest() {
     queryFn: userApi.getAll,
     enabled: !!(user?.reportsToPositionId),
   });
+
+  // Fetch the user's leave balances
+  const { data: leaveBalances = [] } = useQuery<LeaveBalance[]>({
+    queryKey: ['leave-balances', user?.id],
+    queryFn: () => leaveBalanceApi.getByUserId(user!.id),
+    enabled: !!user?.id,
+  });
+
+  const selectedBalance = leaveBalances.find(b => b.leaveType === leaveType);
+  const availableDays = selectedBalance
+    ? Math.max(0, selectedBalance.total - selectedBalance.taken - selectedBalance.pending)
+    : null;
 
   // Fetch the user's manager details (legacy managerId path)
   const { data: legacyManager } = useQuery({
@@ -122,6 +136,7 @@ export function LeaveRequest() {
       setFiles([]);
       setFileContents([]);
       setDateRange({ from: undefined, to: undefined });
+      setFieldErrors({});
     },
     onError: (error: Error) => {
       toast({
@@ -134,14 +149,25 @@ export function LeaveRequest() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dateRange.from || !leaveType || !reason || !user) {
+    const errors = {
+      leaveType: !leaveType,
+      date: !dateRange.from,
+      reason: !reason.trim(),
+    };
+    if (errors.leaveType || errors.date || errors.reason) {
+      setFieldErrors(errors);
+      const missing: string[] = [];
+      if (errors.leaveType) missing.push('Leave Type');
+      if (errors.date) missing.push('Duration');
+      if (errors.reason) missing.push('Reason for Leave');
       toast({
         variant: "destructive",
         title: "Missing Information",
-        description: "Please fill in all required fields.",
+        description: `Please complete the following required fields: ${missing.join(', ')}.`,
       });
       return;
     }
+    setFieldErrors({});
 
     createRequestMutation.mutate({
       userId: user.id,
@@ -194,9 +220,18 @@ export function LeaveRequest() {
                 <div className="grid md:grid-cols-2 gap-6">
                   {/* Leave Type */}
                   <div className="space-y-2">
-                    <Label htmlFor="type">Leave Type</Label>
-                    <Select value={leaveType} onValueChange={setLeaveType}>
-                      <SelectTrigger id="type" className="h-12">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="type">
+                        Leave Type <span className="text-destructive">*</span>
+                      </Label>
+                      {leaveType && leaveType !== 'Unpaid Leave' && availableDays !== null && (
+                        <Badge variant={availableDays > 0 ? "secondary" : "destructive"} className="text-xs">
+                          {availableDays} day{availableDays !== 1 ? 's' : ''} available
+                        </Badge>
+                      )}
+                    </div>
+                    <Select value={leaveType} onValueChange={(v) => { setLeaveType(v); setFieldErrors(e => ({ ...e, leaveType: false })); }}>
+                      <SelectTrigger id="type" className={cn("h-12", fieldErrors.leaveType && "border-destructive ring-1 ring-destructive")}>
                         <SelectValue placeholder="Select type..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -210,11 +245,16 @@ export function LeaveRequest() {
                         <SelectItem value="Unpaid Leave">Unpaid Leave</SelectItem>
                       </SelectContent>
                     </Select>
+                    {fieldErrors.leaveType && (
+                      <p className="text-xs text-destructive flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> Please select a leave type.
+                      </p>
+                    )}
                   </div>
 
                   {/* Date Picker */}
                   <div className="space-y-2">
-                    <Label>Duration</Label>
+                    <Label>Duration <span className="text-destructive">*</span></Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
@@ -222,7 +262,8 @@ export function LeaveRequest() {
                           variant={"outline"}
                           className={cn(
                             "w-full justify-start text-left font-normal h-12",
-                            !dateRange.from && "text-muted-foreground"
+                            !dateRange.from && "text-muted-foreground",
+                            fieldErrors.date && "border-destructive ring-1 ring-destructive"
                           )}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
@@ -246,25 +287,35 @@ export function LeaveRequest() {
                           mode="range"
                           defaultMonth={dateRange.from}
                           selected={dateRange}
-                          onSelect={(range: any) => setDateRange(range)}
+                          onSelect={(range: any) => { setDateRange(range); if (range?.from) setFieldErrors(e => ({ ...e, date: false })); }}
                           numberOfMonths={2}
                         />
                       </PopoverContent>
                     </Popover>
+                    {fieldErrors.date && (
+                      <p className="text-xs text-destructive flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> Please select a date range.
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 {/* Reason */}
                 <div className="space-y-2">
-                  <Label htmlFor="reason">Reason for Leave</Label>
-                  <Textarea 
-                    id="reason" 
-                    placeholder="Please provide details..." 
-                    className="min-h-[100px]"
+                  <Label htmlFor="reason">Reason for Leave <span className="text-destructive">*</span></Label>
+                  <Textarea
+                    id="reason"
+                    placeholder="Please provide details..."
+                    className={cn("min-h-[100px]", fieldErrors.reason && "border-destructive ring-1 ring-destructive")}
                     value={reason}
-                    onChange={(e) => setReason(e.target.value)}
+                    onChange={(e) => { setReason(e.target.value); if (e.target.value.trim()) setFieldErrors(err => ({ ...err, reason: false })); }}
                     data-testid="input-reason"
                   />
+                  {fieldErrors.reason && (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" /> Please provide a reason for your leave.
+                    </p>
+                  )}
                 </div>
 
                 {/* Additional Comments */}
