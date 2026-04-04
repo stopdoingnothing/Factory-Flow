@@ -11,6 +11,7 @@ import { ArrowLeft, User, Mail, Phone, MapPin, Building2, Calendar, Clock } from
 import { userApi, leaveBalanceApi, attendanceApi } from "@/lib/api";
 import { format } from "date-fns";
 import type { LeaveBalance, AttendanceRecord } from "@shared/schema";
+import { groupLeaveBalances } from './admin/utils';
 
 export default function EmployeeProfile() {
   const { user } = useAuth();
@@ -158,8 +159,8 @@ export default function EmployeeProfile() {
             </CardHeader>
             <CardContent>
               {leaveBalances && leaveBalances.length > 0 ? (
-                <div className="space-y-4">
-                  {leaveBalances.map((balance: LeaveBalance) => {
+                (() => {
+                  const renderBalance = (balance: LeaveBalance) => {
                     const carryOver = (balance as any).carryOverDays as number | undefined;
                     const carryOverExpiry = (balance as any).carryOverExpiry as string | null | undefined;
                     const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
@@ -180,8 +181,25 @@ export default function EmployeeProfile() {
                         )}
                       </div>
                     );
-                  })}
-                </div>
+                  };
+                  const { standard, other } = groupLeaveBalances(leaveBalances as LeaveBalance[]);
+                  return (
+                    <div className="space-y-4">
+                      {standard.length > 0 && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Standard</p>
+                          {standard.map(renderBalance)}
+                        </div>
+                      )}
+                      {other.length > 0 && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Other</p>
+                          {other.map(renderBalance)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               ) : (
                 <p className="text-gray-500">No leave balances found.</p>
               )}

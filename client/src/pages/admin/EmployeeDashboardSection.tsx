@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from '@/lib/auth-context';
-import { leaveBalanceApi, leaveRequestApi, userApi, attendanceApi, orgPositionApi } from '@/lib/api';
-import type { OrgPosition } from '@shared/schema';
+import { leaveBalanceApi, leaveRequestApi, userApi, attendanceApi } from '@/lib/api';
 import { useToast } from "@/hooks/use-toast";
 import { Clock, Calendar, AlertCircle, CheckCircle2, FileText, Eye, X, XCircle, LogIn, LogOut } from 'lucide-react';
 import { formatLeaveDays } from './utils';
@@ -43,30 +42,11 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
     refetchOnWindowFocus: true,
   });
 
-  const { data: orgPositions = [] } = useQuery<OrgPosition[]>({
-    queryKey: ['orgPositions'],
-    queryFn: orgPositionApi.getAll,
-    enabled: !!(user?.reportsToPositionId),
-  });
-
-  const { data: allUsers = [] } = useQuery({
-    queryKey: ['users'],
-    queryFn: userApi.getAll,
-    enabled: !!(user?.reportsToPositionId),
-  });
-
-  const { data: manager } = useQuery({
+  const { data: resolvedManager } = useQuery({
     queryKey: ['manager', user?.managerId],
     queryFn: () => user?.managerId ? userApi.getById(user.managerId) : null,
-    enabled: !!user?.managerId && !user?.reportsToPositionId,
+    enabled: !!user?.managerId,
   });
-
-  const reportingPositionTitle = user?.reportsToPositionId
-    ? orgPositions.find(p => p.id === user.reportsToPositionId)?.title
-    : null;
-  const resolvedManager = user?.reportsToPositionId
-    ? allUsers.find((u: any) => u.orgPositionId === user.reportsToPositionId)
-    : manager;
 
   const { data: clockStatus } = useQuery({
     queryKey: ['clock-status', user?.id],
@@ -96,7 +76,6 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
       case 'cancelled': return 'bg-gray-100 text-gray-700';
       case 'pending_manager': return 'bg-orange-100 text-orange-700';
       case 'pending_hr': return 'bg-blue-100 text-blue-700';
-      case 'pending_md': return 'bg-purple-100 text-purple-700';
       default: return 'bg-yellow-100 text-yellow-700';
     }
   };
@@ -114,7 +93,6 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
     switch (status) {
       case 'pending_manager': return 'Awaiting Manager';
       case 'pending_hr': return 'Awaiting HR';
-      case 'pending_md': return 'Awaiting Final Approval';
       case 'approved': return 'Approved';
       case 'rejected': return 'Rejected';
       case 'cancelled': return 'Cancelled';
@@ -124,7 +102,7 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
   };
 
   const isPending = (status: string) =>
-    ['pending', 'pending_manager', 'pending_hr', 'pending_md'].includes(status);
+    ['pending', 'pending_manager', 'pending_hr'].includes(status);
 
   return (
     <div className="space-y-8">
@@ -308,11 +286,11 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
                     <div className={`flex flex-col px-2 py-1 rounded text-xs ${
                       selectedRequest.status === 'pending_manager'
                         ? 'bg-orange-100 text-orange-700 font-medium'
-                        : ['pending_hr', 'pending_md', 'approved'].includes(selectedRequest.status)
+                        : ['pending_hr', 'approved'].includes(selectedRequest.status)
                           ? 'bg-green-100 text-green-700'
                           : selectedRequest.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
                     }`}>
-                      <span>1. {reportingPositionTitle || 'Manager'}</span>
+                      <span>1. Manager</span>
                       {resolvedManager && (
                         <span className="text-[10px] opacity-80">{(resolvedManager as any).firstName} {(resolvedManager as any).surname}</span>
                       )}
@@ -321,21 +299,11 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
                     <div className={`px-2 py-1 rounded text-xs ${
                       selectedRequest.status === 'pending_hr'
                         ? 'bg-blue-100 text-blue-700 font-medium'
-                        : ['pending_md', 'approved'].includes(selectedRequest.status)
-                          ? 'bg-green-100 text-green-700'
-                          : selectedRequest.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      2. HR
-                    </div>
-                    <span className="text-muted-foreground">→</span>
-                    <div className={`px-2 py-1 rounded text-xs ${
-                      selectedRequest.status === 'pending_md'
-                        ? 'bg-purple-100 text-purple-700 font-medium'
                         : selectedRequest.status === 'approved'
                           ? 'bg-green-100 text-green-700'
                           : selectedRequest.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
                     }`}>
-                      3. MD
+                      2. HR
                     </div>
                   </div>
                 </div>

@@ -70,6 +70,27 @@ export default function LeaveRequestsSection() {
     queryFn: userApi.getAll,
   });
 
+  // When the role-filtered users list doesn't include the approvers (e.g. a manager viewing
+  // their own leave request can't see who their manager is via /api/users), fetch them directly.
+  const managerApproverInList = users.find(u => u.id === selectedLeaveRequest?.managerApproverId);
+  const { data: managerApproverUser } = useQuery({
+    queryKey: ['user', selectedLeaveRequest?.managerApproverId],
+    queryFn: () => userApi.getById(selectedLeaveRequest!.managerApproverId!),
+    enabled: !!(selectedLeaveRequest?.managerApproverId) && !managerApproverInList,
+  });
+
+  const hrApproverInList = users.find(u => u.id === selectedLeaveRequest?.hrApproverId);
+  const { data: hrApproverUser } = useQuery({
+    queryKey: ['user', selectedLeaveRequest?.hrApproverId],
+    queryFn: () => userApi.getById(selectedLeaveRequest!.hrApproverId!),
+    enabled: !!(selectedLeaveRequest?.hrApproverId) && !hrApproverInList,
+  });
+
+  const resolveApprover = (id: string | null | undefined) =>
+    users.find(u => u.id === id) ??
+    (id === selectedLeaveRequest?.managerApproverId ? managerApproverUser : undefined) ??
+    (id === selectedLeaveRequest?.hrApproverId ? hrApproverUser : undefined);
+
   const { data: publicHolidays = [] } = useQuery({
     queryKey: ['public-holidays'],
     queryFn: () => publicHolidayApi.getAll(),
@@ -722,7 +743,7 @@ export default function LeaveRequestsSection() {
                 )}
 
                 {/* Approval History Section */}
-                {(selectedLeaveRequest.managerDecision || selectedLeaveRequest.hrNotes || selectedLeaveRequest.mdNotes) && (
+                {(selectedLeaveRequest.managerDecision || selectedLeaveRequest.hrNotes) && (
                   <div className="space-y-3">
                     <Label className="text-muted-foreground text-sm">Approval History</Label>
 
@@ -738,11 +759,14 @@ export default function LeaveRequestsSection() {
                         {selectedLeaveRequest.managerNotes && (
                           <p className={`text-sm ${selectedLeaveRequest.managerDecision === 'rejected' ? 'text-red-800' : 'text-purple-800'}`}>{selectedLeaveRequest.managerNotes}</p>
                         )}
-                        {selectedLeaveRequest.managerApproverId && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            By: {users.find(u => u.id === selectedLeaveRequest.managerApproverId)?.firstName} {users.find(u => u.id === selectedLeaveRequest.managerApproverId)?.surname}
-                          </p>
-                        )}
+                        {selectedLeaveRequest.managerApproverId && (() => {
+                          const approver = resolveApprover(selectedLeaveRequest.managerApproverId);
+                          return approver ? (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              By: {approver.firstName} {approver.surname}
+                            </p>
+                          ) : null;
+                        })()}
                       </div>
                     )}
 
@@ -756,29 +780,14 @@ export default function LeaveRequestsSection() {
                           </span>
                         </div>
                         <p className="text-sm text-cyan-800">{selectedLeaveRequest.hrNotes}</p>
-                        {selectedLeaveRequest.hrApproverId && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            By: {users.find(u => u.id === selectedLeaveRequest.hrApproverId)?.firstName} {users.find(u => u.id === selectedLeaveRequest.hrApproverId)?.surname}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {selectedLeaveRequest.mdNotes && (
-                      <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300">MD Review</Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {selectedLeaveRequest.mdDecision === 'approved' ? '✓ Approved' : '✗ Rejected'}
-                            {selectedLeaveRequest.mdDecisionAt && ` on ${format(new Date(selectedLeaveRequest.mdDecisionAt), 'd MMM yyyy')}`}
-                          </span>
-                        </div>
-                        <p className="text-sm text-amber-800">{selectedLeaveRequest.mdNotes}</p>
-                        {selectedLeaveRequest.mdApproverId && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            By: {users.find(u => u.id === selectedLeaveRequest.mdApproverId)?.firstName} {users.find(u => u.id === selectedLeaveRequest.mdApproverId)?.surname}
-                          </p>
-                        )}
+                        {selectedLeaveRequest.hrApproverId && (() => {
+                          const approver = resolveApprover(selectedLeaveRequest.hrApproverId);
+                          return approver ? (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              By: {approver.firstName} {approver.surname}
+                            </p>
+                          ) : null;
+                        })()}
                       </div>
                     )}
                   </div>

@@ -879,7 +879,7 @@ export default function OrgChart() {
           
           const sharedWorkers = activeUsers.filter(u => 
             u.role === 'worker' && 
-            (managerIds.has(u.managerId || '') || managerIds.has(u.secondManagerId || ''))
+            managerIds.has(u.managerId || '')
           );
           
           const workerChildren: TreeNode[] = [];

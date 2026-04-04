@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { User } from '@shared/schema';
 import { authApi } from './api';
+import { queryClient } from './queryClient';
 
 interface AuthContextType {
   user: User | null;
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await authApi.logout().catch(() => {});
     setUser(null);
     localStorage.removeItem('factory_user');
+    queryClient.clear();
   };
 
   const hasRole = (role: string): boolean => {

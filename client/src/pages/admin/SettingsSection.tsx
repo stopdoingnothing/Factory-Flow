@@ -1176,7 +1176,7 @@ export default function SettingsSection() {
                 <p className="pl-4">"employees": [</p>
                 <p className="pl-8">{'{ "id", "firstName", "surname", "nickname", "email", "mobile",'}</p>
                 <p className="pl-10">{'"role", "departmentId", "departmentName", "employeeTypeName",'}</p>
-                <p className="pl-10">{'"companyId", "companyName", "managerId", "secondManagerId", ... }'}</p>
+                <p className="pl-10">{'"companyId", "companyName", "managerId", ... }'}</p>
                 <p className="pl-4">]</p>
                 <p>{'}'}</p>
               </div>

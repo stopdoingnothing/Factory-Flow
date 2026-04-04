@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from '@/lib/auth-context';
-import { leaveBalanceApi, leaveRequestApi, userApi, attendanceApi, orgPositionApi } from '@/lib/api';
-import type { OrgPosition } from '@shared/schema';
+import { leaveBalanceApi, leaveRequestApi, userApi, attendanceApi } from '@/lib/api';
+import type { LeaveBalance, LeaveRequest } from '@shared/schema';
 import { useToast } from "@/hooks/use-toast";
-import { Clock, Calendar, AlertCircle, CheckCircle2, FileText, Eye, X, XCircle, LogIn, LogOut } from 'lucide-react';
+import { Calendar, AlertCircle, FileText, Eye, X, XCircle, LogIn, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
-import type { LeaveRequest } from '@shared/schema';
+import { groupLeaveBalances } from './admin/utils';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -23,7 +23,7 @@ export default function Dashboard() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   
-  const { data: balances = [] } = useQuery({
+  const { data: balances = [] } = useQuery<LeaveBalance[]>({
     queryKey: ['leave-balances', user?.id],
     queryFn: () => leaveBalanceApi.getByUserId(user!.id),
     enabled: !!user,
@@ -35,34 +35,12 @@ export default function Dashboard() {
     enabled: !!user,
   });
   
-  // Fetch org positions for position-based reporting display
-  const { data: orgPositions = [] } = useQuery<OrgPosition[]>({
-    queryKey: ['orgPositions'],
-    queryFn: orgPositionApi.getAll,
-    enabled: !!(user?.reportsToPositionId),
-  });
-
-  // Fetch all users to resolve who holds the reporting position
-  const { data: allUsers = [] } = useQuery({
-    queryKey: ['users'],
-    queryFn: userApi.getAll,
-    enabled: !!(user?.reportsToPositionId),
-  });
-
-  // Fetch the user's manager details (legacy managerId path)
-  const { data: manager } = useQuery({
+  // Fetch the user's manager details
+  const { data: resolvedManager } = useQuery({
     queryKey: ['manager', user?.managerId],
     queryFn: () => user?.managerId ? userApi.getById(user.managerId) : null,
-    enabled: !!user?.managerId && !user?.reportsToPositionId,
+    enabled: !!user?.managerId,
   });
-
-  // Resolve who the employee reports to (position-based or legacy direct manager)
-  const reportingPositionTitle = user?.reportsToPositionId
-    ? orgPositions.find(p => p.id === user.reportsToPositionId)?.title
-    : null;
-  const resolvedManager = user?.reportsToPositionId
-    ? allUsers.find(u => u.orgPositionId === user.reportsToPositionId)
-    : manager;
 
   // Fetch clock-in status
   const { data: clockStatus } = useQuery({
@@ -93,17 +71,7 @@ export default function Dashboard() {
       case 'cancelled': return 'bg-gray-100 text-gray-700';
       case 'pending_manager': return 'bg-orange-100 text-orange-700';
       case 'pending_hr': return 'bg-blue-100 text-blue-700';
-      case 'pending_md': return 'bg-purple-100 text-purple-700';
       default: return 'bg-yellow-100 text-yellow-700';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'approved': return <CheckCircle2 className="h-5 w-5" />;
-      case 'rejected': return <AlertCircle className="h-5 w-5" />;
-      case 'cancelled': return <XCircle className="h-5 w-5" />;
-      default: return <Clock className="h-5 w-5" />;
     }
   };
 
@@ -111,7 +79,6 @@ export default function Dashboard() {
     switch (status) {
       case 'pending_manager': return 'Awaiting Manager';
       case 'pending_hr': return 'Awaiting HR';
-      case 'pending_md': return 'Awaiting Final Approval';
       case 'approved': return 'Approved';
       case 'rejected': return 'Rejected';
       case 'cancelled': return 'Cancelled';
@@ -121,8 +88,10 @@ export default function Dashboard() {
   };
 
   const isPending = (status: string) => {
-    return ['pending', 'pending_manager', 'pending_hr', 'pending_md'].includes(status);
+    return ['pending', 'pending_manager', 'pending_hr'].includes(status);
   };
+
+  const { standard: standardBalances, other: otherBalances } = groupLeaveBalances(balances);
 
   return (
     <Layout>
@@ -169,45 +138,97 @@ export default function Dashboard() {
         )}
 
         {/* Balance Cards */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {balances.map((balance) => {
-            const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
-            const carryOver = (balance as any).carryOverDays as number | undefined;
-            const carryOverExpiry = (balance as any).carryOverExpiry as string | null | undefined;
-            const today = new Date().toISOString().split('T')[0];
-            const expiringSoon = !!carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
-            return (
-              <Card key={balance.id} className="industrial-card relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <Calendar className="h-16 w-16" />
-                </div>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-                    {balance.leaveType}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold font-heading text-foreground">{available}</div>
-                  <p className="text-xs text-muted-foreground mb-4">days available</p>
-                  <Progress value={(available / balance.total) * 100} className="h-2" />
-                  <div className="mt-2 text-xs text-right text-muted-foreground">
-                    {balance.total} total entitlement
-                  </div>
-                  {!!carryOver && carryOver > 0 && (
-                    <div className="mt-1 text-xs text-blue-600">
-                      +{carryOver} carried over
-                      {carryOverExpiry && (
-                        <span className={expiringSoon ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
-                          {' '}· {expiringSoon ? '⚠ expires ' : 'use by '}
-                          {new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+        <div className="space-y-4">
+          {standardBalances.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Standard</p>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {standardBalances.map((balance) => {
+                  const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
+                  const carryOver = (balance as any).carryOverDays as number | undefined;
+                  const carryOverExpiry = (balance as any).carryOverExpiry as string | null | undefined;
+                  const today = new Date().toISOString().split('T')[0];
+                  const expiringSoon = !!carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
+                  return (
+                    <Card key={balance.id} className="industrial-card relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Calendar className="h-16 w-16" />
+                      </div>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                          {balance.leaveType}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold font-heading text-foreground">{available}</div>
+                        <p className="text-xs text-muted-foreground mb-4">days available</p>
+                        <Progress value={(available / balance.total) * 100} className="h-2" />
+                        <div className="mt-2 text-xs text-right text-muted-foreground">
+                          {balance.total} total entitlement
+                        </div>
+                        {!!carryOver && carryOver > 0 && (
+                          <div className="mt-1 text-xs text-blue-600">
+                            +{carryOver} carried over
+                            {carryOverExpiry && (
+                              <span className={expiringSoon ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
+                                {' '}· {expiringSoon ? '⚠ expires ' : 'use by '}
+                                {new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {otherBalances.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Other</p>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                {otherBalances.map((balance) => {
+                  const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
+                  const carryOver = (balance as any).carryOverDays as number | undefined;
+                  const carryOverExpiry = (balance as any).carryOverExpiry as string | null | undefined;
+                  const today = new Date().toISOString().split('T')[0];
+                  const expiringSoon = !!carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
+                  return (
+                    <Card key={balance.id} className="industrial-card relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Calendar className="h-16 w-16" />
+                      </div>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                          {balance.leaveType}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold font-heading text-foreground">{available}</div>
+                        <p className="text-xs text-muted-foreground mb-4">days available</p>
+                        <Progress value={(available / balance.total) * 100} className="h-2" />
+                        <div className="mt-2 text-xs text-right text-muted-foreground">
+                          {balance.total} total entitlement
+                        </div>
+                        {!!carryOver && carryOver > 0 && (
+                          <div className="mt-1 text-xs text-blue-600">
+                            +{carryOver} carried over
+                            {carryOverExpiry && (
+                              <span className={expiringSoon ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
+                                {' '}· {expiringSoon ? '⚠ expires ' : 'use by '}
+                                {new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Recent Requests */}
@@ -227,61 +248,52 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   requests.map((req) => (
-                    <div 
-                      key={req.id} 
-                      className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                    <div
+                      key={req.id}
+                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border"
                       data-testid={`leave-request-${req.id}`}
                     >
-                      <div className="flex items-center gap-4">
-                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                          req.status === 'approved' ? 'bg-green-100 text-green-600' :
-                          req.status === 'rejected' ? 'bg-red-100 text-red-600' :
-                          req.status === 'cancelled' ? 'bg-gray-100 text-gray-600' :
-                          'bg-yellow-100 text-yellow-600'
-                        }`}>
-                          {getStatusIcon(req.status)}
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full overflow-hidden bg-slate-200 flex-shrink-0">
+                          <img src={user?.photoUrl || 'https://github.com/shadcn.png'} alt="" className="h-full w-full object-cover" />
                         </div>
                         <div>
-                          <div className="font-medium capitalize">{req.leaveType.replace('_', ' ')}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {format(new Date(req.startDate), 'd MMM')} - {format(new Date(req.endDate), 'd MMM yyyy')}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <Badge className={getStatusColor(req.status)}>
+                          <p className="font-medium">{user?.firstName} {user?.surname}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {req.leaveType.replace('_', ' ')} • {format(new Date(req.startDate), 'd MMM')} - {format(new Date(req.endDate), 'd MMM')}
+                          </p>
+                          <Badge className={`text-xs mt-1 ${getStatusColor(req.status)}`}>
                             {formatStatusLabel(req.status)}
                           </Badge>
                         </div>
-                        <div className="flex gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedRequest(req);
+                            setIsViewDialogOpen(true);
+                          }}
+                          title="View Details"
+                          data-testid={`button-view-${req.id}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {isPending(req.status) && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
                             onClick={() => {
                               setSelectedRequest(req);
-                              setIsViewDialogOpen(true);
+                              setIsCancelDialogOpen(true);
                             }}
-                            title="View Details"
-                            data-testid={`button-view-${req.id}`}
+                            title="Cancel Request"
+                            data-testid={`button-cancel-${req.id}`}
                           >
-                            <Eye className="h-4 w-4 text-blue-500" />
+                            <X className="h-4 w-4" />
                           </Button>
-                          {isPending(req.status) && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => {
-                                setSelectedRequest(req);
-                                setIsCancelDialogOpen(true);
-                              }}
-                              title="Cancel Request"
-                              data-testid={`button-cancel-${req.id}`}
-                            >
-                              <X className="h-4 w-4 text-red-500" />
-                            </Button>
-                          )}
-                        </div>
+                        )}
                       </div>
                     </div>
                   ))
@@ -329,38 +341,26 @@ export default function Dashboard() {
                   <p className="text-sm text-muted-foreground mb-2">Approval Progress</p>
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className={`flex flex-col px-2 py-1 rounded text-xs ${
-                      selectedRequest.status === 'pending_manager' 
-                        ? 'bg-orange-100 text-orange-700 font-medium' 
-                        : ['pending_hr', 'pending_md', 'approved'].includes(selectedRequest.status)
+                      selectedRequest.status === 'pending_manager'
+                        ? 'bg-orange-100 text-orange-700 font-medium'
+                        : ['pending_hr', 'approved'].includes(selectedRequest.status)
                           ? 'bg-green-100 text-green-700'
                           : selectedRequest.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
                     }`}>
-                      <span>1. {reportingPositionTitle || 'Manager'}</span>
+                      <span>1. Manager</span>
                       {resolvedManager && (
                         <span className="text-[10px] opacity-80">{resolvedManager.firstName} {resolvedManager.surname}</span>
                       )}
                     </div>
                     <span className="text-muted-foreground">→</span>
                     <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                      selectedRequest.status === 'pending_hr' 
-                        ? 'bg-blue-100 text-blue-700 font-medium' 
-                        : ['pending_md', 'approved'].includes(selectedRequest.status)
-                          ? 'bg-green-100 text-green-700'
-                          : selectedRequest.status === 'rejected' && ['pending_hr', 'pending_md'].includes(selectedRequest.status)
-                            ? 'bg-red-100 text-red-700' 
-                            : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      2. HR
-                    </div>
-                    <span className="text-muted-foreground">→</span>
-                    <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                      selectedRequest.status === 'pending_md' 
-                        ? 'bg-purple-100 text-purple-700 font-medium' 
+                      selectedRequest.status === 'pending_hr'
+                        ? 'bg-blue-100 text-blue-700 font-medium'
                         : selectedRequest.status === 'approved'
                           ? 'bg-green-100 text-green-700'
                           : selectedRequest.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
                     }`}>
-                      3. MD
+                      2. HR
                     </div>
                   </div>
                 </div>

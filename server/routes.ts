@@ -210,7 +210,7 @@ export async function runEscalationReminders(): Promise<number> {
     };
 
     if (request.status === 'pending_manager') {
-      const managerIds = [employee?.managerId, employee?.secondManagerId].filter(Boolean) as string[];
+      const managerIds = [employee?.managerId].filter(Boolean) as string[];
       for (const mgId of managerIds) {
         const manager = await storage.getUser(mgId);
         if (manager?.email) {
@@ -283,13 +283,8 @@ async function getHierarchyEmails(userId: string): Promise<string[]> {
   const emails: string[] = [];
   const visitedUserIds = new Set<string>([userId]); // exclude self
 
-  // Determine starting ancestor position id
-  // If reportsToPositionId is set, use that directly; otherwise use parent of own position
-  let currentPositionId: number | null | undefined =
-    startUser.reportsToPositionId ??
-    (startUser.orgPositionId != null
-      ? positionMap.get(startUser.orgPositionId)?.parentPositionId
-      : null);
+  // Use managerId chain for manager email resolution (position-based reporting not in use)
+  let currentPositionId: number | null | undefined = null;
 
   while (currentPositionId != null) {
     const position = positionMap.get(currentPositionId);
@@ -404,11 +399,15 @@ export async function registerRoutes(
         await storage.updateUser(user.id, { password: hashed });
       }
 
-      req.session.userId = user.id;
-      req.session.userRoles = user.roles || ['employee'];
-      req.session.save(err => {
-        if (err) { console.error("Session save failed (worker login):", err); return res.status(500).json({ error: "Session save failed" }); }
-        return res.json(user);
+      // Regenerate session to prevent session fixation and clear stale data from prior user
+      req.session.regenerate(err => {
+        if (err) { console.error("Session regenerate failed:", err); return res.status(500).json({ error: "Login failed" }); }
+        req.session.userId = user.id;
+        req.session.userRoles = user.roles || ['employee'];
+        req.session.save(err => {
+          if (err) { console.error("Session save failed (worker login):", err); return res.status(500).json({ error: "Session save failed" }); }
+          return res.json(user);
+        });
       });
     } catch (error) {
       console.error("Login error:", error);
@@ -438,11 +437,14 @@ export async function registerRoutes(
         return res.status(401).json({ error: "No face registered for this user" });
       }
 
-      req.session.userId = user.id;
-      req.session.userRoles = user.roles || ['employee'];
-      req.session.save(err => {
-        if (err) return res.status(500).json({ error: "Session save failed" });
-        return res.json(user);
+      req.session.regenerate(err => {
+        if (err) return res.status(500).json({ error: "Login failed" });
+        req.session.userId = user.id;
+        req.session.userRoles = user.roles || ['employee'];
+        req.session.save(err => {
+          if (err) return res.status(500).json({ error: "Session save failed" });
+          return res.json(user);
+        });
       });
     } catch (error) {
       console.error("Face login error:", error);
@@ -477,11 +479,14 @@ export async function registerRoutes(
         await storage.updateUser(user.id, { password: hashed });
       }
 
-      req.session.userId = user.id;
-      req.session.userRoles = user.roles || ['employee'];
-      req.session.save(err => {
-        if (err) { console.error("Session save failed (admin login):", err); return res.status(500).json({ error: "Session save failed" }); }
-        return res.json(user);
+      req.session.regenerate(err => {
+        if (err) { console.error("Session regenerate failed:", err); return res.status(500).json({ error: "Login failed" }); }
+        req.session.userId = user.id;
+        req.session.userRoles = user.roles || ['employee'];
+        req.session.save(err => {
+          if (err) { console.error("Session save failed (admin login):", err); return res.status(500).json({ error: "Session save failed" }); }
+          return res.json(user);
+        });
       });
     } catch (error) {
       console.error("Admin login error:", error);
@@ -527,9 +532,6 @@ export async function registerRoutes(
         await storage.updateUser(manager.id, { password: hashed });
       }
 
-      req.session.userId = employee.id;
-      req.session.userRoles = employee.roles || ['employee'];
-
       await storage.createAuditLog({
         actorId: manager.id,
         action: 'manager_approved_login',
@@ -539,9 +541,14 @@ export async function registerRoutes(
         description: `Manager ${manager.firstName} ${manager.surname} approved kiosk login for ${employee.firstName} ${employee.surname}`,
       }).catch(e => console.error('[audit] manager_approved_login log failed:', e));
 
-      req.session.save(err => {
-        if (err) { console.error("Session save failed (manager approved login):", err); return res.status(500).json({ error: "Session save failed" }); }
-        return res.json(employee);
+      req.session.regenerate(err => {
+        if (err) { console.error("Session regenerate failed:", err); return res.status(500).json({ error: "Login failed" }); }
+        req.session.userId = employee.id;
+        req.session.userRoles = employee.roles || ['employee'];
+        req.session.save(err => {
+          if (err) { console.error("Session save failed (manager approved login):", err); return res.status(500).json({ error: "Session save failed" }); }
+          return res.json(employee);
+        });
       });
     } catch (error) {
       console.error("Manager approved login error:", error);
@@ -689,6 +696,7 @@ export async function registerRoutes(
   });
 
   // Get all users — hr/admin see everyone; managers see their direct reports; workers see themselves
+  // ?view=org-chart returns all active users with only the fields needed for the org chart
   app.get("/api/users", async (req, res) => {
     try {
       const sessionUserId = req.session.userId!;
@@ -697,20 +705,27 @@ export async function registerRoutes(
       const isManager = sessionRoles.includes('manager') && !isHrOrAdmin;
       const allUsers = await storage.getAllUsers();
 
+      // Org chart view: any authenticated user can see the structure
+      if (req.query.view === 'org-chart') {
+        const orgChartUsers = allUsers
+          .filter(u => !u.terminationDate)
+          .map(u => ({
+            id: u.id, firstName: u.firstName, surname: u.surname, nickname: u.nickname,
+            role: u.role, department: u.department, photoUrl: u.photoUrl,
+            managerId: u.managerId, orgPositionId: u.orgPositionId,
+            reportsToPositionId: u.reportsToPositionId, companyId: u.companyId,
+          }));
+        return res.json(orgChartUsers);
+      }
+
       if (isHrOrAdmin) {
         return res.json(allUsers);
       }
 
       if (isManager) {
-        const sessionUser = allUsers.find(u => u.id === sessionUserId);
-        const managerOrgPositionId = sessionUser?.orgPositionId ?? null;
         const visibleIds = new Set(
           allUsers
-            .filter(u =>
-              u.id === sessionUserId ||
-              u.managerId === sessionUserId ||
-              (managerOrgPositionId && u.reportsToPositionId === managerOrgPositionId)
-            )
+            .filter(u => u.id === sessionUserId || u.managerId === sessionUserId)
             .map(u => u.id)
         );
         return res.json(allUsers.filter(u => visibleIds.has(u.id)));
@@ -885,10 +900,9 @@ export async function registerRoutes(
           await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Annual Leave',          total: 0, taken: 0, pending: 0 });
           await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Sick Leave',             total: 0, taken: 0, pending: 0 });
           await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Family Responsibility',  total: 0, taken: 0, pending: 0 });
-          // Provision statutory event-based leave entitlements
-          for (const [leaveType, days] of Object.entries(STATUTORY_LEAVE_ENTITLEMENTS)) {
-            await storage.createLeaveBalance({ userId: newUser.id, leaveType, total: days, taken: 0, pending: 0 });
-          }
+          // NOTE: Statutory event-based leaves (Maternity, Parental, Adoption, Commissioning)
+          // and custom leave types are NOT auto-provisioned. HR or Admin must activate them
+          // per employee via the Personnel > Leave Balances panel.
           // Initialise sick leave tracking record
           await storage.upsertSickLeaveTracking({
             userId: newUser.id,
@@ -1049,16 +1063,9 @@ export async function registerRoutes(
 
       // Manager: scope to direct reports only
       const allUsers = await storage.getAllUsers();
-      const sessionUser = allUsers.find(u => u.id === sessionUserId);
-      const managerOrgPositionId = sessionUser?.orgPositionId ?? null;
       const directReportIds = new Set(
         allUsers
-          .filter(u => {
-            if (u.reportsToPositionId != null) {
-              return managerOrgPositionId != null && u.reportsToPositionId === managerOrgPositionId;
-            }
-            return u.managerId === sessionUserId;
-          })
+          .filter(u => u.managerId === sessionUserId)
           .map(u => u.id)
       );
       // Include the manager's own balances too
@@ -1067,6 +1074,33 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Get all balances error:", error);
       return res.status(500).json({ error: "Failed to fetch leave balances" });
+    }
+  });
+
+  // List activatable leave types (statutory event leaves + custom rules).
+  // Used by HR/Admin to see which restricted types they can grant per employee.
+  // MUST be registered before /:userId to avoid param capture.
+  app.get("/api/leave-balances/activatable-types", requireAdmin, async (req, res) => {
+    try {
+      const customRules = await storage.getAllLeaveRules();
+      const activatable = [
+        ...Object.entries(STATUTORY_LEAVE_ENTITLEMENTS).map(([leaveType, days]) => ({
+          leaveType,
+          defaultDays: days,
+          source: 'statutory' as const,
+          description: `Statutory entitlement — ${days} days`,
+        })),
+        ...customRules.map(r => ({
+          leaveType: r.leaveType,
+          defaultDays: parseFloat(r.daysEarned) || 0,
+          source: 'custom' as const,
+          description: r.description || r.name,
+        })),
+      ];
+      return res.json(activatable);
+    } catch (error) {
+      console.error("Activatable types error:", error);
+      return res.status(500).json({ error: "Failed to fetch activatable leave types" });
     }
   });
 
@@ -1083,12 +1117,8 @@ export async function registerRoutes(
       if (!isHrOrAdmin && sessionUserId !== userId) {
         if (isManager) {
           const allUsers = await storage.getAllUsers();
-          const callerUser = allUsers.find(u => u.id === sessionUserId);
-          const callerPositionId = callerUser?.orgPositionId ?? null;
           const targetUser = allUsers.find(u => u.id === userId);
-          const isDirectManager =
-            targetUser?.managerId === sessionUserId ||
-            (callerPositionId != null && targetUser?.reportsToPositionId === callerPositionId);
+          const isDirectManager = targetUser?.managerId === sessionUserId;
           if (!isDirectManager) {
             return res.status(403).json({ error: "Forbidden" });
           }
@@ -1396,17 +1426,9 @@ export async function registerRoutes(
       // Manager (without HR/admin): only direct reports + own requests
       if (isManagerOnly) {
         const allUsers = await storage.getAllUsers();
-        const sessionUser = allUsers.find(u => u.id === sessionUserId);
-        const managerOrgPositionId = sessionUser?.orgPositionId ?? null;
         const directReportIds = new Set(
           allUsers
-            .filter(u => {
-              // Position-based reporting takes precedence over legacy managerId
-              if (u.reportsToPositionId != null) {
-                return managerOrgPositionId != null && u.reportsToPositionId === managerOrgPositionId;
-              }
-              return u.managerId === sessionUserId;
-            })
+            .filter(u => u.managerId === sessionUserId)
             .map(u => u.id)
         );
         const allRequests = await storage.getLeaveRequests();
@@ -1564,22 +1586,14 @@ export async function registerRoutes(
       // Determine initial status based on whether user has a manager/reporting position
       let initialStatus = 'pending_manager';
 
-      // Resolve manager: prefer reportsToPositionId (position-based), fall back to managerId (legacy)
-      let resolvedManagerId: string | null = null;
-      if (user?.reportsToPositionId) {
-        // Find the person who currently holds that position
-        const allUsers = await storage.getAllUsers();
-        const positionHolder = allUsers.find(u => u.orgPositionId === user!.reportsToPositionId);
-        resolvedManagerId = positionHolder?.id || null;
-      } else if (user?.managerId) {
-        resolvedManagerId = user.managerId;
-      }
+      // Resolve manager via managerId
+      let resolvedManagerId: string | null = user?.managerId || null;
       
       if (!resolvedManagerId) {
         // No manager assigned, go directly to HR
         initialStatus = 'pending_hr';
       }
-      
+
       // Override the status with the correct initial status; include med cert flags
       const requestWithStatus = {
         ...validatedData,
@@ -1758,10 +1772,7 @@ export async function registerRoutes(
       if (!isHrOrAdmin) {
         const employee = await storage.getUser(request.userId);
         const approverUser = await storage.getUser(approverId);
-        // Position-based reporting takes precedence over legacy managerId
-        const isReportingManager = employee?.reportsToPositionId != null
-          ? approverUser?.orgPositionId === employee.reportsToPositionId
-          : employee?.managerId === approverId;
+        const isReportingManager = employee?.managerId === approverId;
         if (!employee || !isReportingManager) {
           return res.status(403).json({ error: "You are not the reporting manager for this employee" });
         }
@@ -2587,7 +2598,7 @@ export async function registerRoutes(
           }
 
           // #12: Also alert the employee's manager(s)
-          const managerIds = [user.managerId, user.secondManagerId].filter(Boolean) as string[];
+          const managerIds = [user.managerId].filter(Boolean) as string[];
           for (const mgId of managerIds) {
             const manager = await storage.getUser(mgId);
             if (manager?.email) {
@@ -2651,7 +2662,7 @@ export async function registerRoutes(
           // Group AWOL workers by manager and send per-manager alert
           const managerToWorkers: Record<string, { manager: any; workers: any[] }> = {};
           for (const worker of awolWorkers) {
-            const managerIds = [worker.managerId, worker.secondManagerId].filter(Boolean) as string[];
+            const managerIds = [worker.managerId].filter(Boolean) as string[];
             if (managerIds.length === 0) {
               // Fall back to admin_email
               const adminSetting = await storage.getSetting('admin_email');

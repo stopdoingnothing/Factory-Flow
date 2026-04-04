@@ -43,6 +43,9 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     allowedHosts: true,
+    watch: {
+      usePolling: true,
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],

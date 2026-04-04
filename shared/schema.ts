@@ -150,10 +150,9 @@ export const users = pgTable("users", {
   startDate: text("start_date"), // Employment start date for leave calculations
   contractEndDate: text("contract_end_date"), // End date for contractors/temps (null for permanent)
   terminationDate: text("termination_date"), // Date when employee was terminated (null if active)
-  managerId: text("manager_id"), // ID of the employee's direct manager (legacy, kept for backwards compat)
-  secondManagerId: text("second_manager_id"), // ID of a second manager (for shared reporting)
+  managerId: text("manager_id"), // ID of the employee's direct line manager
   orgPositionId: integer("org_position_id"), // ID of the org position this employee holds
-  reportsToPositionId: integer("reports_to_position_id"), // Position this employee reports to (position-based reporting)
+  reportsToPositionId: integer("reports_to_position_id"), // Org chart position this employee reports to (used for org chart display only)
   companyId: integer("company_id").references(() => companies.id), // Payroll company
   photoUrl: text("photo_url"),
   faceDescriptor: text("face_descriptor"), // JSON array of 128 face embedding values

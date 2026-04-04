@@ -23,7 +23,7 @@ import aeceLogo from '@assets/AECE_Logo_1765516911038.png';
 
 export default function MaintainerDashboard() {
   const [, setLocation] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, hasRole } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -275,8 +275,8 @@ export default function MaintainerDashboard() {
     return null;
   }
 
-  // Access control: only users with maintainer adminRole can access this dashboard
-  if (user.adminRole !== 'maintainer') {
+  // Access control: only users with maintainer role can access this dashboard
+  if (!hasRole('maintainer')) {
     setLocation('/');
     return null;
   }

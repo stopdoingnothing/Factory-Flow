@@ -170,14 +170,13 @@ export async function applyCustomLeaveRules(storage: IStorage): Promise<number> 
       const newTotal = resolveEntitlement(rule, phases, totalMonths);
 
       const existing = balances.find(b => b.leaveType === rule.leaveType);
+      // Only update existing balances — custom leave must be explicitly activated per
+      // employee by HR/Admin. New balances are never auto-created by this engine.
       if (existing) {
         if (Math.abs((existing.total ?? 0) - newTotal) >= 0.05) {
           await storage.updateLeaveBalance(existing.id, { total: newTotal });
           updated++;
         }
-      } else {
-        await storage.createLeaveBalance({ userId: user.id, leaveType: rule.leaveType, total: newTotal, taken: 0, pending: 0 });
-        updated++;
       }
     }
   }

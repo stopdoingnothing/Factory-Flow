@@ -294,13 +294,13 @@ export class DrizzleStorage implements IStorage {
           user_group_id, employee_type_id, national_id, tax_number, next_of_kin,
           emergency_number, popia_waiver_url, start_date, contract_end_date, termination_date,
           manager_id, admin_role, has_full_admin_access, exclude, attendance_required,
-          second_manager_id, org_position_id)
+          org_position_id)
         SELECT $1, name, email, password, role, department, photo_url, created_at,
           face_descriptor, first_name, surname, nickname, mobile, home_address, gender,
           user_group_id, employee_type_id, national_id, tax_number, next_of_kin,
           emergency_number, popia_waiver_url, start_date, contract_end_date, termination_date,
           manager_id, admin_role, has_full_admin_access, exclude, attendance_required,
-          second_manager_id, org_position_id
+          org_position_id
         FROM users WHERE id = $2
       `, [newId, oldId]);
 
@@ -316,7 +316,6 @@ export class DrizzleStorage implements IStorage {
       await client.query(`UPDATE leave_requests SET user_id = $1 WHERE user_id = $2`, [newId, oldId]);
       await client.query(`UPDATE notifications SET user_id = $1 WHERE user_id = $2`, [newId, oldId]);
       await client.query(`UPDATE users SET manager_id = $1 WHERE manager_id = $2`, [newId, oldId]);
-      await client.query(`UPDATE users SET second_manager_id = $1 WHERE second_manager_id = $2`, [newId, oldId]);
 
       // 3. Delete the old user row (all references now point to newId)
       await client.query(`DELETE FROM users WHERE id = $1`, [oldId]);

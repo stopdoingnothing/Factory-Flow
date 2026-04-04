@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Switch } from "@/components/ui/switch";
-import { userApi, departmentApi, userGroupApi, leaveBalanceApi, employeeTypeApi, contractHistoryApi, faceDescriptorApi, orgPositionApi, companyApi } from '@/lib/api';
+import { userApi, departmentApi, userGroupApi, leaveBalanceApi, leaveRuleApi, employeeTypeApi, contractHistoryApi, faceDescriptorApi, orgPositionApi, companyApi } from '@/lib/api';
 import type { User, Department, UserGroup, LeaveBalance, EmployeeType, OrgPosition } from '@shared/schema';
 import { Plus, Pencil, Trash2, Mail, Camera, Loader2, CheckCircle2, UserCog, Shield, Check, X, Search, UserX, Network, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsUpDown, FileText, ClipboardList, AlertTriangle } from 'lucide-react';
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,8 +24,8 @@ import { formatDateForDisplay, getEmploymentDuration, generatePassword, isValidD
 
 export default function PersonnelSection() {
   const { toast } = useToast();
-  const { user } = useAuth();
-  const isAdminUser = !!user?.adminRole;
+  const { user, hasRole } = useAuth();
+  const isAdminUser = hasRole('admin') || hasRole('hr');
   const queryClient = useQueryClient();
 
   const { data: users = [] } = useQuery({
@@ -53,6 +53,11 @@ export default function PersonnelSection() {
     queryFn: () => leaveBalanceApi.getAll(),
     staleTime: 0,
     refetchOnWindowFocus: true,
+  });
+
+  const { data: activatableTypes = [] } = useQuery<{ leaveType: string; defaultDays: number; source: 'statutory' | 'custom'; description: string }[]>({
+    queryKey: ['activatable-leave-types'],
+    queryFn: () => leaveRuleApi.getActivatableTypes(),
   });
 
   const { data: orgPositions = [] } = useQuery<OrgPosition[]>({
@@ -207,15 +212,15 @@ export default function PersonnelSection() {
   const updateLeaveBalanceMutation = useMutation({
     mutationFn: ({ id, total }: { id: number; total: number }) => leaveBalanceApi.update(id, { total }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leaveBalances'] });
+      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
     },
   });
 
   const createLeaveBalanceMutation = useMutation({
     mutationFn: (data: { userId: string; leaveType: string; total: number }) => leaveBalanceApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leaveBalances'] });
-      toast({ title: "Leave Allocated", description: "Leave balance has been created." });
+      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
+      toast({ title: "Leave Activated", description: "Leave type has been activated for this employee." });
     },
   });
 
@@ -274,7 +279,6 @@ export default function PersonnelSection() {
       startDate: currentUser.startDate || null,
       userGroupId: currentUser.userGroupId || null,
       managerId: currentUser.managerId || null,
-      secondManagerId: null,
       orgPositionId: currentUser.orgPositionId || null,
       reportsToPositionId: null,
       exclude: currentUser.exclude || false,
@@ -283,7 +287,7 @@ export default function PersonnelSection() {
       nickname: currentUser.nickname || null,
       terminationDate: currentUser.terminationDate || null,
       contractEndDate: currentUser.contractEndDate || null,
-      adminRole: currentUser.userGroupId ? (currentUser.adminRole || 'manager') : null,
+      adminRole: null,
       companyId: currentUser.companyId || null,
     };
 
@@ -481,7 +485,7 @@ export default function PersonnelSection() {
       email: adminData.email,
       password: adminData.password,
       role: 'manager',
-      adminRole: 'manager',
+      roles: ['employee', 'manager', 'admin'],
       userGroupId: adminData.userGroupId,
     }, {
       onSuccess: () => {
@@ -2077,47 +2081,89 @@ export default function PersonnelSection() {
 
       {/* Balance Dialog */}
       <Dialog open={isBalanceDialogOpen} onOpenChange={setIsBalanceDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Leave Balances - {selectedEmployeeForBalance?.firstName} {selectedEmployeeForBalance?.surname}
+              Leave Balances — {selectedEmployeeForBalance?.firstName} {selectedEmployeeForBalance?.surname}
             </DialogTitle>
           </DialogHeader>
           {selectedEmployeeForBalance && (() => {
             const employeeBalances = leaveBalances.filter((b: LeaveBalance) => b.userId === selectedEmployeeForBalance.id);
+            const activatedTypes = new Set(employeeBalances.map((b: LeaveBalance) => b.leaveType));
+            const notActivated = activatableTypes.filter(t => !activatedTypes.has(t.leaveType));
+
             return (
-              <div className="space-y-4">
-                {employeeBalances.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4">No leave balances set for this employee.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {employeeBalances.map((balance: LeaveBalance) => {
-                      const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
-                      return (
-                        <div key={balance.id} className="p-4 bg-slate-50 rounded-lg border">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium capitalize">{balance.leaveType.replace('_', ' ')}</span>
-                            <Badge variant={available > 0 ? 'default' : 'destructive'}>
-                              {formatLeaveDays(available)} available
-                            </Badge>
+              <div className="space-y-6">
+                {/* Active balances */}
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 mb-3">Active Leave Types</p>
+                  {employeeBalances.length === 0 ? (
+                    <p className="text-muted-foreground text-sm text-center py-4">No leave balances set for this employee.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {employeeBalances.map((balance: LeaveBalance) => {
+                        const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
+                        return (
+                          <div key={balance.id} className="p-4 bg-slate-50 rounded-lg border">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium capitalize">{balance.leaveType.replace('_', ' ')}</span>
+                              <Badge variant={available > 0 ? 'default' : 'destructive'}>
+                                {formatLeaveDays(available)} available
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-sm">
+                              <div className="text-center p-2 bg-white rounded">
+                                <p className="text-muted-foreground text-xs">Total</p>
+                                <p className="font-semibold">{formatLeaveDays(balance.total)}</p>
+                              </div>
+                              <div className="text-center p-2 bg-white rounded">
+                                <p className="text-muted-foreground text-xs">Taken</p>
+                                <p className="font-semibold text-amber-600">{formatLeaveDays(balance.taken)}</p>
+                              </div>
+                              <div className="text-center p-2 bg-white rounded">
+                                <p className="text-muted-foreground text-xs">Pending</p>
+                                <p className="font-semibold text-blue-600">{formatLeaveDays(balance.pending)}</p>
+                              </div>
+                            </div>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 text-sm">
-                            <div className="text-center p-2 bg-white rounded">
-                              <p className="text-muted-foreground text-xs">Total</p>
-                              <p className="font-semibold">{formatLeaveDays(balance.total)}</p>
-                            </div>
-                            <div className="text-center p-2 bg-white rounded">
-                              <p className="text-muted-foreground text-xs">Taken</p>
-                              <p className="font-semibold text-amber-600">{formatLeaveDays(balance.taken)}</p>
-                            </div>
-                            <div className="text-center p-2 bg-white rounded">
-                              <p className="text-muted-foreground text-xs">Pending</p>
-                              <p className="font-semibold text-blue-600">{formatLeaveDays(balance.pending)}</p>
-                            </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Restricted types available to activate */}
+                {notActivated.length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700 mb-1">Activate Restricted Leave</p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      The following leave types require HR/Admin activation per employee.
+                    </p>
+                    <div className="space-y-2">
+                      {notActivated.map(t => (
+                        <div key={t.leaveType} className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium">{t.leaveType}</p>
+                            <p className="text-xs text-muted-foreground">{t.description}</p>
                           </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-amber-400 text-amber-700 hover:bg-amber-100"
+                            disabled={createLeaveBalanceMutation.isPending}
+                            onClick={() =>
+                              createLeaveBalanceMutation.mutate({
+                                userId: selectedEmployeeForBalance.id,
+                                leaveType: t.leaveType,
+                                total: t.defaultDays,
+                              })
+                            }
+                          >
+                            Activate
+                          </Button>
                         </div>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

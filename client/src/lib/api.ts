@@ -132,6 +132,12 @@ export const userApi = {
     return res.json();
   },
 
+  async getForOrgChart(): Promise<User[]> {
+    const res = await apiFetch(`${API_BASE}/users?view=org-chart`);
+    if (!res.ok) throw new Error("Failed to fetch users");
+    return res.json();
+  },
+
   // Used by tile mode kiosk — public endpoint, no session required
   async getAllForKiosk(): Promise<User[]> {
     const res = await apiFetch(`${API_BASE}/users/kiosk`);
@@ -824,6 +830,12 @@ export const leaveRuleApi = {
       const error = await res.json();
       throw new Error(error.error || "Failed to update leave rule");
     }
+    return res.json();
+  },
+
+  async getActivatableTypes(): Promise<{ leaveType: string; defaultDays: number; source: 'statutory' | 'custom'; description: string }[]> {
+    const res = await apiFetch(`${API_BASE}/leave-balances/activatable-types`);
+    if (!res.ok) throw new Error("Failed to fetch activatable leave types");
     return res.json();
   },
 

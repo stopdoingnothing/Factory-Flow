@@ -91,6 +91,21 @@ export const formatLeaveDays = (days: number | null | undefined): string => {
   return parseFloat(days.toFixed(2)).toString();
 };
 
+export const STANDARD_LEAVE_TYPES = ['Annual Leave', 'Sick Leave', 'Family Responsibility'];
+
+export function groupLeaveBalances<T extends { leaveType: string }>(
+  balances: T[]
+): { standard: T[]; other: T[] } {
+  const unique = balances.filter(
+    (b, i, arr) => arr.findIndex(x => x.leaveType === b.leaveType) === i
+  );
+  const standard = STANDARD_LEAVE_TYPES
+    .map(t => unique.find(b => b.leaveType === t))
+    .filter(Boolean) as T[];
+  const other = unique.filter(b => !STANDARD_LEAVE_TYPES.includes(b.leaveType));
+  return { standard, other };
+}
+
 export const generatePassword = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let password = '';

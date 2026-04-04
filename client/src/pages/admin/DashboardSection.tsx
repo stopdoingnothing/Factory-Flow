@@ -93,15 +93,6 @@ export default function DashboardSection({
     }
   });
 
-  const mdDecisionMutation = useMutation({
-    mutationFn: ({ id, decision, notes }: { id: number; decision: 'approved' | 'rejected'; notes?: string }) => 
-      leaveRequestApi.mdDecision(id, user?.id || '', decision, notes),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
-    }
-  });
-
   const activeEmployees = React.useMemo(() =>
     users.filter((u: any) => !u.terminationDate && !u.excludeFromLeave && (!u.startDate || u.startDate <= todayStr)),
   [users, todayStr]);
@@ -134,14 +125,13 @@ export default function DashboardSection({
   }, [weekAttendance, todayStr, attendanceRequiredEmployees]);
 
   const pendingCounts = React.useMemo(() => {
-    const pending = leaveRequests.filter((r: LeaveRequest) => 
-      ['pending_manager', 'pending_hr', 'pending_md', 'pending'].includes(r.status)
+    const pending = leaveRequests.filter((r: LeaveRequest) =>
+      ['pending_manager', 'pending_hr', 'pending'].includes(r.status)
     );
     return {
       total: pending.length,
       manager: pending.filter((r: LeaveRequest) => r.status === 'pending_manager' || r.status === 'pending').length,
       hr: pending.filter((r: LeaveRequest) => r.status === 'pending_hr').length,
-      md: pending.filter((r: LeaveRequest) => r.status === 'pending_md').length,
     };
   }, [leaveRequests]);
 
@@ -181,7 +171,6 @@ export default function DashboardSection({
                   <div className="flex gap-1 mt-1 text-xs text-muted-foreground">
                     {pendingCounts.manager > 0 && <span className="bg-orange-100 px-1 rounded">M:{pendingCounts.manager}</span>}
                     {pendingCounts.hr > 0 && <span className="bg-blue-100 px-1 rounded">HR:{pendingCounts.hr}</span>}
-                    {pendingCounts.md > 0 && <span className="bg-purple-100 px-1 rounded">MD:{pendingCounts.md}</span>}
                   </div>
                 )}
               </div>
@@ -299,7 +288,7 @@ export default function DashboardSection({
             <p className="text-muted-foreground text-center py-4">No pending leave requests</p>
           ) : (
             <div className="space-y-2">
-              {leaveRequests.filter((r: LeaveRequest) => ['pending_manager', 'pending_hr', 'pending_md', 'pending'].includes(r.status)).slice(0, 5).map((request: LeaveRequest) => {
+              {leaveRequests.filter((r: LeaveRequest) => ['pending_manager', 'pending_hr', 'pending'].includes(r.status)).slice(0, 5).map((request: LeaveRequest) => {
                 const employee = users.find(u => u.id === request.userId);
                 const actionInfo = canTakeAction(request);
                 const statusInfo = formatLeaveStatus(request.status);
@@ -327,7 +316,7 @@ export default function DashboardSection({
                       </Button>
                       {actionInfo.canAct && (
                         <>
-                          <Button 
+                          <Button
                             size="sm"
                             className="bg-green-600 hover:bg-green-700"
                             onClick={() => {
@@ -335,15 +324,13 @@ export default function DashboardSection({
                                 managerDecisionMutation.mutate({ id: request.id, decision: 'approved' });
                               } else if (actionInfo.role === 'hr') {
                                 hrDecisionMutation.mutate({ id: request.id, decision: 'approved' });
-                              } else if (actionInfo.role === 'md') {
-                                mdDecisionMutation.mutate({ id: request.id, decision: 'approved' });
                               }
                             }}
                             title={`Approve as ${actionInfo.stage}`}
                           >
                             <Check className="h-4 w-4" />
                           </Button>
-                          <Button 
+                          <Button
                             size="sm"
                             variant="destructive"
                             onClick={() => {
@@ -351,8 +338,6 @@ export default function DashboardSection({
                                 managerDecisionMutation.mutate({ id: request.id, decision: 'rejected' });
                               } else if (actionInfo.role === 'hr') {
                                 hrDecisionMutation.mutate({ id: request.id, decision: 'rejected' });
-                              } else if (actionInfo.role === 'md') {
-                                mdDecisionMutation.mutate({ id: request.id, decision: 'rejected' });
                               }
                             }}
                             title="Reject"
