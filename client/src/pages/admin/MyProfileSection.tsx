@@ -22,6 +22,8 @@ export default function MyProfileSection() {
     queryKey: ['leave-balances', user?.id],
     queryFn: () => user?.id ? leaveBalanceApi.getByUserId(user.id) : [],
     enabled: !!user?.id,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const { data: recentAttendance } = useQuery({

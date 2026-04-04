@@ -51,6 +51,8 @@ export default function PersonnelSection() {
   const { data: leaveBalances = [] } = useQuery({
     queryKey: ['leave-balances'],
     queryFn: () => leaveBalanceApi.getAll(),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const { data: orgPositions = [] } = useQuery<OrgPosition[]>({

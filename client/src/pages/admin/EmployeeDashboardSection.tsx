@@ -30,12 +30,16 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
     queryKey: ['leave-balances', user?.id],
     queryFn: () => leaveBalanceApi.getByUserId(user!.id),
     enabled: !!user,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const { data: requests = [] } = useQuery({
     queryKey: ['leave-requests', user?.id],
     queryFn: () => leaveRequestApi.getAll(user!.id),
     enabled: !!user,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const { data: orgPositions = [] } = useQuery<OrgPosition[]>({
