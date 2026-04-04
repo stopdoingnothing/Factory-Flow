@@ -15,8 +15,6 @@ import AttendanceTileMode from "@/pages/AttendanceTileMode";
 import AdminDashboard from "@/pages/AdminDashboard";
 import MaintainerDashboard from "@/pages/MaintainerDashboard";
 import ResetPassword from "@/pages/ResetPassword";
-import OrgChart from "@/pages/OrgChart";
-import AttendanceReports from "@/pages/AttendanceReports";
 
 function hexToHsl(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -94,8 +92,6 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
       {/* Main app — single dashboard for all authenticated users */}
       <Route path="/dashboard">{() => <RoleRoute roles={['employee','manager','hr','md','admin']} component={AdminDashboard} />}</Route>
-      <Route path="/org-chart">{() => <RoleRoute roles={['manager','hr','admin']} component={OrgChart} />}</Route>
-      <Route path="/reports">{() => <RoleRoute roles={['manager','hr','admin']} component={AttendanceReports} />}</Route>
       <Route path="/maintainer/dashboard">{() => <RoleRoute roles={['admin']} component={MaintainerDashboard} />}</Route>
       <Route component={NotFound} />
     </Switch>

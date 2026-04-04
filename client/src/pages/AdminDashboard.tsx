@@ -30,8 +30,10 @@ import { LeaveRequest as LeaveRequestForm } from './LeaveRequest';
 import MyAttendanceSection from './admin/MyAttendanceSection';
 import MyProfileSection from './admin/MyProfileSection';
 import EmployeeDashboardSection from './admin/EmployeeDashboardSection';
+import OrgChart from './OrgChart';
+import AttendanceReports from './AttendanceReports';
 
-type ActiveSection = 'dashboard' | 'admin-insights' | 'employees' | 'leave-requests' | 'attendance' | 'departments' | 'employee-types' | 'leave-rules' | 'grievances' | 'holidays' | 'leave-calendar' | 'positions' | 'companies' | 'settings' | 'backup' | 'apply-leave' | 'employee-grievances' | 'my-attendance' | 'profile';
+type ActiveSection = 'dashboard' | 'admin-insights' | 'employees' | 'leave-requests' | 'attendance' | 'departments' | 'employee-types' | 'leave-rules' | 'grievances' | 'holidays' | 'leave-calendar' | 'positions' | 'companies' | 'settings' | 'backup' | 'apply-leave' | 'employee-grievances' | 'my-attendance' | 'profile' | 'org-chart' | 'reports';
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -131,7 +133,7 @@ export default function AdminDashboard() {
   const isManagement = hasRole('manager') || hasRole('hr') || hasRole('admin');
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* Top header bar */}
       <header className="h-16 bg-sidebar text-sidebar-foreground flex items-center justify-between px-4 shadow-md z-50 shrink-0">
         <div className="flex items-center gap-3">
@@ -252,8 +254,8 @@ export default function AdminDashboard() {
 
       <div className="flex flex-1 overflow-hidden">
       {/* Sidebar */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col bg-card border-r border-border shadow-sm z-40 overflow-y-auto">
-        <nav className="flex-1 p-4 space-y-1">
+      <aside className="hidden md:flex w-64 shrink-0 flex-col bg-card border-r border-border shadow-sm z-40">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {/* Dashboard — visible to all */}
           <button
             onClick={() => setActiveSection('dashboard')}
@@ -283,8 +285,8 @@ export default function AdminDashboard() {
                 <Users className="h-4 w-4" /> {hasRole('admin') ? 'Personnel' : 'My Team'}
               </button>
               <button
-                onClick={() => setLocation('/org-chart')}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200"
+                onClick={() => setActiveSection('org-chart')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'org-chart' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
                 data-testid="nav-org-chart"
               >
                 <Network className="h-4 w-4" /> Organization Chart
@@ -316,8 +318,8 @@ export default function AdminDashboard() {
                 <Clock className="h-4 w-4" /> Attendance
               </button>
               <button
-                onClick={() => setLocation('/reports')}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200"
+                onClick={() => setActiveSection('reports')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${activeSection === 'reports' ? 'bg-primary text-white' : 'hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200'}`}
                 data-testid="nav-reports"
               >
                 <TrendingUp className="h-4 w-4" /> Attendance Reports
@@ -425,6 +427,8 @@ export default function AdminDashboard() {
         {activeSection === 'attendance' && <AttendanceSection />}
         {activeSection === 'leave-rules' && <LeaveRulesSection />}
         {activeSection === 'leave-calendar' && <LeaveCalendarSection />}
+        {activeSection === 'org-chart' && <OrgChart />}
+        {activeSection === 'reports' && <AttendanceReports />}
         {activeSection === 'positions' && <OrgPositionsSection />}
         {activeSection === 'companies' && <CompaniesSection />}
         {activeSection === 'settings' && <SettingsSection />}

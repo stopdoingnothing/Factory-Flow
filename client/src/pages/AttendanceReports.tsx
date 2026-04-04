@@ -1,8 +1,6 @@
 import { useState, useMemo } from 'react';
 import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from './admin/utils';
-import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +13,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { attendanceApi, userApi, departmentApi, settingsApi, publicHolidayApi } from '@/lib/api';
 import type { User, AttendanceRecord, Department, PublicHoliday } from '@shared/schema';
 import {
-  ArrowLeft, Download, Clock, AlertTriangle, TrendingUp,
+  Download, Clock, AlertTriangle, TrendingUp,
   Users, Calendar, Search, ChevronDown, ChevronRight,
   CheckCircle2, XCircle, BarChart3, Filter, Star, Sun
 } from 'lucide-react';
@@ -163,7 +161,6 @@ function detectAnomalies(
 }
 
 export default function AttendanceReports() {
-  const [, setLocation] = useLocation();
   const [period, setPeriod] = useState<ReportPeriod>('weekly');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -540,31 +537,20 @@ export default function AttendanceReports() {
   const periodLabel = period === 'weekly' ? 'This Week' : period === 'monthly' ? 'This Month' : period === 'yearly' ? 'This Year' : 'Custom Period';
 
   return (
-    <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setLocation('/dashboard')}
-              data-testid="button-back"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-heading font-bold" data-testid="text-report-title">
-                Attendance Reports
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {format(start, 'dd MMM yyyy')} - {format(end, 'dd MMM yyyy')}
-              </p>
-            </div>
-          </div>
-          <Button onClick={exportPdf} data-testid="button-export-pdf">
-            <Download className="h-4 w-4 mr-2" /> Export PDF
-          </Button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-heading font-bold text-slate-900" data-testid="text-report-title">
+            Attendance Reports
+          </h1>
+          <p className="text-muted-foreground">
+            {format(start, 'dd MMM yyyy')} - {format(end, 'dd MMM yyyy')}
+          </p>
         </div>
+        <Button onClick={exportPdf} data-testid="button-export-pdf">
+          <Download className="h-4 w-4 mr-2" /> Export PDF
+        </Button>
+      </div>
 
         <Tabs value={period} onValueChange={(v) => setPeriod(v as ReportPeriod)}>
           <TabsList className="grid w-full grid-cols-4" data-testid="tabs-period">
@@ -1141,7 +1127,6 @@ export default function AttendanceReports() {
             })()}
           </CardContent>
         </Card>
-      </div>
-    </Layout>
+    </div>
   );
 }

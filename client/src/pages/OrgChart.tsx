@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Users, Building2, User as UserIcon, Crown, Briefcase, ZoomIn, ZoomOut, RotateCcw, Download, Loader2, Eye, EyeOff, Maximize2 } from 'lucide-react';
+import { Users, Building2, User as UserIcon, Crown, Briefcase, ZoomIn, ZoomOut, RotateCcw, Download, Loader2, Eye, EyeOff, Maximize2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { userApi, departmentApi, attendanceApi, orgPositionApi } from '@/lib/api';
 import defaultAvatarUrl from '@/assets/default-avatar.jpg';
@@ -228,7 +227,6 @@ function Connector({ source, target, sourceHeight, targetTier = 1 }: { source: {
 }
 
 export default function OrgChart() {
-  const [, setLocation] = useLocation();
   const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -594,11 +592,6 @@ export default function OrgChart() {
     }
   };
 
-  useEffect(() => {
-    if (!user || user.role !== 'manager') {
-      setLocation('/login');
-    }
-  }, [user, setLocation]);
 
   const { data: users = [], isLoading: usersLoading, isError: usersError } = useQuery<User[]>({
     queryKey: ['users'],
@@ -1086,45 +1079,26 @@ export default function OrgChart() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="max-w-full mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setLocation('/dashboard')}
-                data-testid="button-back"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
-              </Button>
-              <div className="h-6 w-px bg-slate-200" />
-              <div>
-                <h1 className="text-xl font-bold flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" />
-                  Organization Chart
-                </h1>
-                <p className="text-sm text-muted-foreground">Managers with department-grouped teams</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Badge variant="outline" className="gap-1">
-                <Crown className="h-3 w-3" /> {totalManagers} Managers
-              </Badge>
-              <Badge variant="secondary" className="gap-1">
-                <Briefcase className="h-3 w-3" /> {totalWorkers} Workers
-              </Badge>
-              <Badge variant="outline" className="gap-1">
-                <Building2 className="h-3 w-3" /> {departments.length} Departments
-              </Badge>
-            </div>
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-heading font-bold text-slate-900">Organization Chart</h1>
+          <p className="text-muted-foreground">Managers with department-grouped teams</p>
         </div>
-      </header>
+        <div className="flex items-center gap-4">
+          <Badge variant="outline" className="gap-1">
+            <Crown className="h-3 w-3" /> {totalManagers} Managers
+          </Badge>
+          <Badge variant="secondary" className="gap-1">
+            <Briefcase className="h-3 w-3" /> {totalWorkers} Workers
+          </Badge>
+          <Badge variant="outline" className="gap-1">
+            <Building2 className="h-3 w-3" /> {departments.length} Departments
+          </Badge>
+        </div>
+      </div>
 
-      <main className="p-4">
+      <div>
         {isLoading ? (
           <Card>
             <CardHeader>
@@ -1309,7 +1283,7 @@ export default function OrgChart() {
             </CardContent>
           </Card>
         )}
-      </main>
+      </div>
     </div>
   );
 }
