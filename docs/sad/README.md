@@ -1,6 +1,6 @@
 # Factory Flow — System Architecture Documentation
 
-**AECE Checkpoint** is a full-stack workforce management system covering leave management, attendance tracking, organisational structure, and HR administration, built for South African BCEA compliance.
+**Factory Flow** is a full-stack workforce management system covering leave management, attendance tracking, organisational structure, and HR administration, built for South African BCEA compliance.
 
 ## Document Index
 
@@ -27,8 +27,12 @@
 | Database schema | `shared/schema.ts` |
 | All API endpoints | `server/routes.ts` |
 | Database queries | `server/storage.ts` |
-| BCEA leave calculations | `server/bcea.ts` |
+| BCEA leave calculations (pure logic) | `server/bcea.ts` |
+| Leave accrual orchestration + termination settlement | `server/leave-accrual.ts` |
 | Custom accrual engine | `server/custom-leave-rules.ts` |
 | Email templates | `server/email.ts` |
+| Accrual rate tiers | `accrual_rate_tiers` table (seeded via `migrations/0003_leave_accrual_v2.sql`) |
+| Sick leave graduated accrual state | `sick_leave_tracking` table |
+| Leave accrual audit trail + idempotency | `leave_accrual_records` table |
 | Docker deployment | `docker-compose.yml`, `Dockerfile` |
 | Environment variables | [07 — Infrastructure](07-infrastructure.md) |

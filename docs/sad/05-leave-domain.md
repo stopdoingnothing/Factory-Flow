@@ -2,73 +2,210 @@
 
 ## Overview
 
-Leave management is the core business domain of Factory Flow. It has two distinct subsystems:
+Leave management is the core business domain of Factory Flow. It has three subsystems:
 
-1. **BCEA Engine** (`server/bcea.ts`) — statutory South African leave entitlements calculated from an employee's start date
-2. **Custom Accrual Engine** (`server/custom-leave-rules.ts`) — configurable rules for non-statutory or organisation-specific leave types
+1. **BCEA Engine** (`server/bcea.ts`) — pure-logic functions for South African statutory leave calculations
+2. **Accrual Orchestration** (`server/leave-accrual.ts`) — queries the DB, calls bcea.ts, writes results
+3. **Custom Accrual Engine** (`server/custom-leave-rules.ts`) — configurable rules for non-statutory leave types
 
-Both engines write to the `leaveBalances` table. Leave requests deduct from balances via a multi-stage approval workflow.
+The monthly accrual scheduler in `server/index.ts` drives the automated run. All engines write to `leaveBalances` and `leaveAccrualRecords`. Leave requests deduct from balances via a multi-stage approval workflow.
+
+Spec reference: `specs/leave-accrual-implementation-spec.md` (v1.3). Spec is authoritative for all leave calculations.
+
+---
+
+## Cycle Definitions
+
+Three distinct cycle types govern different leave categories:
+
+| Cycle type | Anchor | Length | Leave types |
+|-----------|--------|--------|-------------|
+| **System-wide calendar** | `annual_leave_cycle_start` setting (default 1 Jan) | 12 months | Annual Leave, FRL |
+| **Per-employee employment** | Employee's `employment_start_date` (exact date, can be mid-month) | 36 months | Sick Leave |
+| **Per-leave-type configurable** | `cycle_anchor` field on `leaveRules` (`calendar_year` or `employment_start_date`) | `cycle_length_months` on rule | Custom leave types |
+
+Because the annual leave cycle start is always the 1st of a month, no mid-month cycle boundary split is ever needed for annual leave or FRL.
 
 ---
 
 ## BCEA Leave Types
 
-The Basic Conditions of Employment Act (South Africa) mandates the following:
-
 | Leave type | Entitlement | Cycle | Notes |
 |-----------|------------|-------|-------|
-| Annual leave | 21 days | 12-month cycle | Pro-rated monthly from start date |
-| Sick leave | 30 days | 3-year cycle | First 6 months: 1 day per 26 worked; thereafter full allocation |
-| Family responsibility | 3 days | Per 12-month cycle | Available from month 4 of employment |
-| Maternity | 87 days | Per event | Not pro-rated |
-| Parental | 10 days | Per event | For partner at birth/adoption |
-| Adoption | 50 days | Per event | Primary caregiver |
-| Commissioning | 50 days | Per event | Surrogacy commissioning parent |
-
-The BCEA engine calculates each employee's entitlement based on their `startDate` and the current date. It is called:
-- When a new employee is created
-- When `POST /api/leave-balances/recalculate-sa` is triggered (bulk recalculate)
-- When an employee type changes
+| **Annual Leave** | Configurable via rate tiers (default Tier 1: 15 days/yr) | 12-month system-wide calendar cycle | Pro-rated monthly; paused by unpaid/maternity etc. |
+| **Sick Leave** | 30 days (full-time) | 36-month per-employee cycle | First 6 months: graduated accrual (1 per 26 days worked); thereafter fixed pool |
+| **Family Responsibility Leave (FRL)** | 3 days | 12-month system-wide calendar cycle | Lump sum; eligibility: ≥ 4 months employed AND `workDaysPerWeek >= 4` |
+| **Maternity** | 87 working days | Per event | Fixed; not accrued monthly |
+| **Parental** | 10 days | Per event | For the non-birthing partner |
+| **Adoption** | 50 days | Per event | Primary caregiver |
+| **Commissioning Parental** | 50 days | Per event | Surrogacy commissioning parent |
 
 ---
 
-## Custom Leave Accrual
+## Annual Leave Accrual (Spec §5)
 
-Custom leave rules allow organisations to define leave types beyond the BCEA minimum. Examples: study leave, special leave, probation leave.
+### Rate determination
 
-### Accrual Types
-
-| Type | Behaviour | Use case |
-|------|-----------|---------|
-| `per_days_worked` | Earn X days per Y working days | Attendance-based accrual |
-| `monthly` | Earn X days at the start of each month | Standard monthly allocation |
-| `annual` | Earn X days per year on anniversary | Annual grant |
-| `fixed_per_cycle` | Flat allocation per N-month cycle | Probation period grants |
-
-### Leave Rule Phases
-
-A single rule can have multiple phases with different accrual rates, activated by months of service:
+The monthly accrual rate (`RATE`) is determined per employee on each run:
 
 ```
-Example: Annual Leave for contractors
-  Phase 1 (months 0–5):   earn 1 day per 26 days worked   ← probation rate
-  Phase 2 (months 6+):    earn 1.75 days per 26 days worked ← post-probation rate
+if employee.annual_leave_override_days IS NOT NULL:
+    RATE = annual_leave_override_days / 12         ← HR-set override; tier logic skipped
+else:
+    tier = highest tier where min_months_of_service <= employee's completed months
+    RATE = tier.annual_entitlement_days / 12
 ```
 
-The accrual engine:
-1. Looks up all `leaveRules` applicable to the employee's `employeeTypeId`
-2. Determines which `leaveRulePhase` is active based on months since `startDate`
-3. Applies the phase's rate to the appropriate unit (working days, months, or cycle)
-4. Enforces `maxAccrual` cap and `waitingPeriodMonths`
-5. Updates `leaveBalances.total`
+Default tiers (HR-editable in `accrual_rate_tiers` table):
 
-### Carry-Over
+| Tier | Requires | Annual days | Monthly RATE |
+|------|---------|-------------|--------------|
+| 1 | 0+ months | 15 | 1.25 |
+| 2 | 24+ months | 20 | 1.6667 |
 
-Each leave balance has:
-- `carryOverDays` — days carried from the previous cycle
-- `carryOverExpiry` — date after which carry-over is forfeited
+When an employee crosses a tier boundary mid-month, the new rate applies to the **entire month** — no split.
 
-On cycle renewal, the engine caps carry-over at `leaveRules.carryOverLimit` and sets the expiry date (typically 6 months after the employee's anniversary).
+The `annual_leave_override_days` field on the employee profile permanently overrides tier logic until HR clears it. Setting or clearing the override is audit-logged.
+
+### Active days formula
+
+The actual accrual amount uses calendar days, not working days:
+
+```
+active_days = days_employed_in_month - accrual_pausing_leave_days
+accrual     = RATE × (active_days / calendar_days_in_month)
+```
+
+`active_days` is reduced below `calendar_days_in_month` when:
+- The employee started mid-month (new starter)
+- The employee was deactivated mid-month (termination)
+- The employee had approved leave of a pausing type during the month
+
+**No rounding** — the exact decimal is stored. Display rounds to 2 decimal places.
+
+### Accrual-pausing leave types
+
+These leave types reduce `active_days` when approved and overlapping the accrual month:
+
+- Unpaid Leave
+- Maternity Leave
+- Parental Leave
+- Adoption Leave
+- Commissioning Parental Leave
+- Any custom leave type with `pauses_annual_accrual = true`
+
+Sick Leave, Family Responsibility Leave, and Annual Leave itself do **not** pause accrual.
+
+### Termination settlement
+
+When an employee's `terminationDate` is set via `PATCH /api/users/:id`, `processTerminationSettlement()` fires immediately:
+1. Calculates pro-rated annual leave for the current partial month
+2. Credits to `leaveBalances` immediately (does not wait for the 1st of next month)
+3. Writes a `termination_settlement` event to `leaveAccrualRecords`
+4. Notifies all HR users with the remaining balance
+
+### Annual leave cycle rollover
+
+At the end of each 12-month cycle (the month before `annual_leave_cycle_start`):
+1. Unused balance (`total - taken - pending`) is tagged as `carryOverDays`
+2. `leaveBalances.total` is **zeroed** and the new cycle starts fresh
+3. `carryOverExpiry` is set to 6 months after cycle end (configurable via `leave_carry_over_grace_months`)
+4. Forfeiture warnings are sent to the employee and HR at 60 and 30 days before expiry
+5. After expiry: the system flags the record for HR review — **it does not auto-forfeit**. HR must manually action the forfeiture.
+
+---
+
+## Sick Leave Accrual (Spec §6)
+
+### First 6 months — graduated accrual
+
+During the first 6 months of employment, sick leave accrues at 1 day per 26 days worked:
+
+```
+days_worked_in_month = scheduled_working_days - leave_days_taken (any type)
+cumulative_days_worked += days_worked_in_month
+new_credit = floor(cumulative_days_worked / 26) - graduated_days_credited
+```
+
+`cumulative_days_worked` and `graduated_days_credited` are persisted per employee in `sickLeaveTracking`.
+
+The system uses **actual leave records** to calculate `leave_days_taken` — it does not approximate.
+
+### 6-month transition
+
+On the 1st of the month following the employee's 6-month anniversary:
+1. Calculate full cycle entitlement: `30 × (workDaysPerWeek / 5)`
+2. Set balance to `full_entitlement - sick_leave_days_TAKEN` (not accrued — days actually taken)
+3. Set `graduated_accrual_active = false`
+4. Notify employee and HR
+
+### After transition — fixed pool
+
+After month 6, no monthly accrual occurs. The balance decrements as sick leave is taken and approved.
+
+For part-time employees, the entitlement scales: a 4-day worker gets `30 × (4/5) = 24 days`.
+
+### 36-month cycle reset
+
+When `sick_cycle_start_date + 36 months` is reached (checked on each monthly run):
+1. Unused sick leave is **lost** — the balance resets to the full entitlement
+2. `sick_cycle_start_date` advances to the new cycle start
+3. Employee and HR are notified
+
+The graduated accrual rule does **not** re-apply on subsequent cycles.
+
+---
+
+## Family Responsibility Leave (Spec §7)
+
+FRL is a lump-sum grant (3 days) at the start of each annual leave cycle (same boundary as annual leave). No monthly accrual.
+
+**Eligibility:** Both conditions must be met:
+1. Employed for at least 4 months (from `employment_start_date`)
+2. `workDaysPerWeek >= 4`
+
+On the 4-month anniversary, the 3 days are granted immediately (no waiting for next cycle). On each subsequent cycle reset, eligibility is re-evaluated against the current `workDaysPerWeek`. If an employee drops below 4 days/week mid-cycle, they retain their remaining FRL for the current cycle but receive no allocation at the next reset. The 4-month employment gate is a one-time check — once passed, it is permanently satisfied.
+
+---
+
+## Custom Leave Types (Spec §9)
+
+Custom leave rules allow organisations to define leave types beyond the BCEA minimum (e.g. study leave, special leave).
+
+Each rule configures:
+- `accrual_type`: `none` (approval-only), `lump_sum`, or `monthly`
+- `accrual_rate` / `lump_sum_amount`: rate or amount
+- `cycle_length_months` + `cycle_anchor`: cycle length and whether it's calendar-year or employment-anchored
+- `pauses_annual_accrual`: if true, days on this leave count against annual leave `active_days`
+- `carry_over`: whether unused balance carries forward
+- `max_days_per_cycle`: optional cap
+
+If `accrual_type = monthly`, the same pro-ration formula applies as annual leave, using the custom `accrual_rate` instead of `RATE`. If `cycle_anchor = employment_start_date`, cycle boundaries can fall mid-month; first and last months are pro-rated.
+
+BCEA-managed types (`Annual Leave`, `Sick Leave`, `Family Responsibility`, and the statutory event leaves) are skipped by the custom engine to prevent conflicts.
+
+---
+
+## Monthly Accrual Run (Spec §4, §14)
+
+**Trigger:** Fires on the **1st of each month**. Credits leave for the **prior calendar month**.
+
+**Idempotency:** Before writing any accrual, `writeAccrualRecord()` checks for an existing `leaveAccrualRecords` row with the same `(employee_id, leave_type, accrual_period, event_type)`. If found, the event is skipped — running the engine twice for the same month is safe.
+
+**Eligible employees:** All employees who were active at any point during the prior month. This includes employees whose `terminationDate` falls within the prior month (they receive a final pro-rated accrual for that month in addition to any immediate termination settlement).
+
+**Processing order per employee:**
+1. Determine RATE (override or tier)
+2. Calculate `active_days` for the prior month
+3. Credit annual leave; write `monthly_accrual` or `pro_rated_accrual` record
+4. If in graduated sick period: update `cumulative_days_worked`, credit if threshold crossed
+5. Check for sick leave 6-month transition
+6. Check for sick leave 36-month cycle reset
+7. Check for annual leave cycle rollover (if prior month = last month of cycle)
+8. Check for FRL cycle reset (same cycle boundary)
+9. Credit custom monthly-accrual leave types
+10. Check for forfeiture warnings / flags
+11. Settle past approved leave requests (pending → taken)
 
 ---
 
@@ -76,77 +213,73 @@ On cycle renewal, the engine caps carry-over at `leaveRules.carryOverLimit` and 
 
 ### Submission
 
-When a worker submits a leave request:
-1. Client sends `POST /api/leave-requests` with `leaveType`, `startDate`, `endDate`, `reason`
-2. Server calculates business days (excluding weekends and public holidays)
-3. Checks sufficient balance (`total - taken - pending >= days`)
-4. Creates the record with `status = 'pending_manager'`
+1. Client sends `POST /api/leave-requests`
+2. Server calculates business days (excludes weekends and public holidays matching employee's religion)
+3. Checks available balance: `total + carryOverDays - taken - pending >= days`
+4. Creates record with `status = 'pending_manager'`
 5. Increments `leaveBalances.pending`
-6. Sends email notification to the employee's manager
+6. Notifies manager by email
 
-### Approval Stages
+### Approval stages
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending_manager: Employee submits
-    pending_manager --> pending_hr: Manager recommends or does not recommend
+    [*] --> pending_manager: Employee submits\n(has manager)
+    [*] --> pending_hr: Employee submits\n(no manager)
+    pending_manager --> pending_hr: Manager recommends or not
+    pending_manager --> pending_md: Manager forwards\n(HR stage disabled)
     pending_hr --> pending_md: HR approves
     pending_hr --> rejected: HR rejects
     pending_md --> approved: MD approves
     pending_md --> rejected: MD rejects
-    pending_manager --> cancelled: Employee cancels (before recommendation)
+    pending_manager --> cancelled: Employee cancels
     pending_hr --> cancelled: Admin cancels
-    pending_md --> cancelled: Admin cancels
     approved --> [*]
     rejected --> [*]
     cancelled --> [*]
 ```
 
-**Manager recommendation:** The manager submits a recommendation (`recommended` or `not_recommended`) with supporting notes. This always forwards the request to HR — the manager cannot approve or reject. HR sees the recommendation and can override a "not recommended" decision.
+The manager's role is **recommendation only** — they cannot approve or reject outright. HR sees the recommendation and can override a "not recommended" decision (shown with a red warning banner). HR and MD hold final approval/rejection authority.
 
-**HR stage disabled:** If the `leave_require_hr_stage` setting is `false`, the manager's recommendation forwards directly to MD instead of HR.
+### Settlement
 
-**No manager assigned:** If the employee has no manager, the request starts at `pending_hr` directly.
+The monthly accrual run calls `settlePastApprovedLeave()` for every eligible employee: approved requests whose `endDate < today` and `settledAt IS NULL` are settled — pending days are moved to taken and `settledAt` is stamped.
 
-**MD bypass:** The MD can approve directly from `pending_hr`, skipping the MD queue (for requests that arrived at HR but MD acts first).
+### Medical certificate flags
 
-**On approval (final):**
-- `leaveBalances.taken` incremented by `days`
-- `leaveBalances.pending` decremented by `days`
-- Email sent to employee
+For sick leave requests, `requiresMedCert` is set and `medCertFlags` is populated when:
 
-**On rejection:**
-- `leaveBalances.pending` decremented (balance restored)
-- Email sent to employee with rejection notes
-
-### Medical Certificate Flags
-
-For sick leave requests exceeding 2 consecutive days, `medicalCertRequired` is set to `true`. Admins mark `medicalCertReceived = true` when the physical certificate is received.
-
-### Escalation Reminders
-
-`POST /api/leave-requests/send-escalation-reminders` can be called (manually or by a scheduled job) to send reminder emails to managers for any requests pending > 3 days.
+| Flag | Condition |
+|------|-----------|
+| `exceeds_2_days` | More than 2 consecutive sick days |
+| `fri_mon_pattern` | Includes a Friday adjacent to the following Monday |
+| `public_holiday_adjacent` | Adjacent to a public holiday |
 
 ---
 
-## Historic Leave Entry
+## Manual Balance Adjustments
 
-Admins can backfill leave records from physical records using `POST /api/leave-requests/historic`. This creates an `isHistoric = true` request that directly adjusts `leaveBalances.taken` without going through the approval workflow.
+HR can directly adjust any leave balance via `PATCH /api/leave-balances/:id`. Requirements:
+- A non-empty `reason` is **mandatory** — the API rejects blank reasons with HTTP 400
+- Bypasses all validation rules (negative balances are allowed for corrections)
+- Effective immediately
+- Logged to `audit_logs` with `action = 'manual_adjustment'`, including the reason
 
 ---
 
 ## Balance Display
 
-Workers see their leave balances as:
-- **Available** = `total + carryOverDays - taken - pending`
-- **Taken** = `taken`
-- **Pending** = `pending`
-- **Total entitlement** = `total`
+| Label | Formula |
+|-------|---------|
+| Available | `total + carryOverDays - taken - pending` |
+| Taken | `taken` |
+| Pending | `pending` |
+| Total entitlement | `total` |
 
-Carry-over days are displayed separately with their expiry date to remind employees to use them.
+Carry-over days are displayed separately with their expiry date.
 
 ---
 
 ## Leave Calendar
 
-The leave calendar (`/leave-calendar`) shows a visual timeline of all approved leave requests. Admins see the full organisation; workers see their own leave plus colleagues in their department. Public holidays are overlaid from the `publicHolidays` table.
+The leave calendar (`/leave-calendar`) shows a visual timeline of all approved leave requests. Admins see the full organisation; employees see their own leave plus colleagues in their department. Public holidays are overlaid, with religion-specific holidays shown only to employees of the matching religion.

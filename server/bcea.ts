@@ -1,236 +1,228 @@
 /**
- * SA BCEA (Basic Conditions of Employment Act) leave entitlement calculations.
- * Exported as a shared module used by routes and startup recalculation.
+ * SA BCEA (Basic Conditions of Employment Act) leave accrual calculations.
+ *
+ * This module is a pure-logic layer — it receives data and returns numbers.
+ * All DB access is done in the accrual engine (index.ts).
+ *
+ * Spec version: 1.3
  */
+
+import type { AccrualRateTier } from "@shared/schema";
+
+// ── Leave types that pause annual leave accrual (spec §5.6) ──────────────────
+export const ACCRUAL_PAUSING_LEAVE_TYPES = new Set([
+  'Unpaid Leave',
+  'Maternity Leave',
+  'Parental Leave',
+  'Adoption Leave',
+  'Commissioning Leave',
+]);
+
+// ── Rate determination (spec §5.1) ───────────────────────────────────────────
 
 /**
- * Calculate the date by which carry-over annual leave must be taken.
- * Under BCEA, unused leave must be taken within the grace period after the
- * anniversary date on which it was carried over. After that it is forfeited.
+ * Determine the monthly accrual RATE for an employee.
  *
- * @param startDate    Employee employment start date ('yyyy-MM-dd')
- * @param graceMonths  Months after anniversary before carry-over is forfeited (default 6, configurable via setting 'leave_carry_over_grace_months')
- * @returns  Expiry date string ('yyyy-MM-dd')
+ * Priority:
+ *   1. If `annualLeaveOverrideDays` is set on the employee: RATE = override / 12.
+ *   2. Otherwise: find the highest tier where min_months_of_service <= completedMonths.
+ *
+ * @param completedMonths  Full calendar months employed as of the last day of the accrual period.
+ * @param annualLeaveOverrideDays  Per-employee override (nullable).
+ * @param tiers  All accrual rate tiers from the DB, sorted ascending by minMonthsOfService.
  */
-export function getCarryOverExpiryDate(startDate: string, graceMonths = 6): string {
-  const start = new Date(startDate + 'T00:00:00');
-  const today = new Date();
-
-  const totalMonths =
-    (today.getFullYear() - start.getFullYear()) * 12 +
-    (today.getMonth() - start.getMonth()) +
-    (today.getDate() >= start.getDate() ? 0 : -1);
-
-  // Most recent anniversary = start + N complete years
-  const completedYears = Math.floor(Math.max(0, totalMonths) / 12);
-  const anniversary = new Date(start);
-  anniversary.setFullYear(anniversary.getFullYear() + completedYears);
-
-  // Carry-over expires graceMonths after the anniversary
-  const expiry = new Date(anniversary);
-  expiry.setMonth(expiry.getMonth() + graceMonths);
-
-  return expiry.toISOString().split('T')[0];
-}
-
-export interface BceaEntitlements {
-  annualLeave: number;
-  sickLeave: number;
-  familyResponsibility: number;
-  monthsWorked: number;
-  notes: {
-    annualLeave: string;
-    sickLeave: string;
-    familyResponsibility: string;
+export function determineAccrualRate(
+  completedMonths: number,
+  annualLeaveOverrideDays: number | null | undefined,
+  tiers: AccrualRateTier[],
+): { rate: number; basis: string } {
+  if (annualLeaveOverrideDays != null) {
+    const rate = annualLeaveOverrideDays / 12;
+    return { rate, basis: `override (${annualLeaveOverrideDays} days/yr ÷ 12 = ${rate.toFixed(6)})` };
+  }
+  // Sort descending and pick the highest tier the employee qualifies for
+  const sorted = [...tiers].sort((a, b) => b.minMonthsOfService - a.minMonthsOfService);
+  const tier = sorted.find(t => completedMonths >= t.minMonthsOfService);
+  if (!tier) {
+    // Fallback: Tier 1 = 15 days/yr if no tiers are seeded yet
+    return { rate: 15 / 12, basis: 'Tier 1 fallback (15 days/yr ÷ 12 = 1.25 days/month)' };
+  }
+  const rate = tier.annualEntitlementDays / 12;
+  return {
+    rate,
+    basis: `Tier ${tier.id} (${tier.annualEntitlementDays} days/yr ÷ 12 = ${rate.toFixed(6)}, min ${tier.minMonthsOfService} months)`,
   };
 }
 
+// ── Active days calculation (spec §5.3–5.7) ──────────────────────────────────
+
 /**
- * Statutory leave entitlements under BCEA Chapter 3 (event-based, not accrual-based).
- * These are fixed per-employee values that are provisioned once on first startup.
- * The startup recalc never overwrites them after creation so that HR adjustments persist.
+ * Calculate the number of calendar days an employee was actively employed
+ * and NOT on accrual-pausing leave during a given month.
  *
- * Maternity  (s25):   4 consecutive months ≈ 87 working days
- * Parental   (s25A):  10 consecutive days (interpreted as working days per industry norm)
- * Adoption   (s25B):  10 consecutive weeks = 50 working days
- * Commissioning (s25C): 10 consecutive weeks = 50 working days
+ * @param year / month  The accrual period (prior month). month is 1-based.
+ * @param employmentStartDate  'yyyy-MM-dd'
+ * @param deactivationDate  'yyyy-MM-dd' | null
+ * @param pausingLeaveDays  Total calendar days of approved accrual-pausing leave
+ *                          that fall within this month (queried by the caller).
  */
+export function calculateActiveDays(
+  year: number,
+  month: number,  // 1-based
+  employmentStartDate: string,
+  deactivationDate: string | null | undefined,
+  pausingLeaveDays: number,
+): { activeDays: number; totalDays: number; notes: string[] } {
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0); // last day of month
+  const totalDays = lastDay.getDate();
+  const notes: string[] = [];
+
+  const startDate = new Date(employmentStartDate + 'T00:00:00');
+  const endDate = deactivationDate ? new Date(deactivationDate + 'T00:00:00') : null;
+
+  // Days employed within this month
+  const employedFrom = startDate > firstDay ? startDate : firstDay;
+  const employedTo = endDate && endDate < lastDay ? endDate : lastDay;
+
+  // If employment hasn't started yet or ended before this month, 0 days
+  if (employedFrom > lastDay || (endDate && endDate < firstDay)) {
+    return { activeDays: 0, totalDays, notes: ['not employed during this month'] };
+  }
+
+  const daysEmployed = Math.floor((employedTo.getTime() - employedFrom.getTime()) / (86400 * 1000)) + 1;
+
+  if (startDate > firstDay) {
+    notes.push(`new starter (start ${employmentStartDate}): ${daysEmployed} of ${totalDays} days employed`);
+  }
+  if (endDate && endDate < lastDay) {
+    notes.push(`termination (${deactivationDate}): ${daysEmployed} of ${totalDays} days employed`);
+  }
+
+  const activeDays = Math.max(0, daysEmployed - pausingLeaveDays);
+  if (pausingLeaveDays > 0) {
+    notes.push(`${pausingLeaveDays} accrual-pausing leave day(s) deducted`);
+  }
+
+  return { activeDays, totalDays, notes };
+}
+
+// ── Annual leave accrual formula (spec §5.2–5.7) ─────────────────────────────
+
+/**
+ * Calculate the annual leave accrual amount for one employee for one month.
+ */
+export function calculateAnnualLeaveAccrual(
+  rate: number,
+  activeDays: number,
+  totalDays: number,
+): number {
+  if (activeDays <= 0) return 0;
+  if (activeDays >= totalDays) return rate;
+  // No rounding — store exact decimal (spec §5.3)
+  return rate * (activeDays / totalDays);
+}
+
+// ── Sick leave helpers (spec §6) ─────────────────────────────────────────────
+
+/**
+ * Calculate sick leave entitlement (full 36-month cycle).
+ * Scales by work_days_per_week (spec §6.1).
+ */
+export function sickLeaveFullEntitlement(workDaysPerWeek: number): number {
+  return 30 * (workDaysPerWeek / 5);
+}
+
+/**
+ * Calculate graduated sick leave credit for a given month (spec §6.2).
+ * Returns the number of new sick days to credit this month (may be 0).
+ *
+ * @param cumulativeDaysWorked  Counter before this month.
+ * @param daysWorkedThisMonth   scheduled_working_days - leave_days_taken in this month.
+ * @param graduatedDaysCredited  How many sick days have already been credited under the 1-per-26 rule.
+ */
+export function calculateGraduatedSickCredit(
+  cumulativeDaysWorked: number,
+  daysWorkedThisMonth: number,
+  graduatedDaysCredited: number,
+): { newCredit: number; newCumulative: number } {
+  const newCumulative = cumulativeDaysWorked + daysWorkedThisMonth;
+  const totalEarned = Math.floor(newCumulative / 26);
+  const newCredit = Math.max(0, totalEarned - graduatedDaysCredited);
+  return { newCredit, newCumulative };
+}
+
+/**
+ * Calculate the sick leave balance to set at the 6-month transition (spec §6.3).
+ * Formula: full_entitlement - sick_leave_days_TAKEN (not accrued).
+ */
+export function calculateSickLeaveTransitionBalance(
+  workDaysPerWeek: number,
+  sickLeaveTaken: number,
+): number {
+  return Math.max(0, sickLeaveFullEntitlement(workDaysPerWeek) - sickLeaveTaken);
+}
+
+// ── Carry-over expiry (spec §5.9) ─────────────────────────────────────────────
+
+/**
+ * Calculate the date by which prior-cycle annual leave carry-over expires.
+ * Under the spec: 6 months after the annual leave cycle ends.
+ *
+ * @param cycleEndDate  'yyyy-MM-dd' — last day of the annual leave cycle.
+ * @param graceMonths   Default 6.
+ */
+export function getCarryOverExpiryDate(cycleEndDate: string, graceMonths = 6): string {
+  const end = new Date(cycleEndDate + 'T00:00:00');
+  end.setMonth(end.getMonth() + graceMonths);
+  return end.toISOString().split('T')[0];
+}
+
+// ── Completed months helper ───────────────────────────────────────────────────
+
+/**
+ * Calculate full completed calendar months between start and a reference date.
+ * Used for rate tier lookup and FRL eligibility.
+ */
+export function completedMonths(startDate: string, referenceDate: Date): number {
+  const start = new Date(startDate + 'T00:00:00');
+  const total =
+    (referenceDate.getFullYear() - start.getFullYear()) * 12 +
+    (referenceDate.getMonth() - start.getMonth()) +
+    (referenceDate.getDate() >= start.getDate() ? 0 : -1);
+  return Math.max(0, total);
+}
+
+// ── FRL eligibility (spec §7.2) ───────────────────────────────────────────────
+
+export function isFrlEligible(startDate: string, workDaysPerWeek: number, referenceDate: Date): boolean {
+  return completedMonths(startDate, referenceDate) >= 4 && workDaysPerWeek >= 4;
+}
+
+// ── Scheduled working days in a month (for sick leave graduated accrual) ─────
+
+/**
+ * Count the number of scheduled working days in a given month for an employee
+ * based on their work_days_per_week.
+ *
+ * Approximation: assumes 5-day week maps to Mon–Fri.
+ * For other schedules we scale the weekday count proportionally.
+ */
+export function scheduledWorkingDaysInMonth(year: number, month: number, workDaysPerWeek: number): number {
+  let weekdays = 0;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month - 1, d).getDay(); // 0=Sun, 6=Sat
+    if (dow !== 0 && dow !== 6) weekdays++;
+  }
+  // Scale: 5-day worker gets all weekdays; 4-day gets 4/5 of weekdays; etc.
+  return Math.round(weekdays * (workDaysPerWeek / 5));
+}
+
+// ── Statutory leave entitlements (fixed-duration event leaves) ───────────────
 export const STATUTORY_LEAVE_ENTITLEMENTS: Record<string, number> = {
-  'Maternity Leave':     87,
+  'Maternity Leave':     87,  // 4 months ≈ 87 working days
   'Parental Leave':      10,
-  'Adoption Leave':      50,
+  'Adoption Leave':      50,  // 10 weeks
   'Commissioning Leave': 50,
 };
-
-/**
- * Calculate the pro-rated leave accrual for the first partial month of employment.
- * Called once at employee creation — adds days earned from the start date to
- * the end of the hire month.  Subsequent accrual is handled by the month-end cron
- * (see calculateMonthEndAccrual).
- */
-export function calculateFirstMonthAccrual(startDate: string): {
-  annualLeave: number;
-  sickLeave: number;
-  familyResponsibility: number;
-} {
-  const start = new Date(startDate + 'T00:00:00');
-  const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
-  // Days remaining in the start month, including the start day itself
-  const daysRemaining = daysInMonth - start.getDate() + 1;
-  const fraction = daysRemaining / daysInMonth;
-
-  // Annual: always at the 15 days/year rate (< 24 months at hire)
-  const annualLeave = (fraction / 12) * 15;
-
-  // Sick: probationary 1 per 26 working days — virtually always 0 in a partial first month
-  const workingDays = fraction * (52 * 5 / 12);
-  const sickLeave = Math.floor(workingDays / 26);
-
-  // Family responsibility not available until month 4
-  return { annualLeave, sickLeave, familyResponsibility: 0 };
-}
-
-/**
- * Calculate the leave increment to add at the end of a calendar month.
- * Run by the last-day-of-month cron for every active employee.
- * Returns days to ADD to each balance's total.
- *
- * @param startDate           Employee employment start date ('yyyy-MM-dd')
- * @param currentSickTotal    Current sick leave balance.total (used to derive increment)
- */
-export function calculateMonthEndAccrual(
-  startDate: string,
-  currentSickTotal: number,
-): {
-  annualLeave: number;
-  sickLeave: number;
-  familyResponsibility: number;
-  isAnnualCycleEnd: boolean; // true when a 12-month cycle just completed
-} {
-  const start = new Date(startDate + 'T00:00:00');
-  const today = new Date();
-
-  const totalMonths =
-    (today.getFullYear() - start.getFullYear()) * 12 +
-    (today.getMonth() - start.getMonth()) +
-    (today.getDate() >= start.getDate() ? 0 : -1);
-
-  if (totalMonths <= 0) {
-    return { annualLeave: 0, sickLeave: 0, familyResponsibility: 0, isAnnualCycleEnd: false };
-  }
-
-  // Annual: one month's worth at the applicable rate
-  const annualEntitlement = totalMonths >= 24 ? 20 : 15;
-  const annualLeave = (1 / 12) * annualEntitlement;
-
-  // Sick leave (BCEA s22)
-  // Months 0-5: probationary — 1 day per 26 working days worked.
-  //   The increment is the difference between what the employee should have by now
-  //   and what has already been granted (idempotent across multiple cron runs).
-  // Month 6: one-time grant to bring the balance to the full 30-day cycle entitlement.
-  // Months 7-35: no further accrual within the 36-month cycle.
-  let sickLeave = 0;
-  if (totalMonths < 6) {
-    const workingDaysWorked = Math.floor(totalMonths * (52 * 5 / 12));
-    const expectedTotal = Math.floor(workingDaysWorked / 26);
-    sickLeave = Math.max(0, expectedTotal - currentSickTotal);
-  } else if (totalMonths === 6) {
-    sickLeave = Math.max(0, 30 - currentSickTotal);
-  }
-
-  // Family responsibility (BCEA s27): 3 days from month 4, once per leave cycle
-  const familyResponsibility = totalMonths === 4 ? 3 : 0;
-
-  // Signal year-end so the cron can handle annual leave carry-over
-  const isAnnualCycleEnd = totalMonths % 12 === 0;
-
-  return { annualLeave, sickLeave, familyResponsibility, isAnnualCycleEnd };
-}
-
-/**
- * Calculate SA BCEA leave entitlements for an employee based on their start date.
- *
- * Annual Leave (s20):  15 working days per 12-month leave cycle (= 21 consecutive days for a 5-day week), pro-rated monthly.
- * Sick Leave (s22):    30 days per 3-year (36-month) cycle, pro-rated monthly.
- *                      This respects the BCEA intent while preventing employees
- *                      from seeing the full 30 days before they have earned it.
- * Family Responsibility (s27): 3 days per cycle, available from month 4.
- * @deprecated Use calculateFirstMonthAccrual (on hire) + calculateMonthEndAccrual (cron) instead.
- *             Retained for the admin SA-preview endpoint and manual recalc tools.
- */
-export function calculateBceaEntitlements(startDate: string): BceaEntitlements {
-  const start = new Date(startDate + 'T00:00:00');
-  const today = new Date();
-
-  const totalMonths =
-    (today.getFullYear() - start.getFullYear()) * 12 +
-    (today.getMonth() - start.getMonth()) +
-    (today.getDate() >= start.getDate() ? 0 : -1);
-
-  // ANNUAL LEAVE
-  // Accrues monthly at entitlement/12 per month within the current 12-month cycle.
-  // Entitlement is 15 days until 24 full calendar months of employment are completed,
-  // then 20 days for all subsequent cycles.
-  // REQ-003 / STORY-007: the first partial calendar month is pro-rated by
-  // (days elapsed since start) / (days in the start calendar month).
-  const annualEntitlement = totalMonths >= 24 ? 20 : 15;
-  const currentAnnualCycleMonths = totalMonths % 12;
-
-  let monthsForAnnual: number;
-  let annualNoteDetail: string;
-  if (totalMonths === 0) {
-    // Still within the first calendar month of employment — pro-rate by days elapsed.
-    const daysInStartMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const daysSinceStart = Math.max(0, Math.floor((today.getTime() - start.getTime()) / msPerDay));
-    monthsForAnnual = daysSinceStart / daysInStartMonth;
-    annualNoteDetail = `${daysSinceStart}/${daysInStartMonth} days of first month (pro-rated, REQ-003)`;
-  } else if (currentAnnualCycleMonths === 0) {
-    // Completed a full 12-month cycle
-    monthsForAnnual = 12;
-    annualNoteDetail = `12 of 12 months`;
-  } else {
-    monthsForAnnual = currentAnnualCycleMonths;
-    annualNoteDetail = `${currentAnnualCycleMonths} of 12 months`;
-  }
-
-  const annualLeave = Math.round((monthsForAnnual / 12) * annualEntitlement * 10) / 10;
-  const annualNote = `${annualNoteDetail} × ${annualEntitlement} days = ${annualLeave} days (${totalMonths >= 24 ? '≥' : '<'} 24 months employed)`;
-
-  // SICK LEAVE — BCEA Section 22 (strictly applied per DEC-004)
-  // s22(1): 30 days per 36-month cycle.
-  // s22(2): During the first 6 months of employment, 1 day per 26 days worked.
-  // After 6 months the full 30-day cycle entitlement is available immediately —
-  // no pro-rating within the cycle. Subsequent cycles also start at full entitlement
-  // (s22(2) applies only to the first 6 months of employment, not to later cycles).
-  let sickLeave: number;
-  let sickNote: string;
-  if (totalMonths < 6) {
-    // Probationary accrual: 1 day per 26 working days.
-    // Working days approximated as months × 21.67 (5-day week, 52 weeks/12 months).
-    // For the first partial month, use the same fractional months value used for annual leave.
-    const workingDaysWorked = Math.floor(monthsForAnnual * (52 * 5 / 12));
-    sickLeave = Math.floor(workingDaysWorked / 26);
-    sickNote = `Probationary period (${totalMonths} months < 6): ~${workingDaysWorked} working days ÷ 26 = ${sickLeave} days (BCEA s22(2))`;
-  } else {
-    // Full cycle entitlement: 30 days, available immediately from month 6.
-    sickLeave = 30;
-    sickNote = `Full entitlement (${totalMonths} months ≥ 6): 30 days per 36-month cycle (BCEA s22(1))`;
-  }
-
-  // FAMILY RESPONSIBILITY — BCEA Section 27
-  // 3 days per leave cycle, only available after 4 months of continuous employment.
-  const familyResponsibility = totalMonths >= 4 ? 3 : 0;
-  const familyNote =
-    totalMonths >= 4
-      ? `3 days per leave cycle (available from month 4)`
-      : `Not yet available — requires 4+ months employment (${totalMonths} months so far)`;
-
-  return {
-    annualLeave,
-    sickLeave,
-    familyResponsibility,
-    monthsWorked: totalMonths,
-    notes: { annualLeave: annualNote, sickLeave: sickNote, familyResponsibility: familyNote },
-  };
-}

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The frontend is a **React 19 SPA** built with Vite 7. It is served as static files from the Express backend (`dist/public/`) — there is no separate frontend hosting. Routing is handled client-side by Wouter. The app has three distinct operating modes: worker portal, admin portal, and attendance kiosk.
+The frontend is a **React 19 SPA** built with Vite 7. It is served as static files from the Express backend (`dist/`) — there is no separate frontend hosting. Routing is handled client-side by Wouter. The app has two distinct operating modes: the **application portal** (all authenticated roles) and the **attendance kiosk** (sessionless, shared device).
 
 ---
 
@@ -10,18 +10,19 @@ The frontend is a **React 19 SPA** built with Vite 7. It is served as static fil
 
 ```mermaid
 graph TD
-    Root["/\nModeSelect"] --> Worker["Worker Portal\n/login → /dashboard"]
-    Root --> Admin["Admin Portal\n/admin → /admin/dashboard"]
+    Root["/\nModeSelect"] --> Portal["Application Portal\n/login → /dashboard"]
     Root --> Kiosk["Attendance Kiosk\n/attendance-kiosk\n/attendance-tile-mode"]
+    ModeSelect["ModeSelect also hosts\nBackup Restore modal\n(bootstrap + admin)"]
 ```
 
 | Mode | Entry | Auth | Primary users |
 |------|-------|------|---------------|
-| Worker portal | `/login` | Session (ID + password) | Employees |
-| Admin portal | `/admin` | Session (email + password) | HR, managers |
+| Application portal | `/login` | Session (email + password) | All roles |
 | Kiosk | `/attendance-kiosk` | None (face/ID only) | Shared devices |
 
-The kiosk modes are intentionally sessionless — they call the public attendance API directly without login.
+The ModeSelect home page (`/`) also hosts the **Backup Restore** modal with two flows:
+- **Bootstrap restore** — available on empty database without login, for first-time setup from a backup
+- **Admin restore** — requires login, additive-only import (never overwrites existing records)
 
 ---
 
@@ -30,23 +31,57 @@ The kiosk modes are intentionally sessionless — they call the public attendanc
 Wouter is used instead of React Router. Routes are defined as a flat list in `App.tsx`:
 
 ```
-/                          ModeSelect
-/login                     Worker login
-/admin                     Admin login
-/dashboard                 Worker dashboard
-/admin/dashboard           Admin dashboard (with sub-sections)
+/                          ModeSelect (+ backup restore modal)
+/login                     Login (email + password)
+/admin                     AdminLogin (legacy entry point)
+/dashboard                 Unified dashboard (all roles, tab-based)
+/admin/dashboard           AdminDashboard (same component, admin entry)
 /leave-request             Leave request form
 /attendance                Manual attendance entry
 /attendance-kiosk          Face/ID kiosk
 /attendance-tile-mode      Tile kiosk view
 /employee-profile          Profile view/edit
 /org-chart                 Org hierarchy visualisation
-/grievances                Worker grievance submission
-/attendance-reports        Admin attendance analytics
+/grievances                Grievance submission
+/attendance-reports        Attendance analytics
 /leave-calendar            Visual leave timeline
+/reset-password            Password reset via token
 ```
 
-Protected routes check `AuthContext` and redirect to the appropriate login if no session exists.
+Protected routes check `AuthContext` and redirect to `/login` if no session exists.
+
+---
+
+## Unified Dashboard
+
+All authenticated users land on a single dashboard (`AdminDashboard.tsx`) with a left-sidebar navigation. Visible tabs are determined by the user's roles — no separate portals for workers vs. admins.
+
+**Self-service tabs (visible to all authenticated users):**
+| Tab | Component | Purpose |
+|-----|-----------|---------|
+| My Dashboard | `EmployeeDashboardSection` | Leave summary, quick stats, upcoming leave |
+| My Profile | `MyProfileSection` | Edit own profile, photo capture, password change |
+| My Attendance | `MyAttendanceSection` | Own clock-in/out history |
+
+**Role-gated tabs:**
+| Tab | Roles | Component |
+|-----|-------|-----------|
+| Personnel | hr, admin | `PersonnelSection` |
+| Leave Requests | manager, hr, md, admin | `LeaveRequestsSection` |
+| Attendance | manager, hr, admin | `AttendanceSection` |
+| Leave Calendar | hr, admin | `LeaveCalendarSection` |
+| Leave Rules | admin | `LeaveRulesSection` (includes custom leave rule phases) |
+| Org Positions | admin | `OrgPositionsSection` |
+| Departments | admin | `DepartmentsSection` |
+| Companies | admin | `CompaniesSection` |
+| Employee Types | admin | `EmployeeTypesSection` |
+| Grievances | hr, admin | `GrievancesSection` |
+| Public Holidays | admin | `PublicHolidaysSection` |
+| Settings | admin | `SettingsSection` (includes `annual_leave_cycle_start`, branding, etc.) |
+| Database Backup | admin | `DatabaseBackupSection` |
+| Admin Insights | admin | `DashboardSection` |
+
+> **Note:** Accrual rate tiers (`accrual_rate_tiers` table) are currently managed only via direct DB or API — there is no dedicated frontend UI for editing them. Default tiers (Tier 1: 15 days, Tier 2 at 24 months: 20 days) are seeded on first migration.
 
 ---
 
@@ -73,10 +108,10 @@ const mutation = useMutation({
 
 | Context | File | What it holds |
 |---------|------|---------------|
-| `AuthContext` | `client/src/lib/auth-context.tsx` | Current user object, login/logout functions |
+| `AuthContext` | `client/src/lib/auth-context.tsx` | Current user object, `hasRole()` helper, login/logout |
 | `ThemeContext` | `client/src/lib/theme-context.tsx` | Light/dark mode preference |
 
-`AuthContext` also persists the user to `localStorage` as a fallback for page reloads before the `/api/auth/me` response returns. This prevents flash-of-unauthenticated-content.
+`AuthContext` exposes a `hasRole(role)` helper used throughout the app to conditionally render UI elements. It also persists the user to `localStorage` to prevent flash-of-unauthenticated-content on page reload.
 
 ---
 
@@ -94,30 +129,39 @@ All API calls go through typed wrapper functions in `api.ts`, not raw `fetch` ca
 ```
 client/src/
 ├── pages/                  # Route-level components (one per route)
+│   ├── ModeSelect.tsx      # Home page + backup restore modal
+│   ├── Login.tsx
+│   ├── AdminLogin.tsx
 │   ├── Dashboard.tsx
-│   ├── AdminDashboard.tsx
-│   ├── LeaveRequest.tsx
+│   ├── AdminDashboard.tsx  # Unified dashboard (all roles)
 │   ├── AttendanceKiosk.tsx
-│   └── ...
+│   ├── AttendanceTileMode.tsx
+│   ├── OrgChart.tsx        # D3-based org hierarchy visualisation
+│   └── admin/              # Dashboard section components (role-gated)
+│       ├── MyProfileSection.tsx
+│       ├── MyAttendanceSection.tsx
+│       ├── EmployeeDashboardSection.tsx
+│       ├── PersonnelSection.tsx
+│       ├── LeaveRequestsSection.tsx
+│       ├── AttendanceSection.tsx
+│       ├── LeaveCalendarSection.tsx
+│       ├── LeaveRulesSection.tsx
+│       ├── OrgPositionsSection.tsx
+│       ├── DepartmentsSection.tsx
+│       ├── CompaniesSection.tsx
+│       ├── EmployeeTypesSection.tsx
+│       ├── GrievancesSection.tsx
+│       ├── PublicHolidaysSection.tsx
+│       ├── SettingsSection.tsx
+│       ├── DatabaseBackupSection.tsx
+│       └── DashboardSection.tsx
 ├── components/
-│   ├── admin/              # Admin-specific sections
-│   │   ├── DashboardSection.tsx
-│   │   ├── PersonnelSection.tsx
-│   │   ├── LeaveRequestsSection.tsx
-│   │   ├── AttendanceSection.tsx
-│   │   ├── OrgPositionsSection.tsx
-│   │   ├── DatabaseBackupSection.tsx
-│   │   └── ...
 │   ├── ui/                 # Radix UI wrappers (shadcn/ui pattern)
-│   │   ├── button.tsx
-│   │   ├── dialog.tsx
-│   │   ├── select.tsx
-│   │   └── ...
 │   ├── Layout.tsx          # App shell with nav
 │   ├── ThemeToggle.tsx
 │   ├── NotificationBell.tsx
-│   ├── WebcamCapture.tsx   # Face capture for registration
-│   └── MultiAngleFaceCapture.tsx
+│   ├── WebcamCapture.tsx           # Single-shot photo capture
+│   └── MultiAngleFaceCapture.tsx   # Multi-angle face capture for recognition training
 └── hooks/                  # Custom React hooks
 ```
 
@@ -126,8 +170,6 @@ client/src/
 ## UI Library
 
 The app uses **Radix UI** primitives styled with **Tailwind CSS 4**, following the shadcn/ui pattern. Components in `client/src/components/ui/` are thin wrappers around Radix primitives with Tailwind class variants applied via `class-variance-authority`.
-
-**Components in use:** Accordion, Alert Dialog, Avatar, Badge, Button, Card, Checkbox, Collapsible, Command, Dialog, Dropdown Menu, Form, Input, Label, Popover, Progress, Radio Group, Resizable Panels, Scroll Area, Select, Separator, Sheet, Sidebar, Skeleton, Slider, Switch, Table, Tabs, Textarea, Tooltip.
 
 ### Dynamic Branding
 Primary and accent colors are stored in the `settings` table and loaded on app startup. They are converted from hex to HSL and injected as CSS custom properties (`--primary`, `--accent`) on the `<html>` element:
@@ -150,6 +192,8 @@ This allows per-instance branding without a rebuild.
 5. If distance < threshold, sends `POST /api/attendance` with the matched user ID
 
 Face detection is computationally local — no video is sent to the server. Only the matched user ID and a photo snapshot are sent.
+
+Multi-angle face capture (`MultiAngleFaceCapture`) is used during employee onboarding to store several descriptors per user (front, left, right, etc.), improving recognition accuracy.
 
 ---
 
@@ -180,6 +224,6 @@ Both modes are sessionless and auto-refresh without user interaction.
 
 ## Build
 
-Vite builds the SPA to `dist/public/`. The Express server serves `dist/public/index.html` for all non-API routes (SPA fallback). The build is triggered by `script/build.ts`, which runs Vite then esbuild for the server bundle.
+Vite builds the SPA to `dist/`. The Express server serves `dist/index.html` for all non-API routes (SPA fallback). The build is triggered by `script/build.ts`, which runs Vite then esbuild for the server bundle.
 
 See [07 — Infrastructure](07-infrastructure.md) for the full build and deployment pipeline.

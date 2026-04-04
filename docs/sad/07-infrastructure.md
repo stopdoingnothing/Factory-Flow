@@ -14,7 +14,7 @@ graph LR
         subgraph "Docker Compose Stack"
             app["app\nNode.js 20\nport 5000"]
             db["db\nPostgreSQL 16\nport 5432 (internal)"]
-            backup["backup\npg_dump daemon\nhourly cron"]
+            backup["backup\npg_dump daemon\nevery 6 hours"]
         end
         data["./data/\n├── postgres/\n└── backups/"]
     end
@@ -29,7 +29,9 @@ graph LR
 |---------|-------|---------------|------|
 | `app` | custom (Dockerfile) | `5000:5000` | Express API + React SPA |
 | `db` | `postgres:16-alpine` | internal only | PostgreSQL database |
-| `backup` | `postgres:16-alpine` | none | Hourly pg_dump daemon |
+| `backup` | `postgres:16-alpine` | none | 6-hourly pg_dump daemon |
+
+The database name and user are both `factoryflow`.
 
 ---
 
@@ -40,7 +42,7 @@ Multi-stage build to minimise the runtime image size:
 ```
 Stage 1 — Build (node:20-alpine)
   ├── npm ci (install all deps including devDeps)
-  ├── vite build → dist/public/
+  ├── vite build → dist/
   └── esbuild server → dist/index.cjs
 
 Stage 2 — Runtime (node:20-alpine)
@@ -56,9 +58,10 @@ The build stage includes all dev dependencies (TypeScript, Vite, etc.) but the r
 ## Startup Sequence (`docker-entrypoint.sh`)
 
 On every container start:
-1. Wait for PostgreSQL to be ready (`pg_isready`)
-2. Run `npx drizzle-kit migrate` — applies any pending migrations
-3. Start the application: `node dist/index.cjs`
+1. Wait for PostgreSQL to accept TCP connections (`pg_isready -h db -p 5432 -U factoryflow`)
+2. Run `npx drizzle-kit migrate --config=drizzle.config.ts` — applies any pending migrations
+3. Run idempotent SQL to create unmanaged tables (`sessions`, `audit_logs`) not tracked by Drizzle
+4. Start the application: `node dist/index.cjs`
 
 This ensures the database schema is always up to date before the application accepts traffic.
 
@@ -68,7 +71,7 @@ This ensures the database schema is always up to date before the application acc
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `POSTGRES_PASSWORD` | Yes | — | PostgreSQL password (shared between all services) |
+| `POSTGRES_PASSWORD` | Yes | `changeme` | PostgreSQL password (shared between all services) |
 | `SESSION_SECRET` | No | dev default | Session cookie signing key — **set this in production** |
 | `POSTMARK_API_KEY` | No | — | Email sending; if absent, all emails are silently skipped |
 | `NODE_ENV` | No | `development` | Set to `production` in Docker Compose |
@@ -78,7 +81,7 @@ This ensures the database schema is always up to date before the application acc
 
 In Docker Compose, `DATABASE_URL` is assembled from other variables:
 ```yaml
-DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/factory_flow
+DATABASE_URL: postgres://factoryflow:${POSTGRES_PASSWORD}@db:5432/factoryflow
 ```
 
 ---
@@ -90,18 +93,22 @@ All persistent data lives under `./data/` on the host:
 ```
 ./data/
 ├── postgres/     ← PostgreSQL data directory (bind-mounted into db container)
-└── backups/      ← Hourly pg_dump SQL files (bind-mounted into backup container)
+└── backups/      ← pg_dump .sql.gz files (bind-mounted into backup container)
 ```
 
 **Why host bind-mounts instead of Docker volumes?** See [ADR-005](08-decision-log.md#adr-005-host-bind-mounts-for-data-storage).
 
 ### Backup retention
-The backup daemon runs this cron hourly:
+The backup daemon runs a continuous while/sleep loop (not cron):
 ```bash
-pg_dump -h db -U postgres -d factory_flow > /backups/backup_$(date +%Y%m%d_%H%M%S).sql
-find /backups -name "*.sql" -mtime +7 -delete
+while true; do
+  FILENAME=/backups/factoryflow_$(date +%Y%m%d_%H%M%S).sql.gz
+  pg_dump -h db -U factoryflow factoryflow | gzip > $FILENAME
+  find /backups -name 'factoryflow_*.sql.gz' -mtime +90 -delete
+  sleep 21600   # 6 hours
+done
 ```
-Up to 168 backup files (7 days × 24 hours) are retained at any time.
+Up to ~360 backup files (90 days × 4 per day) are retained at any time. Each file is gzip-compressed SQL.
 
 ---
 
@@ -170,21 +177,21 @@ All three containers share a single Docker Compose default network. The `app` an
 
 ## Development
 
-For local development outside Docker:
+For local development outside Docker, node/npm must be available in the dev container — not the host shell.
 
 ```bash
 # Start PostgreSQL (e.g. via Docker)
-docker run -e POSTGRES_PASSWORD=dev -p 5432:5432 -d postgres:16-alpine
+docker run -e POSTGRES_PASSWORD=dev -e POSTGRES_USER=factoryflow -e POSTGRES_DB=factoryflow \
+  -p 5432:5432 -d postgres:16-alpine
 
 # Set environment
-export DATABASE_URL=postgres://postgres:dev@localhost:5432/factory_flow
+export DATABASE_URL=postgres://factoryflow:dev@localhost:5432/factoryflow
 
 # Run migrations
 npm run db:push
 
 # Start development servers
-npm run dev          # Express with tsx (hot reload)
-npm run dev:client   # Vite dev server (proxied)
+npm run dev          # Express with tsx (hot reload) + Vite dev server
 ```
 
 Development uses Vite's dev server with a proxy to the Express backend, so both run on port 5000 from the browser's perspective.

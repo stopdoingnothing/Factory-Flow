@@ -168,3 +168,92 @@ Architecture Decision Records for Factory Flow. Each entry captures a non-obviou
 - Simpler routing code: `<Route path="/dashboard" component={Dashboard} />`
 - No built-in data loading, code splitting, or nested layouts (implement manually if needed)
 - Less community documentation than React Router
+
+---
+
+### ADR-009: Leave Accrual Engine Split into Three Modules
+
+**Status:** Accepted  
+**Date:** 2026-04-04  
+**Context:** The original accrual logic was in `bcea.ts` (calculations) and scattered across `index.ts` (scheduling). As the spec grew to include rate tiers, per-employee overrides, accrual-pausing leave, graduated sick accrual, termination settlements, and idempotency requirements, a single-module approach became difficult to test and maintain. Additionally, `routes.ts` needed to call `processTerminationSettlement()` when a user's `terminationDate` was set — but `routes.ts` is imported by `index.ts`, creating a circular dependency if `index.ts` exported that function.
+
+**Options considered:**
+1. Keep all logic in `bcea.ts` + `index.ts` (status quo, growing complexity)
+2. Split into: pure logic module, orchestration module, scheduler — breaking the circular dependency
+3. Move to a separate worker process (over-engineered for a monolith)
+
+**Decision:** Three-module split: `bcea.ts` (pure calculations, no DB), `leave-accrual.ts` (DB-calling helpers and termination settlement), `index.ts` (scheduler only).
+
+**Rationale:** `bcea.ts` becomes a pure function library with no side effects — straightforward to unit test. `leave-accrual.ts` holds the DB-interacting helpers that are shared between the scheduler (`index.ts`) and route handlers (`routes.ts`), resolving the circular dependency without a separate process. The scheduler in `index.ts` orchestrates the full monthly run but delegates all logic.
+
+**Consequences:**
+- `bcea.ts` functions are pure and testable without a database or mocked storage
+- No circular import: `routes.ts` → `leave-accrual.ts` → `storage.ts`; `index.ts` → `leave-accrual.ts` → `storage.ts`
+- Adding a new accrual event type means touching `leave-accrual.ts` for the DB write, `bcea.ts` for any pure calculation, and `index.ts` for scheduling — three files instead of one
+
+---
+
+### ADR-010: Dedicated `leave_accrual_records` Table for Idempotency and Audit
+
+**Status:** Accepted  
+**Date:** 2026-04-04  
+**Context:** The original accrual engine had no idempotency protection — running the month-end job twice would double-credit every employee's leave. There was also no audit trail showing how a balance reached its current value (only a general `audit_logs` table for admin mutations). The spec required both: idempotency and a full calculation trace per event.
+
+**Options considered:**
+1. Add a `last_accrual_run_month` field to `leaveBalances` and skip if already run
+2. Create a `leave_accrual_records` table with one row per accrual event; unique constraint enforces idempotency
+3. Use the existing `audit_logs` table with accrual-specific fields
+
+**Decision:** Dedicated `leave_accrual_records` table with a unique constraint on `(employee_id, leave_type, accrual_period, event_type)`.
+
+**Rationale:** Option 1 only handles the simple case — it cannot distinguish between different event types in the same month (e.g. a regular monthly accrual AND a cycle reset). Option 3 would repurpose a general-purpose changelog as a domain-specific ledger and would require extending the schema with accrual-specific columns (calculation_basis, metadata). A dedicated table keeps concerns separate, supports multiple events per employee per month, and provides a queryable accrual history with calculation traces for HR.
+
+**Consequences:**
+- Running the accrual engine twice for the same month is safe — no duplicate credits
+- Each balance change has a corresponding record with `balanceBefore`, `balanceAfter`, and a human-readable `calculationBasis` string
+- HR can query the full accrual history for any employee
+- Adds a DB write per accrual event per employee — acceptable at the scale of a single-org deployment
+
+---
+
+### ADR-011: System-Wide Annual Leave Cycle (Not Per-Employee Anniversary)
+
+**Status:** Accepted  
+**Date:** 2026-04-04  
+**Context:** The original implementation used each employee's `employment_start_date` as the anchor for annual leave cycle rollovers (`totalMonths % 12 === 0`). This meant employees' leave cycles ended on different dates throughout the year, making it difficult for HR to reason about or manage forfeiture. The spec was updated (v1.2) to align with how most SA organisations actually operate: a single calendar-year cycle for all employees.
+
+**Options considered:**
+1. Per-employee anniversary (original implementation)
+2. System-wide configurable `annual_leave_cycle_start` date (same for all employees)
+
+**Decision:** System-wide `annual_leave_cycle_start` setting (format: `MM-DD`, default `01-01`). Sick leave retains per-employee anchoring because it is governed by a 36-month employment cycle in the BCEA.
+
+**Rationale:** HR managers think in terms of "the leave year" not "each person's anniversary." A shared cycle boundary makes rollover, forfeiture, and reporting predictable and batch-processable. The BCEA does not mandate per-employee annual leave cycles; it specifies a 12-month cycle, which this satisfies. Sick leave is different — the BCEA explicitly anchors it to `employment_start_date` for the first 36 months, so it retains per-employee anchoring.
+
+**Consequences:**
+- All annual leave and FRL cycle boundaries fall on the same date for all employees
+- Cycle boundaries always align with month starts (the setting is constrained to `MM-01`) — no mid-month split needed for annual leave or FRL
+- HR can change the cycle start date system-wide; the transition extends or shortens the current cycle to bridge to the new date (rare admin action)
+- Sick leave cycles remain per-employee, so `sickLeaveTracking` stores per-employee `sick_cycle_start_date`
+
+---
+
+### ADR-012: Per-Employee Annual Leave Override
+
+**Status:** Accepted  
+**Date:** 2026-04-04  
+**Context:** Some employees (senior hires, employees on special contractual arrangements) have negotiated annual leave entitlements that differ from the tier schedule. Before this field existed, HR had to manually adjust balances each month to compensate — error-prone and invisible in the accrual audit trail.
+
+**Options considered:**
+1. Add a new tier row for each exception (pollutes the tier table with employee-specific entries)
+2. Add a nullable `annual_leave_override_days` field on `users`; when set, completely bypasses tier logic for that employee
+3. Create a separate `employee_leave_overrides` table (over-engineered for the current use case)
+
+**Decision:** Nullable `annual_leave_override_days` on `users`. When set, `RATE = override / 12` and tier logic is skipped entirely.
+
+**Rationale:** This is a per-employee exception, not a new tier. Putting it on the user record keeps the data model simple, makes the per-employee nature explicit, and means the accrual engine only needs one additional null check. Setting or clearing the override is audit-logged (including old value, new value, and HR user) per spec requirements.
+
+**Consequences:**
+- HR can grant a custom entitlement to any employee without modifying the global tier table
+- Tier boundary crossings (e.g. at 24 months) have no effect on employees with an override — the override is permanent until cleared
+- Clearing the override (setting to null) falls back to tier-based rate from the next accrual run

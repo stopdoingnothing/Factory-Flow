@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, MapPin, Building2, Calendar, Clock } from "lucide-react";
+import { User, Mail, Phone, MapPin, Building2, Calendar, Clock, Users } from "lucide-react";
 import { userApi, leaveBalanceApi, attendanceApi } from "@/lib/api";
 import { format } from "date-fns";
 import type { LeaveBalance, AttendanceRecord } from "@shared/schema";
@@ -30,9 +30,19 @@ export default function MyProfileSection() {
     enabled: !!user?.id,
   });
 
+  const managerId = (userDetails as any)?.managerId || (user as any)?.managerId;
+  const { data: managerDetails } = useQuery({
+    queryKey: ['user', managerId],
+    queryFn: () => userApi.getById(managerId),
+    enabled: !!managerId,
+  });
+
   if (!user) return null;
 
   const displayUser = userDetails || user;
+  const managerName = managerDetails
+    ? `${(managerDetails as any).firstName} ${(managerDetails as any).surname}`
+    : null;
 
   const getInitials = () => {
     const first = (displayUser as any).firstName?.[0] || '';
@@ -58,13 +68,30 @@ export default function MyProfileSection() {
                 <p className="text-gray-500">"{(displayUser as any).nickname}"</p>
               )}
               <div className="mt-2 flex flex-wrap justify-center md:justify-start gap-2">
-                <Badge variant="secondary">
-                  {(displayUser as any).role === 'manager' ? 'Manager' : 'Employee'}
-                </Badge>
-                {(displayUser as any).department && (
-                  <Badge variant="outline">{(displayUser as any).department}</Badge>
-                )}
+                {((displayUser as any).roles?.length
+                  ? (displayUser as any).roles
+                  : [(displayUser as any).role === 'manager' ? 'manager' : 'employee']
+                ).map((r: string) => (
+                  <Badge key={r} variant="secondary" className="capitalize">{r}</Badge>
+                ))}
               </div>
+              {(displayUser as any).department && (
+                <p className="mt-2 text-sm text-gray-500 flex items-center justify-center md:justify-start gap-1">
+                  <Building2 className="h-3.5 w-3.5" />
+                  {(displayUser as any).department}
+                </p>
+              )}
+              {managerName ? (
+                <p className="mt-1 text-sm text-gray-500 flex items-center justify-center md:justify-start gap-1">
+                  <Users className="h-3.5 w-3.5" />
+                  Reports to {managerName}
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-amber-600 flex items-center justify-center md:justify-start gap-1">
+                  <Users className="h-3.5 w-3.5" />
+                  No line manager assigned
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
@@ -102,14 +129,6 @@ export default function MyProfileSection() {
                 <p>{(displayUser as any).homeAddress || 'Not provided'}</p>
               </div>
             </div>
-            <Separator />
-            <div className="flex items-center gap-3">
-              <Building2 className="h-4 w-4 text-gray-500" />
-              <div>
-                <p className="text-sm text-gray-500">Department</p>
-                <p>{(displayUser as any).department || 'Not assigned'}</p>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -136,7 +155,7 @@ export default function MyProfileSection() {
                           <span className="text-gray-500 text-sm"> / {balance.total} days</span>
                         </div>
                       </div>
-                      {carryOver && carryOver > 0 && (
+                      {!!carryOver && carryOver > 0 && (
                         <p className="text-xs text-amber-600">
                           +{carryOver} carried over
                           {carryOverExpiry && ` (expires ${new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})`}

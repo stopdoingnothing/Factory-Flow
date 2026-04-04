@@ -1503,7 +1503,7 @@ export default function PersonnelSection() {
           <DialogHeader>
             <DialogTitle>{isEditing ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto overflow-x-hidden pr-2">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="firstName" className="text-right">First Name</Label>
               <Input 
@@ -1842,38 +1842,6 @@ export default function PersonnelSection() {
                 placeholder="Emergency phone number"
                 data-testid="input-emergency-number"
               />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="userGroup" className="text-right">Admin Access</Label>
-              <div className="col-span-3">
-                <Select 
-                  value={currentUser.userGroupId?.toString() || 'none'} 
-                  onValueChange={(value) => {
-                    if (value === 'none') {
-                      setCurrentUser({...currentUser, userGroupId: undefined, role: 'worker', adminRole: null});
-                    } else {
-                      setCurrentUser({...currentUser, userGroupId: parseInt(value), role: 'manager', adminRole: 'manager'});
-                    }
-                  }}
-                >
-                  <SelectTrigger data-testid="select-user-group">
-                    <SelectValue placeholder="No admin access" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No admin access (Employee only)</SelectItem>
-                    {userGroups.map((group) => (
-                      <SelectItem key={group.id} value={group.id.toString()}>
-                        {group.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {currentUser.userGroupId ? 
-                    "This user has admin access and can log into the admin dashboard." : 
-                    "Select a group to grant admin access to this user."}
-                </p>
-              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="exclude" className="text-right">Exclude</Label>

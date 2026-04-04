@@ -3,7 +3,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { eq, and, desc, gte, lte, inArray } from "drizzle-orm";
 import * as schema from "@shared/schema";
-import { calculateFirstMonthAccrual } from "./bcea";
+// bcea import removed — leave provisioning is handled in routes.ts
 import type {
   User,
   InsertUser,
@@ -41,6 +41,12 @@ import type {
   InsertCompany,
   AuditLog,
   InsertAuditLog,
+  AccrualRateTier,
+  InsertAccrualRateTier,
+  SickLeaveTracking,
+  InsertSickLeaveTracking,
+  LeaveAccrualRecord,
+  InsertLeaveAccrualRecord,
 } from "@shared/schema";
 
 const pool = new Pool({
@@ -205,6 +211,22 @@ export interface IStorage {
   // Audit log operations
   createAuditLog(entry: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(limit?: number): Promise<AuditLog[]>;
+
+  // Accrual rate tier operations (spec §5.1, §13.5)
+  getAllAccrualRateTiers(): Promise<AccrualRateTier[]>;
+  createAccrualRateTier(tier: InsertAccrualRateTier): Promise<AccrualRateTier>;
+  updateAccrualRateTier(id: number, tier: Partial<InsertAccrualRateTier>): Promise<AccrualRateTier | undefined>;
+  deleteAccrualRateTier(id: number): Promise<boolean>;
+
+  // Sick leave tracking operations (spec §13.4)
+  getSickLeaveTracking(userId: string): Promise<SickLeaveTracking | undefined>;
+  upsertSickLeaveTracking(data: InsertSickLeaveTracking): Promise<SickLeaveTracking>;
+  updateSickLeaveTracking(userId: string, data: Partial<InsertSickLeaveTracking>): Promise<SickLeaveTracking | undefined>;
+
+  // Leave accrual records operations (spec §12, idempotency)
+  getLeaveAccrualRecord(employeeId: string, leaveType: string, accrualPeriod: string, eventType: string): Promise<LeaveAccrualRecord | undefined>;
+  createLeaveAccrualRecord(record: InsertLeaveAccrualRecord): Promise<LeaveAccrualRecord>;
+  getLeaveAccrualRecords(employeeId: string): Promise<LeaveAccrualRecord[]>;
 }
 
 export class DrizzleStorage implements IStorage {
@@ -246,38 +268,8 @@ export class DrizzleStorage implements IStorage {
     };
     const [newUser] = await db.insert(schema.users).values(userWithName).returning();
     
-    // Create default leave balances for new users using SA BCEA calculations
-    if (user.role === 'worker') {
-      // Calculate pro-rated entitlements based on start date (SA BCEA)
-      const ent = user.startDate
-        ? calculateFirstMonthAccrual(user.startDate)
-        : { annualLeave: 21, sickLeave: 30, familyResponsibility: 3 };
-
-      const { annualLeave, sickLeave, familyResponsibility } = ent;
-
-      await this.createLeaveBalance({
-        userId: newUser.id,
-        leaveType: 'Annual Leave',
-        total: annualLeave,
-        taken: 0,
-        pending: 0,
-      });
-      await this.createLeaveBalance({
-        userId: newUser.id,
-        leaveType: 'Sick Leave',
-        total: sickLeave,
-        taken: 0,
-        pending: 0,
-      });
-      await this.createLeaveBalance({
-        userId: newUser.id,
-        leaveType: 'Family Responsibility',
-        total: familyResponsibility,
-        taken: 0,
-        pending: 0,
-      });
-    }
-    
+    // Leave balance provisioning is handled in routes.ts POST /api/users,
+    // which uses the spec-compliant BCEA accrual logic.
     return newUser;
   }
 
@@ -1211,6 +1203,87 @@ export class DrizzleStorage implements IStorage {
 
   async getAuditLogs(limit = 500): Promise<AuditLog[]> {
     return db.select().from(schema.auditLogs).orderBy(desc(schema.auditLogs.timestamp)).limit(limit);
+  }
+
+  // ── Accrual Rate Tiers ──────────────────────────────────────────────────────
+  async getAllAccrualRateTiers(): Promise<AccrualRateTier[]> {
+    return db.select().from(schema.accrualRateTiers).orderBy(schema.accrualRateTiers.minMonthsOfService);
+  }
+
+  async createAccrualRateTier(tier: InsertAccrualRateTier): Promise<AccrualRateTier> {
+    const [row] = await db.insert(schema.accrualRateTiers).values(tier).returning();
+    return row;
+  }
+
+  async updateAccrualRateTier(id: number, tier: Partial<InsertAccrualRateTier>): Promise<AccrualRateTier | undefined> {
+    const [row] = await db.update(schema.accrualRateTiers).set(tier).where(eq(schema.accrualRateTiers.id, id)).returning();
+    return row;
+  }
+
+  async deleteAccrualRateTier(id: number): Promise<boolean> {
+    const result = await db.delete(schema.accrualRateTiers).where(eq(schema.accrualRateTiers.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // ── Sick Leave Tracking ─────────────────────────────────────────────────────
+  async getSickLeaveTracking(userId: string): Promise<SickLeaveTracking | undefined> {
+    const rows = await db.select().from(schema.sickLeaveTracking).where(eq(schema.sickLeaveTracking.userId, userId));
+    return rows[0];
+  }
+
+  async upsertSickLeaveTracking(data: InsertSickLeaveTracking): Promise<SickLeaveTracking> {
+    const [row] = await db
+      .insert(schema.sickLeaveTracking)
+      .values(data)
+      .onConflictDoUpdate({
+        target: schema.sickLeaveTracking.userId,
+        set: {
+          sickCycleStartDate: data.sickCycleStartDate,
+          graduatedAccrualActive: data.graduatedAccrualActive,
+          cumulativeDaysWorked: data.cumulativeDaysWorked,
+          graduatedDaysCredited: data.graduatedDaysCredited,
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async updateSickLeaveTracking(userId: string, data: Partial<InsertSickLeaveTracking>): Promise<SickLeaveTracking | undefined> {
+    const [row] = await db
+      .update(schema.sickLeaveTracking)
+      .set(data)
+      .where(eq(schema.sickLeaveTracking.userId, userId))
+      .returning();
+    return row;
+  }
+
+  // ── Leave Accrual Records ───────────────────────────────────────────────────
+  async getLeaveAccrualRecord(employeeId: string, leaveType: string, accrualPeriod: string, eventType: string): Promise<LeaveAccrualRecord | undefined> {
+    const rows = await db
+      .select()
+      .from(schema.leaveAccrualRecords)
+      .where(
+        and(
+          eq(schema.leaveAccrualRecords.employeeId, employeeId),
+          eq(schema.leaveAccrualRecords.leaveType, leaveType),
+          eq(schema.leaveAccrualRecords.accrualPeriod, accrualPeriod),
+          eq(schema.leaveAccrualRecords.eventType, eventType),
+        ),
+      );
+    return rows[0];
+  }
+
+  async createLeaveAccrualRecord(record: InsertLeaveAccrualRecord): Promise<LeaveAccrualRecord> {
+    const [row] = await db.insert(schema.leaveAccrualRecords).values(record).returning();
+    return row;
+  }
+
+  async getLeaveAccrualRecords(employeeId: string): Promise<LeaveAccrualRecord[]> {
+    return db
+      .select()
+      .from(schema.leaveAccrualRecords)
+      .where(eq(schema.leaveAccrualRecords.employeeId, employeeId))
+      .orderBy(desc(schema.leaveAccrualRecords.createdAt));
   }
 }
 

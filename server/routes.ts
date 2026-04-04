@@ -51,7 +51,8 @@ import { storage, pool } from "./storage";
 import { z } from "zod";
 import { insertUserSchema, insertLeaveRequestSchema, insertAttendanceRecordSchema, insertDepartmentSchema, insertUserGroupSchema, insertEmployeeTypeSchema, insertLeaveRuleSchema, insertLeaveRulePhaseSchema, insertGrievanceSchema } from "@shared/schema";
 import { sendLeaveRequestNotification, sendLateAttendanceNotification, sendAdminWelcomeEmail, sendLeaveStatusNotification, sendPasswordResetEmail, sendAdminCredentialsEmail, sendManagerMissedClockOutAlert, sendLeaveStageNotification, sendLeaveEscalationReminder, sendAWOLAlert } from "./email";
-import { calculateBceaEntitlements, calculateFirstMonthAccrual, getCarryOverExpiryDate } from "./bcea";
+import { STATUTORY_LEAVE_ENTITLEMENTS, completedMonths, isFrlEligible, determineAccrualRate } from "./bcea";
+import { processTerminationSettlement, backfillUserAccrual } from "./leave-accrual";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 
@@ -859,16 +860,45 @@ export async function registerRoutes(
       
       const newUser = await storage.createUser(validatedData);
 
-      // Auto-provision mandatory BCEA leave balances if the employee has a start date
+      // Auto-provision mandatory BCEA leave balances if the employee has a start date.
+      // Grants a pro-rated first-month annual leave accrual; sick and FRL start at 0
+      // (sick leave accrues per 26 days worked; FRL unlocks at 4 months).
       if (newUser.startDate && newUser.excludeFromLeave !== true) {
         try {
-          const ent = calculateFirstMonthAccrual(newUser.startDate);
-          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Annual Leave',          total: ent.annualLeave,          taken: 0, pending: 0 });
-          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Sick Leave',             total: ent.sickLeave,            taken: 0, pending: 0 });
-          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Family Responsibility',  total: ent.familyResponsibility,  taken: 0, pending: 0 });
+          const startDay = new Date(newUser.startDate + 'T00:00:00');
+          const daysInMonth = new Date(startDay.getFullYear(), startDay.getMonth() + 1, 0).getDate();
+          const daysRemaining = daysInMonth - startDay.getDate() + 1;
+          const tiers = await storage.getAllAccrualRateTiers();
+          const { rate } = determineAccrualRate(0, (newUser as any).annualLeaveOverrideDays ?? null, tiers);
+          const firstMonthAnnual = rate * (daysRemaining / daysInMonth);
+          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Annual Leave',          total: firstMonthAnnual, taken: 0, pending: 0 });
+          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Sick Leave',             total: 0,                taken: 0, pending: 0 });
+          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Family Responsibility',  total: 0,                taken: 0, pending: 0 });
+          // Provision statutory event-based leave entitlements
+          for (const [leaveType, days] of Object.entries(STATUTORY_LEAVE_ENTITLEMENTS)) {
+            await storage.createLeaveBalance({ userId: newUser.id, leaveType, total: days, taken: 0, pending: 0 });
+          }
+          // Initialise sick leave tracking record
+          await storage.upsertSickLeaveTracking({
+            userId: newUser.id,
+            sickCycleStartDate: newUser.startDate,
+            graduatedAccrualActive: true,
+            cumulativeDaysWorked: 0,
+            graduatedDaysCredited: 0,
+          });
         } catch (leaveErr) {
           console.error('Failed to provision leave balances for new user:', leaveErr);
         }
+
+        // Backfill accrual for any months that have already passed since startDate.
+        // Runs asynchronously so it doesn't block the create response.
+        backfillUserAccrual(newUser.id)
+          .then(({ monthsProcessed }) => {
+            if (monthsProcessed > 0) {
+              console.log(`[backfill] Accrued ${monthsProcessed} past month(s) for new user ${newUser.id}`);
+            }
+          })
+          .catch(err => console.error(`[backfill] Failed for user ${newUser.id}:`, err));
       }
 
       if (validatedData.role === 'manager' && validatedData.email && plaintextPassword) {
@@ -931,6 +961,15 @@ export async function registerRoutes(
           changes,
           description: `Updated ${Object.keys(changes).join(', ')} for user ${req.params.id}`,
         }).catch(e => console.error('[audit] log failed:', e));
+      }
+
+      // Termination settlement (spec §5.8): if terminationDate is newly set, process final accrual.
+      const terminationDateAdded = 'terminationDate' in updateData &&
+        updateData.terminationDate &&
+        !before?.terminationDate;
+      if (terminationDateAdded) {
+        processTerminationSettlement(req.params.id, updateData.terminationDate)
+          .catch(err => console.error('[termination-settlement] Failed:', err));
       }
 
       return res.json(updatedUser);
@@ -1052,11 +1091,16 @@ export async function registerRoutes(
     }
   });
 
-  // Update leave balance
+  // Update leave balance (manual adjustment — spec §11)
   app.patch("/api/leave-balances/:id", requireAdmin, async (req, res) => {
     try {
       const balanceId = parseInt(req.params.id);
-      const { total, taken, pending } = req.body;
+      const { total, taken, pending, reason } = req.body;
+
+      // spec §11: reason is mandatory and must not be empty
+      if (!reason || typeof reason !== 'string' || !reason.trim()) {
+        return res.status(400).json({ error: "A non-empty reason is required for manual balance adjustments (spec §11)." });
+      }
 
       const before = await storage.getLeaveBalance(balanceId);
       const updatedBalance = await storage.updateLeaveBalance(balanceId, { total, taken, pending });
@@ -1067,15 +1111,16 @@ export async function registerRoutes(
 
       await storage.createAuditLog({
         actorId: req.session.userId ?? null,
-        action: 'update_leave_balance',
+        action: 'manual_adjustment',
         entityType: 'leave_balance',
         entityId: String(balanceId),
         changes: {
           total:   { before: before?.total,   after: updatedBalance.total },
           taken:   { before: before?.taken,   after: updatedBalance.taken },
           pending: { before: before?.pending, after: updatedBalance.pending },
+          reason:  { before: null, after: reason.trim() },
         },
-        description: `Adjusted ${updatedBalance.leaveType} balance for user ${updatedBalance.userId}`,
+        description: `Manual adjustment — ${updatedBalance.leaveType} for user ${updatedBalance.userId}: ${reason.trim()}`,
       }).catch(e => console.error('[audit] log failed:', e));
 
       return res.json(updatedBalance);
@@ -1174,43 +1219,28 @@ export async function registerRoutes(
         details: [],
       };
 
-      const graceMonthsSetting = await storage.getSetting('leave_carry_over_grace_months');
-      const carryOverGraceMonths = graceMonthsSetting ? parseInt(graceMonthsSetting.value, 10) || 6 : 6;
+      const tiers = await storage.getAllAccrualRateTiers();
 
       for (const user of workers) {
         try {
-          const entitlements = calculateBceaEntitlements(user.startDate!);
+          const today = new Date();
+          const months = completedMonths(user.startDate!, today);
+          const { rate } = determineAccrualRate(months, (user as any).annualLeaveOverrideDays ?? null, tiers);
+          // Approximate cumulative annual leave accrued (months × rate), capped at cycle length
+          const cycleMonths = months % 12 || 12;
+          const annualLeaveTotal = rate * cycleMonths;
+
+          // Sick leave: graduated (<6 months) or full entitlement (>=6 months)
+          const workDays = (user as any).workDaysPerWeek ?? 5;
+          const fullEntitlement = 30 * (workDays / 5);
+          const sickLeaveTotal = months < 6
+            ? Math.floor(Math.floor(months * (52 * 5 / 12)) / 26)  // approximate graduated
+            : fullEntitlement;
+
+          // FRL: 3 if eligible, 0 otherwise
+          const frlTotal = isFrlEligible(user.startDate!, workDays, today) ? 3 : 0;
+
           const existingBalances = await storage.getLeaveBalances(user.id);
-
-          const upsertAnnual = async (total: number) => {
-            const existing = existingBalances.find((b) => b.leaveType === 'Annual Leave');
-            const todayStr = new Date().toISOString().split('T')[0];
-            if (existing) {
-              const currentCarryOver = existing.carryOverDays || 0;
-              const carryOverExpiry = (existing as any).carryOverExpiry as string | null;
-
-              // Forfeit carry-over if the grace window has passed
-              if (currentCarryOver > 0 && carryOverExpiry && todayStr > carryOverExpiry) {
-                const safeTaken = existing.taken + existing.pending;
-                const safeTotal = Math.max(total, safeTaken);
-                await storage.updateLeaveBalance(existing.id, { total: safeTotal, carryOverDays: 0, carryOverExpiry: null } as any);
-                return;
-              }
-
-              const purePrevTotal = existing.total - currentCarryOver;
-              // Detect cycle reset: pure entitlement dropped by more than 5 days
-              const cycleReset = purePrevTotal > total + 5;
-              if (cycleReset) {
-                const unusedDays = Math.max(0, Math.round((existing.total - existing.taken - existing.pending) * 10) / 10);
-                const expiry = getCarryOverExpiryDate(user.startDate!, carryOverGraceMonths);
-                await storage.updateLeaveBalance(existing.id, { total: total + unusedDays, carryOverDays: unusedDays, carryOverExpiry: expiry } as any);
-              } else {
-                await storage.updateLeaveBalance(existing.id, { total: total + currentCarryOver });
-              }
-            } else {
-              await storage.createLeaveBalance({ userId: user.id, leaveType: 'Annual Leave', total, taken: 0, pending: 0, carryOverDays: 0 });
-            }
-          };
 
           const upsert = async (leaveType: string, total: number) => {
             const existing = existingBalances.find((b) => b.leaveType === leaveType);
@@ -1221,18 +1251,18 @@ export async function registerRoutes(
             }
           };
 
-          await upsertAnnual(entitlements.annualLeave);
-          await upsert('Sick Leave', entitlements.sickLeave);
-          await upsert('Family Responsibility', entitlements.familyResponsibility);
+          await upsert('Annual Leave', Math.round(annualLeaveTotal * 100) / 100);
+          await upsert('Sick Leave', sickLeaveTotal);
+          await upsert('Family Responsibility', frlTotal);
 
           results.updated++;
           results.details.push({
             userId: user.id,
             name: `${user.firstName} ${user.surname}`,
-            annualLeave: entitlements.annualLeave,
-            sickLeave: entitlements.sickLeave,
-            familyResponsibility: entitlements.familyResponsibility,
-            monthsWorked: entitlements.monthsWorked,
+            annualLeave: Math.round(annualLeaveTotal * 100) / 100,
+            sickLeave: sickLeaveTotal,
+            familyResponsibility: frlTotal,
+            monthsWorked: months,
           });
         } catch (err) {
           results.errors.push(`${user.id} (${user.firstName} ${user.surname}): ${err}`);
@@ -1249,15 +1279,39 @@ export async function registerRoutes(
     }
   });
 
-  // Preview SA BCEA entitlements for an employee (by userId or startDate)
+  // Preview SA BCEA entitlements for an employee (by userId)
   app.get("/api/leave-balances/sa-preview/:userId", async (req, res) => {
     try {
       const user = await storage.getUser(req.params.userId);
       if (!user) return res.status(404).json({ error: "Employee not found" });
       if (!user.startDate) return res.status(400).json({ error: "Employee has no start date" });
 
-      const entitlements = calculateBceaEntitlements(user.startDate);
-      return res.json(entitlements);
+      const today = new Date();
+      const tiers = await storage.getAllAccrualRateTiers();
+      const months = completedMonths(user.startDate, today);
+      const workDays = (user as any).workDaysPerWeek ?? 5;
+      const { rate, basis: rateBasis } = determineAccrualRate(months, (user as any).annualLeaveOverrideDays ?? null, tiers);
+      const fullSickEntitlement = 30 * (workDays / 5);
+
+      return res.json({
+        monthsWorked: months,
+        annualLeave: Math.round(rate * (months % 12 || 12) * 100) / 100,
+        annualLeaveMonthlyRate: rate,
+        annualLeaveRateBasis: rateBasis,
+        sickLeave: months < 6
+          ? Math.floor(Math.floor(months * (52 * 5 / 12)) / 26)
+          : fullSickEntitlement,
+        familyResponsibility: isFrlEligible(user.startDate, workDays, today) ? 3 : 0,
+        notes: {
+          annualLeave: rateBasis,
+          sickLeave: months < 6
+            ? `Probationary (< 6 months): 1 day per 26 working days`
+            : `Full entitlement: ${fullSickEntitlement} days per 36-month cycle`,
+          familyResponsibility: isFrlEligible(user.startDate, workDays, today)
+            ? `3 days per cycle (eligible)`
+            : `Not yet eligible (requires 4+ months and 4+ days/week)`,
+        },
+      });
     } catch (error) {
       console.error("SA preview error:", error);
       return res.status(500).json({ error: "Failed to calculate SA preview" });

@@ -67,6 +67,8 @@ export const leaveRules = pgTable("leave_rules", {
   carryOverLimit: integer("carry_over_limit"), // Max days that can carry over to next year
   waitingPeriodDays: integer("waiting_period_days").default(0), // Days before accrual starts
   cycleMonths: integer("cycle_months"), // e.g., 36 for "every 3 years"
+  pausesAnnualAccrual: boolean("pauses_annual_accrual").notNull().default(false), // Whether this leave type pauses annual leave accrual (spec §9.1)
+  cycleAnchor: text("cycle_anchor").notNull().default("calendar_year"), // 'calendar_year' | 'employment_start_date' (spec §3.3)
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -158,6 +160,8 @@ export const users = pgTable("users", {
   exclude: boolean("exclude").default(false), // Exclude from org chart and attendance (for test/dummy users)
   excludeFromLeave: boolean("exclude_from_leave").default(false), // Exclude from leave management (external contractors, system accounts)
   attendanceRequired: boolean("attendance_required").default(true), // Whether employee needs to clock in/out (false for contractors, consultants, off-site workers)
+  workDaysPerWeek: integer("work_days_per_week").notNull().default(5), // Standard working days per week — affects sick leave entitlement and FRL eligibility (spec §13.2)
+  annualLeaveOverrideDays: real("annual_leave_override_days"), // Optional per-employee override: annual leave days/year. When set, RATE = this/12; tier logic skipped. (spec §5.1)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -434,3 +438,51 @@ export const auditLogs = pgTable("audit_logs", {
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+// Accrual Rate Tiers Table (spec §5.1, §13.5)
+// System-wide, HR-editable. Default: Tier 1 = 15 days/yr (0+ months), Tier 2 = 20 days/yr (24+ months).
+export const accrualRateTiers = pgTable("accrual_rate_tiers", {
+  id: serial("id").primaryKey(),
+  minMonthsOfService: integer("min_months_of_service").notNull(),
+  annualEntitlementDays: real("annual_entitlement_days").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type AccrualRateTier = typeof accrualRateTiers.$inferSelect;
+export type InsertAccrualRateTier = typeof accrualRateTiers.$inferInsert;
+
+// Sick Leave Tracking Table (spec §13.4)
+// Per-employee state needed for the graduated accrual period and 36-month cycle resets.
+export const sickLeaveTracking = pgTable("sick_leave_tracking", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  sickCycleStartDate: text("sick_cycle_start_date").notNull(),   // 'yyyy-MM-dd'
+  graduatedAccrualActive: boolean("graduated_accrual_active").notNull().default(true),
+  cumulativeDaysWorked: integer("cumulative_days_worked").notNull().default(0),
+  graduatedDaysCredited: integer("graduated_days_credited").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type SickLeaveTracking = typeof sickLeaveTracking.$inferSelect;
+export type InsertSickLeaveTracking = typeof sickLeaveTracking.$inferInsert;
+
+// Leave Accrual Records Table (spec §12, §4 idempotency)
+// One row per accrual event. The unique constraint enforces idempotency: running the
+// engine twice for the same (employee, leave_type, accrual_period, event_type) is safe.
+export const leaveAccrualRecords = pgTable("leave_accrual_records", {
+  id: serial("id").primaryKey(),
+  employeeId: text("employee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  leaveType: text("leave_type").notNull(),
+  accrualPeriod: text("accrual_period").notNull(),       // 'YYYY-MM'
+  eventType: text("event_type").notNull(),               // see spec §12 event_type enum
+  amount: real("amount").notNull(),
+  balanceBefore: real("balance_before").notNull(),
+  balanceAfter: real("balance_after").notNull(),
+  calculationBasis: text("calculation_basis"),
+  triggeredBy: text("triggered_by").notNull().default("system"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type LeaveAccrualRecord = typeof leaveAccrualRecords.$inferSelect;
+export type InsertLeaveAccrualRecord = typeof leaveAccrualRecords.$inferInsert;
