@@ -18,7 +18,7 @@ import { leaveRequestApi, leaveBalanceApi, userApi, publicHolidayApi } from '@/l
 import type { LeaveRequest, LeaveBalance } from '@shared/schema';
 import { FileText, Check, X, Trash2, Loader2, Plus, Pencil, BookOpen, Lock, CalendarIcon, Users } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
-import { formatLeaveStatus, canTakeAction } from './utils';
+import { formatLeaveStatus, canTakeAction, formatLeaveDays } from './utils';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -56,6 +56,13 @@ export default function LeaveRequestsSection() {
   const { data: leaveBalances = [] } = useQuery({
     queryKey: ['leave-balances'],
     queryFn: () => leaveBalanceApi.getAll(),
+  });
+
+  // Per-employee balance query for the review dialog — accessible to managers (no admin required)
+  const { data: selectedEmployeeBalances = [] } = useQuery<LeaveBalance[]>({
+    queryKey: ['leave-balances', selectedLeaveRequest?.userId],
+    queryFn: () => leaveBalanceApi.getByUserId(selectedLeaveRequest!.userId),
+    enabled: !!selectedLeaveRequest?.userId,
   });
 
   const { data: users = [] } = useQuery({
@@ -448,11 +455,11 @@ export default function LeaveRequestsSection() {
                           <TableCell className="text-muted-foreground capitalize">
                             {balance.leaveType}
                           </TableCell>
-                          <TableCell className="text-right">{pureEntitlement}</TableCell>
+                          <TableCell className="text-right">{formatLeaveDays(pureEntitlement)}</TableCell>
                           <TableCell className="text-right">
                             {carryOver > 0 ? (
                               <span className={`text-blue-600 font-medium${expiringSoon ? ' text-orange-600' : ''}`}>
-                                +{carryOver}
+                                +{formatLeaveDays(carryOver)}
                                 {carryOverExpiry && (
                                   <span className="block text-[10px] font-normal text-muted-foreground">
                                     {expiringSoon ? '⚠ ' : ''}expires {new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
@@ -463,11 +470,11 @@ export default function LeaveRequestsSection() {
                               <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-right">{taken > 0 ? taken : <span className="text-muted-foreground">—</span>}</TableCell>
-                          <TableCell className="text-right">{pending > 0 ? pending : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-right">{taken > 0 ? formatLeaveDays(taken) : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-right">{pending > 0 ? formatLeaveDays(pending) : <span className="text-muted-foreground">—</span>}</TableCell>
                           <TableCell className="text-right">
                             <Badge variant={available > 0 ? 'outline' : 'destructive'} className="text-xs font-semibold">
-                              {available}
+                              {formatLeaveDays(available)}
                             </Badge>
                           </TableCell>
                         </TableRow>
@@ -514,10 +521,12 @@ export default function LeaveRequestsSection() {
                         )}
                       </Label>
                     </div>
-                    <Button onClick={openAddHistoric} data-testid="button-add-historic">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Historic Entry
-                    </Button>
+                    {isHrOrAdmin && (
+                      <Button onClick={openAddHistoric} data-testid="button-add-historic">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Historic Entry
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -575,28 +584,32 @@ export default function LeaveRequestsSection() {
                               {request.reason || <span className="text-muted-foreground italic">—</span>}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => openEditHistoric(request)}
-                                data-testid={`button-edit-historic-${request.id}`}
-                                title="Edit"
-                              >
-                                <Pencil className="h-4 w-4 text-blue-500" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  if (confirm('Delete this historic entry? The leave days will be credited back to the employee\'s balance.')) {
-                                    permanentDeleteMutation.mutate(request.id);
-                                  }
-                                }}
-                                data-testid={`button-delete-historic-${request.id}`}
-                                title="Delete"
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
+                              {isHrOrAdmin && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openEditHistoric(request)}
+                                    data-testid={`button-edit-historic-${request.id}`}
+                                    title="Edit"
+                                  >
+                                    <Pencil className="h-4 w-4 text-blue-500" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                      if (confirm('Delete this historic entry? The leave days will be credited back to the employee\'s balance.')) {
+                                        permanentDeleteMutation.mutate(request.id);
+                                      }
+                                    }}
+                                    data-testid={`button-delete-historic-${request.id}`}
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -617,7 +630,10 @@ export default function LeaveRequestsSection() {
           </DialogHeader>
           {selectedLeaveRequest && (() => {
             const employee = users.find(u => u.id === selectedLeaveRequest.userId);
-            const employeeLeaveBalances = leaveBalances.filter((b: LeaveBalance) => b.userId === selectedLeaveRequest.userId);
+            // Prefer the dedicated per-employee query (works for managers); fall back to bulk admin data
+            const employeeLeaveBalances = selectedEmployeeBalances.length > 0
+              ? selectedEmployeeBalances
+              : leaveBalances.filter((b: LeaveBalance) => b.userId === selectedLeaveRequest.userId);
             const relevantBalance = employeeLeaveBalances.find((b: LeaveBalance) => b.leaveType === selectedLeaveRequest.leaveType);
             const availableDays = relevantBalance ? (relevantBalance.total ?? 0) - (relevantBalance.taken ?? 0) - (relevantBalance.pending ?? 0) : 0;
             const requestedDays = countWorkingDays(
@@ -657,31 +673,31 @@ export default function LeaveRequestsSection() {
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-sm">Working Days</Label>
-                    <p className="font-medium">{requestedDays} day{requestedDays !== 1 ? 's' : ''}</p>
+                    <p className="font-medium">{formatLeaveDays(requestedDays)} day{requestedDays !== 1 ? 's' : ''}</p>
                   </div>
                 </div>
 
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                   <Label className="text-green-800 text-sm font-medium">Employee Leave Balance ({selectedLeaveRequest.leaveType.replace('_', ' ')})</Label>
                   <p className="text-green-700 text-xs mt-1">
-                    This request accounts for {requestedDays} of the {relevantBalance?.pending ?? 0} pending day(s).
+                    This request accounts for {formatLeaveDays(requestedDays)} of the {formatLeaveDays(relevantBalance?.pending ?? 0)} pending day(s).
                   </p>
                   <div className="grid grid-cols-4 gap-2 mt-2 text-sm">
                     <div className="text-center p-2 bg-white rounded">
                       <p className="text-muted-foreground text-xs">Total</p>
-                      <p className="font-semibold">{relevantBalance?.total || 0}</p>
+                      <p className="font-semibold">{formatLeaveDays(relevantBalance?.total || 0)}</p>
                     </div>
                     <div className="text-center p-2 bg-white rounded">
                       <p className="text-muted-foreground text-xs">Taken</p>
-                      <p className="font-semibold text-amber-600">{relevantBalance?.taken || 0}</p>
+                      <p className="font-semibold text-amber-600">{formatLeaveDays(relevantBalance?.taken || 0)}</p>
                     </div>
                     <div className="text-center p-2 bg-white rounded">
                       <p className="text-muted-foreground text-xs">Pending</p>
-                      <p className="font-semibold text-blue-600">{relevantBalance?.pending || 0}</p>
+                      <p className="font-semibold text-blue-600">{formatLeaveDays(relevantBalance?.pending || 0)}</p>
                     </div>
                     <div className="text-center p-2 bg-white rounded">
                       <p className="text-muted-foreground text-xs">Available</p>
-                      <p className={`font-semibold ${availableDays > 0 ? 'text-green-600' : 'text-red-600'}`}>{availableDays}</p>
+                      <p className={`font-semibold ${availableDays > 0 ? 'text-green-600' : 'text-red-600'}`}>{formatLeaveDays(availableDays)}</p>
                     </div>
                   </div>
                   {availableDays <= 0 && (

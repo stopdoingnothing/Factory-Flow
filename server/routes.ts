@@ -405,7 +405,6 @@ export async function registerRoutes(
       }
 
       req.session.userId = user.id;
-      req.session.userRole = user.role;
       req.session.userRoles = user.roles || ['employee'];
       req.session.save(err => {
         if (err) { console.error("Session save failed (worker login):", err); return res.status(500).json({ error: "Session save failed" }); }
@@ -440,7 +439,6 @@ export async function registerRoutes(
       }
 
       req.session.userId = user.id;
-      req.session.userRole = user.role;
       req.session.userRoles = user.roles || ['employee'];
       req.session.save(err => {
         if (err) return res.status(500).json({ error: "Session save failed" });
@@ -452,7 +450,8 @@ export async function registerRoutes(
     }
   });
 
-  // Admin login by email/password
+  // DEPRECATED — the unified /api/auth/login endpoint now handles email, employee ID, and national ID.
+  // This route is kept to avoid 404s from any cached clients but is no longer the active login path.
   app.post("/api/auth/admin-login", async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -462,9 +461,9 @@ export async function registerRoutes(
       }
 
       const user = await storage.getUserByEmail(email);
-      
-      // Allow users with adminRole, or line managers (role === 'manager' without adminRole)
-      if (!user || (!user.adminRole && user.role !== 'manager')) {
+
+      // Allow users with admin, hr, or manager role (roles[] is the source of truth)
+      if (!user || !(user.roles || []).some((r: string) => ['admin', 'hr', 'manager'].includes(r))) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
@@ -479,7 +478,6 @@ export async function registerRoutes(
       }
 
       req.session.userId = user.id;
-      req.session.userRole = user.adminRole || user.role;
       req.session.userRoles = user.roles || ['employee'];
       req.session.save(err => {
         if (err) { console.error("Session save failed (admin login):", err); return res.status(500).json({ error: "Session save failed" }); }
@@ -505,7 +503,8 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Employee not found" });
       }
 
-      if (employee.role === 'manager' || employee.adminRole) {
+      // Only pure employees (no elevated roles) can use this kiosk flow
+      if ((employee.roles || []).some((r: string) => ['manager', 'admin', 'hr'].includes(r))) {
         return res.status(403).json({ error: "This employee cannot use manager approval login" });
       }
 
@@ -514,7 +513,7 @@ export async function registerRoutes(
       }
 
       const manager = await storage.getUserByEmail(managerEmail);
-      if (!manager || !manager.adminRole || !['manager', 'maintainer'].includes(manager.adminRole)) {
+      if (!manager || !(manager.roles || []).some((r: string) => ['manager', 'admin', 'hr'].includes(r))) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
@@ -529,7 +528,7 @@ export async function registerRoutes(
       }
 
       req.session.userId = employee.id;
-      req.session.userRole = employee.role;
+      req.session.userRoles = employee.roles || ['employee'];
 
       await storage.createAuditLog({
         actorId: manager.id,
@@ -689,22 +688,36 @@ export async function registerRoutes(
     }
   });
 
-  // Get all users — admins (manager/maintainer) see everyone; workers see only themselves and direct reports
+  // Get all users — hr/admin see everyone; managers see their direct reports; workers see themselves
   app.get("/api/users", async (req, res) => {
     try {
       const sessionUserId = req.session.userId!;
-      const sessionRole = req.session.userRole ?? '';
+      const sessionRoles: string[] = req.session.userRoles || [];
+      const isHrOrAdmin = sessionRoles.includes('hr') || sessionRoles.includes('admin');
+      const isManager = sessionRoles.includes('manager') && !isHrOrAdmin;
       const allUsers = await storage.getAllUsers();
 
-      if (['manager', 'maintainer'].includes(sessionRole)) {
+      if (isHrOrAdmin) {
         return res.json(allUsers);
       }
 
-      // Workers: only see themselves and their direct reports
-      const filteredUsers = allUsers.filter(u =>
-        u.id === sessionUserId ||
-        u.managerId === sessionUserId
-      );
+      if (isManager) {
+        const sessionUser = allUsers.find(u => u.id === sessionUserId);
+        const managerOrgPositionId = sessionUser?.orgPositionId ?? null;
+        const visibleIds = new Set(
+          allUsers
+            .filter(u =>
+              u.id === sessionUserId ||
+              u.managerId === sessionUserId ||
+              (managerOrgPositionId && u.reportsToPositionId === managerOrgPositionId)
+            )
+            .map(u => u.id)
+        );
+        return res.json(allUsers.filter(u => visibleIds.has(u.id)));
+      }
+
+      // Employees: only see themselves
+      const filteredUsers = allUsers.filter(u => u.id === sessionUserId);
       return res.json(filteredUsers);
     } catch (error) {
       console.error("Get users error:", error);
@@ -739,7 +752,7 @@ export async function registerRoutes(
         .filter(u =>
           !u.terminationDate &&
           !u.exclude &&
-          !u.adminRole && // managers with admin credentials use their own login path
+          !((u.roles || []).some((r: string) => ['admin', 'hr', 'manager'].includes(r))) && // elevated users use their own login path
           (`${u.firstName} ${u.surname}`.toLowerCase().includes(lower) ||
            u.firstName.toLowerCase().includes(lower) ||
            u.surname.toLowerCase().includes(lower))
@@ -1021,11 +1034,36 @@ export async function registerRoutes(
 
   // ========== LEAVE BALANCE ROUTES ==========
   
-  // Get all leave balances (admin)
-  app.get("/api/leave-balances", requireAdmin, async (req, res) => {
+  // Get all leave balances — hr/admin see all; managers see their direct reports only
+  app.get("/api/leave-balances", requireRole('hr', 'admin', 'manager'), async (req, res) => {
     try {
+      const sessionUserId = req.session.userId!;
+      const sessionRoles: string[] = req.session.userRoles || [];
+      const isHrOrAdmin = sessionRoles.includes('hr') || sessionRoles.includes('admin');
+
       const balances = await storage.getAllLeaveBalances();
-      return res.json(balances);
+
+      if (isHrOrAdmin) {
+        return res.json(balances);
+      }
+
+      // Manager: scope to direct reports only
+      const allUsers = await storage.getAllUsers();
+      const sessionUser = allUsers.find(u => u.id === sessionUserId);
+      const managerOrgPositionId = sessionUser?.orgPositionId ?? null;
+      const directReportIds = new Set(
+        allUsers
+          .filter(u => {
+            if (u.reportsToPositionId != null) {
+              return managerOrgPositionId != null && u.reportsToPositionId === managerOrgPositionId;
+            }
+            return u.managerId === sessionUserId;
+          })
+          .map(u => u.id)
+      );
+      // Include the manager's own balances too
+      directReportIds.add(sessionUserId);
+      return res.json(balances.filter(b => directReportIds.has(b.userId)));
     } catch (error) {
       console.error("Get all balances error:", error);
       return res.status(500).json({ error: "Failed to fetch leave balances" });
@@ -1036,6 +1074,29 @@ export async function registerRoutes(
   app.get("/api/leave-balances/:userId", async (req, res) => {
     try {
       const userId = req.params.userId;
+      const sessionUserId = req.session.userId!;
+      const sessionRoles: string[] = req.session.userRoles || [];
+      const isHrOrAdmin = sessionRoles.includes('hr') || sessionRoles.includes('admin');
+      const isManager = sessionRoles.includes('manager') && !isHrOrAdmin;
+
+      // Authorisation: must be own record, direct manager, or hr/admin
+      if (!isHrOrAdmin && sessionUserId !== userId) {
+        if (isManager) {
+          const allUsers = await storage.getAllUsers();
+          const callerUser = allUsers.find(u => u.id === sessionUserId);
+          const callerPositionId = callerUser?.orgPositionId ?? null;
+          const targetUser = allUsers.find(u => u.id === userId);
+          const isDirectManager =
+            targetUser?.managerId === sessionUserId ||
+            (callerPositionId != null && targetUser?.reportsToPositionId === callerPositionId);
+          if (!isDirectManager) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+        } else {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      }
+
       const user = await storage.getUser(userId);
 
       // Forfeit any expired annual leave carry-over (grace window check only — accrual is handled by the month-end cron)
@@ -1335,8 +1396,18 @@ export async function registerRoutes(
       // Manager (without HR/admin): only direct reports + own requests
       if (isManagerOnly) {
         const allUsers = await storage.getAllUsers();
+        const sessionUser = allUsers.find(u => u.id === sessionUserId);
+        const managerOrgPositionId = sessionUser?.orgPositionId ?? null;
         const directReportIds = new Set(
-          allUsers.filter(u => u.managerId === sessionUserId).map(u => u.id)
+          allUsers
+            .filter(u => {
+              // Position-based reporting takes precedence over legacy managerId
+              if (u.reportsToPositionId != null) {
+                return managerOrgPositionId != null && u.reportsToPositionId === managerOrgPositionId;
+              }
+              return u.managerId === sessionUserId;
+            })
+            .map(u => u.id)
         );
         const allRequests = await storage.getLeaveRequests();
         const filtered = allRequests.filter(
@@ -1686,7 +1757,12 @@ export async function registerRoutes(
       const isHrOrAdmin = sessionRoles.includes('hr') || sessionRoles.includes('admin');
       if (!isHrOrAdmin) {
         const employee = await storage.getUser(request.userId);
-        if (!employee || employee.managerId !== approverId) {
+        const approverUser = await storage.getUser(approverId);
+        // Position-based reporting takes precedence over legacy managerId
+        const isReportingManager = employee?.reportsToPositionId != null
+          ? approverUser?.orgPositionId === employee.reportsToPositionId
+          : employee?.managerId === approverId;
+        if (!employee || !isReportingManager) {
           return res.status(403).json({ error: "You are not the reporting manager for this employee" });
         }
       }
