@@ -169,7 +169,7 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
           const available = Math.round(((balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0)) * 10) / 10;
           const carryOverExpiry = balance.carryOverExpiry as string | null | undefined;
           const today = new Date().toISOString().split('T')[0];
-          const expiringSoon = carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
+          const expiringSoon = !!carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
           return (
             <Card key={balance.id} className="relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -185,10 +185,10 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
                 <p className="text-xs text-muted-foreground mb-4">days available</p>
                 <Progress value={Math.min(100, (available / (balance.total ?? 1)) * 100)} className="h-2" />
                 <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-                  <span>{Math.round(((balance.total ?? 0) - (carryOver ?? 0)) * 10) / 10} entitlement{carryOver && carryOver > 0 ? ` + ${carryOver} carry-over` : ''}</span>
+                  <span>{Math.round(((balance.total ?? 0) - (carryOver ?? 0)) * 10) / 10} entitlement{!!carryOver && carryOver > 0 ? ` + ${carryOver} carry-over` : ''}</span>
                   <span>{balance.taken ?? 0} taken{(balance.pending ?? 0) > 0 ? `, ${balance.pending} pending` : ''}</span>
                 </div>
-                {carryOver && carryOver > 0 && carryOverExpiry && (
+                {!!carryOver && carryOver > 0 && carryOverExpiry && (
                   <div className={`mt-1 text-xs ${expiringSoon ? 'text-orange-600 font-medium' : 'text-blue-600'}`}>
                     {expiringSoon ? '⚠ Carry-over expires ' : 'Carry-over use by '}
                     {new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
