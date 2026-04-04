@@ -10,6 +10,7 @@ import { leaveBalanceApi, leaveRequestApi, userApi, attendanceApi, orgPositionAp
 import type { OrgPosition } from '@shared/schema';
 import { useToast } from "@/hooks/use-toast";
 import { Clock, Calendar, AlertCircle, CheckCircle2, FileText, Eye, X, XCircle, LogIn, LogOut } from 'lucide-react';
+import { formatLeaveDays } from './utils';
 import { format } from 'date-fns';
 import type { LeaveRequest } from '@shared/schema';
 
@@ -185,12 +186,12 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold font-heading text-foreground">{available}</div>
+                <div className="text-3xl font-bold font-heading text-foreground">{formatLeaveDays(available)}</div>
                 <p className="text-xs text-muted-foreground mb-4">days available</p>
                 <Progress value={Math.min(100, (available / (balance.total ?? 1)) * 100)} className="h-2" />
                 <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-                  <span>{Math.round(((balance.total ?? 0) - (carryOver ?? 0)) * 10) / 10} entitlement{!!carryOver && carryOver > 0 ? ` + ${carryOver} carry-over` : ''}</span>
-                  <span>{balance.taken ?? 0} taken{(balance.pending ?? 0) > 0 ? `, ${balance.pending} pending` : ''}</span>
+                  <span>{formatLeaveDays(Math.round(((balance.total ?? 0) - (carryOver ?? 0)) * 10) / 10)} entitlement{!!carryOver && carryOver > 0 ? ` + ${formatLeaveDays(carryOver)} carry-over` : ''}</span>
+                  <span>{formatLeaveDays(balance.taken ?? 0)} taken{(balance.pending ?? 0) > 0 ? `, ${formatLeaveDays(balance.pending)} pending` : ''}</span>
                 </div>
                 {!!carryOver && carryOver > 0 && carryOverExpiry && (
                   <div className={`mt-1 text-xs ${expiringSoon ? 'text-orange-600 font-medium' : 'text-blue-600'}`}>

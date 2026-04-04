@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User, Mail, Phone, MapPin, Building2, Calendar, Clock, Users } from "lucide-react";
 import { userApi, leaveBalanceApi, attendanceApi } from "@/lib/api";
+import { formatLeaveDays } from './utils';
 import { format } from "date-fns";
 import type { LeaveBalance, AttendanceRecord } from "@shared/schema";
 
@@ -153,13 +154,13 @@ export default function MyProfileSection() {
                       <div className="flex justify-between items-center">
                         <span className="font-medium capitalize">{balance.leaveType.replace('_', ' ')}</span>
                         <div className="text-right">
-                          <span className="text-green-600 font-bold">{available}</span>
-                          <span className="text-gray-500 text-sm"> / {balance.total} days</span>
+                          <span className="text-green-600 font-bold">{formatLeaveDays(available)}</span>
+                          <span className="text-gray-500 text-sm"> / {formatLeaveDays(balance.total)} days</span>
                         </div>
                       </div>
                       {!!carryOver && carryOver > 0 && (
                         <p className="text-xs text-amber-600">
-                          +{carryOver} carried over
+                          +{formatLeaveDays(carryOver)} carried over
                           {carryOverExpiry && ` (expires ${new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})`}
                         </p>
                       )}

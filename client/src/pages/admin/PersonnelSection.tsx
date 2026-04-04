@@ -20,7 +20,7 @@ import { useAuth } from '@/lib/auth-context';
 import WebcamCapture from '@/components/WebcamCapture';
 import MultiAngleFaceCapture from '@/components/MultiAngleFaceCapture';
 import { loadFaceModels, extractFaceDescriptorFromBase64, descriptorToJson } from '@/lib/face-recognition';
-import { formatDateForDisplay, getEmploymentDuration, generatePassword, isValidDateFormat, parseDateFromDisplay } from './utils';
+import { formatDateForDisplay, getEmploymentDuration, generatePassword, isValidDateFormat, parseDateFromDisplay, formatLeaveDays } from './utils';
 
 export default function PersonnelSection() {
   const { toast } = useToast();
@@ -505,8 +505,13 @@ export default function PersonnelSection() {
 
   const filteredUsers = users
     .filter(u => {
-      // Non-admin managers see only their direct reports
-      if (!isAdminUser) return u.managerId === user?.id;
+      // Non-admin managers see only their direct reports (position-based takes precedence)
+      if (!isAdminUser) {
+        if ((u as any).reportsToPositionId != null) {
+          return (user as any)?.orgPositionId != null && (u as any).reportsToPositionId === (user as any).orgPositionId;
+        }
+        return u.managerId === user?.id;
+      }
       return true;
     })
     .filter(u => {
@@ -1236,14 +1241,14 @@ export default function PersonnelSection() {
                                       <>
                                         <div className="flex items-center gap-2 mb-2">
                                           <Badge variant={available > 0 ? 'default' : 'destructive'} className="text-lg">
-                                            {available}
+                                            {formatLeaveDays(available)}
                                           </Badge>
                                           <span className="text-xs text-muted-foreground">available</span>
                                         </div>
                                         <div className="text-xs text-muted-foreground space-y-1">
                                           <div className="flex justify-between">
                                             <span>Total:</span>
-                                            <Input 
+                                            <Input
                                               type="number"
                                               value={balance.total}
                                               onChange={(e) => {
@@ -1254,8 +1259,8 @@ export default function PersonnelSection() {
                                               min={0}
                                             />
                                           </div>
-                                          <div className="flex justify-between"><span>Taken:</span><span>{balance.taken}</span></div>
-                                          <div className="flex justify-between"><span>Pending:</span><span>{balance.pending}</span></div>
+                                          <div className="flex justify-between"><span>Taken:</span><span>{formatLeaveDays(balance.taken)}</span></div>
+                                          <div className="flex justify-between"><span>Pending:</span><span>{formatLeaveDays(balance.pending)}</span></div>
                                           {balance.carryOverDays > 0 && (() => {
                                             const expiry = (balance as any).carryOverExpiry as string | null;
                                             const today = new Date().toISOString().split('T')[0];
@@ -1263,7 +1268,7 @@ export default function PersonnelSection() {
                                             return (
                                               <div className="space-y-0.5">
                                                 <div className="flex justify-between text-blue-600 font-medium">
-                                                  <span>Carried over:</span><span>+{balance.carryOverDays}</span>
+                                                  <span>Carried over:</span><span>+{formatLeaveDays(balance.carryOverDays)}</span>
                                                 </div>
                                                 {expiry && (
                                                   <div className={`text-xs ${expiringSoon ? 'text-orange-600 font-medium' : 'text-muted-foreground'}`}>
@@ -1386,8 +1391,8 @@ export default function PersonnelSection() {
                 return (
                   <div key={leaveType} className="p-4 bg-slate-50 rounded-lg border">
                     <p className="text-sm text-muted-foreground">{leaveType}</p>
-                    <p className="text-2xl font-bold">{available}</p>
-                    <p className="text-xs text-muted-foreground">Available ({Math.round(takenDays)} taken, {Math.round(pendingDays)} pending)</p>
+                    <p className="text-2xl font-bold">{formatLeaveDays(available)}</p>
+                    <p className="text-xs text-muted-foreground">Available ({formatLeaveDays(Math.round(takenDays))} taken, {formatLeaveDays(Math.round(pendingDays))} pending)</p>
                   </div>
                 );
               })}
@@ -1406,7 +1411,7 @@ export default function PersonnelSection() {
                       <div className="flex gap-2">
                         {lowBalances.map((b: LeaveBalance) => (
                           <Badge key={b.id} variant="outline" className="border-amber-400 text-amber-700 text-[10px]">
-                            {b.leaveType}: {Math.round((b.total ?? 0) - (b.taken ?? 0) - (b.pending ?? 0))} left
+                            {b.leaveType}: {formatLeaveDays(Math.round((b.total ?? 0) - (b.taken ?? 0) - (b.pending ?? 0)))} left
                           </Badge>
                         ))}
                       </div>
@@ -2093,21 +2098,21 @@ export default function PersonnelSection() {
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium capitalize">{balance.leaveType.replace('_', ' ')}</span>
                             <Badge variant={available > 0 ? 'default' : 'destructive'}>
-                              {available} available
+                              {formatLeaveDays(available)} available
                             </Badge>
                           </div>
                           <div className="grid grid-cols-3 gap-2 text-sm">
                             <div className="text-center p-2 bg-white rounded">
                               <p className="text-muted-foreground text-xs">Total</p>
-                              <p className="font-semibold">{balance.total}</p>
+                              <p className="font-semibold">{formatLeaveDays(balance.total)}</p>
                             </div>
                             <div className="text-center p-2 bg-white rounded">
                               <p className="text-muted-foreground text-xs">Taken</p>
-                              <p className="font-semibold text-amber-600">{balance.taken}</p>
+                              <p className="font-semibold text-amber-600">{formatLeaveDays(balance.taken)}</p>
                             </div>
                             <div className="text-center p-2 bg-white rounded">
                               <p className="text-muted-foreground text-xs">Pending</p>
-                              <p className="font-semibold text-blue-600">{balance.pending}</p>
+                              <p className="font-semibold text-blue-600">{formatLeaveDays(balance.pending)}</p>
                             </div>
                           </div>
                         </div>

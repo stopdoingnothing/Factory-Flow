@@ -79,6 +79,18 @@ export const canTakeAction = (request: LeaveRequest): { canAct: boolean; role: '
   return { canAct: false, role: null, stage: '' };
 };
 
+/**
+ * Format a leave day count: up to 2 decimal places, no trailing zeros.
+ * 15     → "15"
+ * 15.8   → "15.8"
+ * 15.83  → "15.83"
+ * 15.836 → "15.84"
+ */
+export const formatLeaveDays = (days: number | null | undefined): string => {
+  if (days == null) return '0';
+  return parseFloat(days.toFixed(2)).toString();
+};
+
 export const generatePassword = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let password = '';
