@@ -3740,6 +3740,20 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid backup file format" });
       }
 
+      // JSON serialisation turns Date objects into strings — convert them back
+      // so Drizzle's timestamp columns receive proper Date instances.
+      const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+      function reviveDates(obj: any): any {
+        if (obj == null || typeof obj !== 'object') return obj;
+        if (Array.isArray(obj)) return obj.map(reviveDates);
+        const out: any = {};
+        for (const [k, v] of Object.entries(obj)) {
+          out[k] = typeof v === 'string' && ISO_DATE_RE.test(v) ? new Date(v) : reviveDates(v);
+        }
+        return out;
+      }
+      backup.data = reviveDates(backup.data);
+
       const importedCounts: Record<string, number> = {};
 
       if (backup.data.departments?.length) {
@@ -3915,8 +3929,22 @@ export async function registerRoutes(
       }
       
       const clearExisting = options?.clearExisting ?? false;
+
+      // JSON serialisation turns Date objects into strings — convert them back
+      const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+      function reviveDates(obj: any): any {
+        if (obj == null || typeof obj !== 'object') return obj;
+        if (Array.isArray(obj)) return obj.map(reviveDates);
+        const out: any = {};
+        for (const [k, v] of Object.entries(obj)) {
+          out[k] = typeof v === 'string' && ISO_DATE_RE.test(v) ? new Date(v) : reviveDates(v);
+        }
+        return out;
+      }
+      backup.data = reviveDates(backup.data);
+
       const importedCounts: Record<string, number> = {};
-      
+
       // Import in dependency order — referenced tables before referencing tables.
       // All inserts are additive: existing records (matched by natural key or id) are skipped.
 
