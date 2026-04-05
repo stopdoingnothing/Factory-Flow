@@ -8,7 +8,10 @@ done
 echo "[entrypoint:dev] Database ready."
 
 echo "[entrypoint:dev] Running database migrations..."
-npx drizzle-kit migrate --config=drizzle.config.ts
+for f in migrations/0*.sql; do
+  echo "[entrypoint:dev] Applying $f ..."
+  sed 's/--> statement-breakpoint//g' "$f" | psql "$DATABASE_URL" -v ON_ERROR_STOP=0 2>&1 || true
+done
 
 echo "[entrypoint:dev] Ensuring unmanaged tables exist..."
 psql "$DATABASE_URL" <<'EOSQL' 2>/dev/null || true

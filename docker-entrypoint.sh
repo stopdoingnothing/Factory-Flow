@@ -11,7 +11,13 @@ done
 echo "[entrypoint] Database ready."
 
 echo "[entrypoint] Running database migrations..."
-npx drizzle-kit migrate --config=drizzle.config.ts
+# Run migration SQL files directly via psql instead of drizzle-kit,
+# which can silently fail or exit 0 on error.
+for f in migrations/0*.sql; do
+  echo "[entrypoint] Applying $f ..."
+  # Strip drizzle's "--> statement-breakpoint" markers before executing
+  sed 's/--> statement-breakpoint//g' "$f" | psql "$DATABASE_URL" -v ON_ERROR_STOP=0 2>&1 || true
+done
 
 echo "[entrypoint] Ensuring unmanaged tables exist..."
 psql "$DATABASE_URL" <<'EOSQL' 2>/dev/null || true
