@@ -31,6 +31,7 @@ const PUBLIC_ROUTES = [
   "/users/search",           // manager-approval login — employee name search
   "/departments",            // tile mode — department filter
   "/settings/",             // company name/logo needed on login page and kiosks (PUT is separately guarded by requireAdmin)
+  "/backup/bootstrap",      // bootstrap restore — only works when DB has no users
 ];
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
