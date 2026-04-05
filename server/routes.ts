@@ -3677,9 +3677,13 @@ export async function registerRoutes(
 
   app.get("/api/backup/bootstrap-check", async (_req, res) => {
     try {
-      const users = await storage.getAllUsers();
-      return res.json({ empty: users.length === 0 });
-    } catch (error) {
+      const result = await pool.query("SELECT COUNT(*)::int AS count FROM users");
+      return res.json({ empty: result.rows[0].count === 0 });
+    } catch (error: any) {
+      // Table may not exist yet on a completely fresh DB — treat as empty
+      if (error?.code === '42P01' || error?.code === '42703') {
+        return res.json({ empty: true });
+      }
       console.error("Bootstrap check error:", error);
       return res.status(500).json({ empty: false });
     }
@@ -3687,8 +3691,8 @@ export async function registerRoutes(
 
   app.post("/api/backup/bootstrap-validate", async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
-      if (users.length > 0) {
+      const result = await pool.query("SELECT COUNT(*)::int AS count FROM users");
+      if (result.rows[0].count > 0) {
         return res.status(403).json({ error: "Bootstrap restore is only available on an empty database", valid: false });
       }
       const { backup } = req.body;
@@ -3727,8 +3731,8 @@ export async function registerRoutes(
 
   app.post("/api/backup/bootstrap-import", async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
-      if (users.length > 0) {
+      const result = await pool.query("SELECT COUNT(*)::int AS count FROM users");
+      if (result.rows[0].count > 0) {
         return res.status(403).json({ error: "Bootstrap restore is only available on an empty database" });
       }
       const { backup } = req.body;
