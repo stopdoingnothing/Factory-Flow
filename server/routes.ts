@@ -3778,10 +3778,11 @@ export async function registerRoutes(
         importedCounts.orgPositions = backup.data.orgPositions.length;
       }
       if (backup.data.users?.length) {
+        let userCount = 0;
         for (const user of backup.data.users) {
-          try { const e = await storage.getUser(user.id); if (!e) await storage.createUser(user); } catch (e) {}
+          try { const e = await storage.getUser(user.id); if (!e) { await storage.createUser(user); userCount++; } } catch (e) { console.error(`[bootstrap-import] user ${user.id}:`, (e as Error).message); }
         }
-        importedCounts.users = backup.data.users.length;
+        importedCounts.users = userCount;
       }
       if (backup.data.leaveBalances?.length) {
         for (const balance of backup.data.leaveBalances) {
@@ -3966,10 +3967,11 @@ export async function registerRoutes(
 
       // 6. Users
       if (backup.data.users?.length) {
+        let userCount = 0;
         for (const user of backup.data.users) {
-          try { const e = await storage.getUser(user.id); if (!e) await storage.createUser(user); } catch (e) {}
+          try { const e = await storage.getUser(user.id); if (!e) { await storage.createUser(user); userCount++; } } catch (e) { console.error(`[import] user ${user.id}:`, (e as Error).message); }
         }
-        importedCounts.users = backup.data.users.length;
+        importedCounts.users = userCount;
       }
 
       // 7. Leave Balances
