@@ -3861,7 +3861,7 @@ export async function registerRoutes(
       const leaveRequests = await storage.getLeaveRequests();
       const leaveRules = await storage.getAllLeaveRules();
       const leaveRulePhases = await storage.getAllLeaveRulePhases();
-      const attendanceRecords = await storage.getAllAttendanceRecords();
+      const attendanceRecords = (await storage.getAllAttendanceRecords()).map(({ photo_url, photoUrl, ...rest }: any) => rest);
       const contractHistory = await storage.getAllContractHistory();
       const grievances = await storage.getAllGrievances();
       const publicHolidays = await storage.getAllPublicHolidays();
