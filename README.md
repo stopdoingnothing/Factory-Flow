@@ -12,54 +12,89 @@ Workforce management system covering leave management, attendance tracking, org 
 
 ---
 
-## First-time setup
+## Deploying on a new machine
 
-### 1. Clone the repository
+There are two ways to deploy. Choose one.
+
+---
+
+### Option A — Deploy from pre-built image (recommended)
+
+No source code needed. Downloads the pre-built image from the GitHub Container Registry.
+
+**1. Download the two required files**
 
 ```bash
-git clone <repository-url>
+curl -O https://raw.githubusercontent.com/stopdoingnothing/Factory-Flow/SDN/docker-compose.release.yml
+curl -O https://raw.githubusercontent.com/stopdoingnothing/Factory-Flow/SDN/.env.example
+```
+
+**2. Run the setup script** *(or skip to step 3 and edit `.env` manually)*
+
+```bash
+curl -O https://raw.githubusercontent.com/stopdoingnothing/Factory-Flow/SDN/setup.sh
+bash setup.sh
+```
+
+The script generates a `SESSION_SECRET` automatically and prompts for your database password and app URL.
+
+**3. Start the application**
+
+```bash
+docker compose -f docker-compose.release.yml up -d
+```
+
+---
+
+### Option B — Deploy from source
+
+Builds the image locally. Requires cloning the repository.
+
+**1. Clone the repository**
+
+```bash
+git clone https://github.com/stopdoingnothing/Factory-Flow.git
 cd "Factory Flow"
 ```
 
-### 2. Create your environment file
+**2. Run the setup script** *(or copy `.env.example` to `.env` and edit manually)*
 
 ```bash
-cp .env.example .env
+bash setup.sh
 ```
 
-Open `.env` and set the following values:
-
-| Variable | Description |
-|---|---|
-| `POSTGRES_PASSWORD` | Password for the database. Use any strong password. |
-| `SESSION_SECRET` | Optional. Long random string used to sign session cookies. A default is used if not set — recommended to change for production. |
-| `POSTMARK_API_KEY` | Optional. API key for email notifications. Leave empty to disable emails. |
-
-### 3. Start the application
+**3. Start the application**
 
 ```bash
 docker compose up -d
 ```
 
-This will:
-- Pull the PostgreSQL 16 image
-- Build the application container
-- Apply the database schema automatically
-- Start the app on port **5000**
+---
 
-The first build takes a few minutes. Once started, the app is available at:
+### Environment file reference
+
+If setting up `.env` manually instead of using `setup.sh`:
+
+| Variable | Description |
+|---|---|
+| `POSTGRES_PASSWORD` | Password for the database. Use any strong password. |
+| `SESSION_SECRET` | Long random string used to sign session cookies. Generate with: `openssl rand -hex 32` |
+| `APP_URL` | Public URL of this app, used in email links (no trailing slash). |
+| `POSTMARK_API_KEY` | Optional. API key for email notifications. Leave empty to disable emails. |
+
+Once started, the app is available at:
 
 ```
 http://localhost:5000
 ```
 
-Or replace `localhost` with the VM's IP address if accessing from another machine.
+Or replace `localhost` with the machine's IP address if accessing from another machine.
 
-### 4. Log in for the first time
+### Log in for the first time
 
 The default admin account is created during the first startup. Use the credentials provided by your system administrator.
 
-### 5. Restore the database backup
+### Restore the database backup
 
 On a fresh install the database contains only the schema — no employees, org chart, or settings. To load the full dataset:
 

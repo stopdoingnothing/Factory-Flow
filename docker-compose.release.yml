@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: factoryflow
+      POSTGRES_USER: factoryflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U factoryflow -d factoryflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    image: ghcr.io/stopdoingnothing/factory-flow:latest
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgres://factoryflow:${POSTGRES_PASSWORD:-changeme}@db:5432/factoryflow
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-in-production}
+      POSTMARK_API_KEY: ${POSTMARK_API_KEY:-}
+      PORT: 5000
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backup:
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - ./data/backups:/backups
+    entrypoint: >
+      sh -c "
+        while true; do
+          FILENAME=/backups/factoryflow_$$(date +%Y%m%d_%H%M%S).sql.gz
+          echo \"[backup] dumping to $$FILENAME\"
+          pg_dump -h db -U factoryflow factoryflow | gzip > $$FILENAME
+          find /backups -name 'factoryflow_*.sql.gz' -mtime +90 -delete
+          echo \"[backup] done. sleeping 6h\"
+          sleep 21600
+        done
+      "
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
