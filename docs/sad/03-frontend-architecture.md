@@ -39,7 +39,9 @@ Wouter is used instead of React Router. Routes are defined as a flat list in `Ap
 /leave-request             Leave request form
 /attendance                Manual attendance entry
 /attendance-kiosk          Face/ID kiosk
-/attendance-tile-mode      Tile kiosk view
+/attendance-tiles          Tile kiosk view (primary route)
+/attendance-tile           Tile kiosk view (alias)
+/maintainer/dashboard      Admin-only maintainer dashboard
 /employee-profile          Profile view/edit
 /org-chart                 Org hierarchy visualisation
 /grievances                Grievance submission

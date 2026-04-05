@@ -1208,14 +1208,22 @@ export const backupApi = {
     return res.blob();
   },
 
-  async validate(backup: BackupData): Promise<BackupValidation> {
-    const res = await apiFetch(`${API_BASE}/backup/validate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ backup }),
-    });
-    if (!res.ok) throw new Error("Failed to validate backup");
-    return res.json();
+  validate(backup: BackupData): BackupValidation {
+    if (!backup || !backup.data) throw new Error("Invalid backup file format");
+    const countKeys = [
+      'departments', 'userGroups', 'employeeTypes', 'companies', 'orgPositions',
+      'users', 'leaveBalances', 'leaveRequests', 'leaveRules', 'leaveRulePhases',
+      'attendanceRecords', 'contractHistory', 'grievances', 'publicHolidays',
+      'notifications', 'settings', 'faceDescriptors',
+    ] as const;
+    const counts: Record<string, number> = {};
+    for (const k of countKeys) counts[k] = (backup.data as any)[k]?.length || 0;
+    return {
+      valid: true,
+      version: backup.version || "unknown",
+      exportedAt: backup.exportedAt || "unknown",
+      counts,
+    };
   },
 
   async import(backup: BackupData, options?: { clearExisting?: boolean }): Promise<{ success: boolean; message: string; importedCounts: Record<string, number> }> {

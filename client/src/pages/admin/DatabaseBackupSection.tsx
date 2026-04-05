@@ -72,14 +72,23 @@ export default function DatabaseBackupSection() {
     try {
       const text = await file.text();
       const backup = JSON.parse(text);
-      const res = await api('/api/backup/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ backup }),
+      if (!backup || !backup.data) throw new Error('Invalid backup file');
+
+      const countKeys = [
+        'departments', 'userGroups', 'employeeTypes', 'companies', 'orgPositions',
+        'users', 'leaveBalances', 'leaveRequests', 'leaveRules', 'leaveRulePhases',
+        'attendanceRecords', 'contractHistory', 'grievances', 'publicHolidays',
+        'notifications', 'settings', 'faceDescriptors',
+      ] as const;
+      const counts: Record<string, number> = {};
+      for (const k of countKeys) counts[k] = backup.data[k]?.length || 0;
+
+      setBackupInfo({
+        valid: true,
+        version: backup.version || 'unknown',
+        exportedAt: backup.exportedAt || 'unknown',
+        counts,
       });
-      const info: BackupInfo = await res.json();
-      if (!info.valid) throw new Error('Invalid backup file');
-      setBackupInfo(info);
       setPendingBackup(backup);
     } catch {
       toast({ title: 'Invalid file', description: 'The selected file is not a valid backup.', variant: 'destructive' });

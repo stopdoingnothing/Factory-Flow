@@ -60,7 +60,7 @@ app.use(session({
   cookie: {
     maxAge: 8 * 60 * 60 * 1000,       // 8-hour session lifetime
     httpOnly: true,
-    secure: process.env.TRUST_PROXY === 'true'
+    secure: process.env.NODE_ENV === 'production' && process.env.TRUST_PROXY === 'true'
   }
 }));
 ```
