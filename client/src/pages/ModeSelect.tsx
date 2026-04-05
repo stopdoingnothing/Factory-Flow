@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,26 +34,40 @@ function RestoreModal({ onClose }: { onClose: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // On mount: check whether the DB is empty (bootstrap mode) or needs login
-  useState(() => {
-    api('/api/backup/bootstrap-validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ backup: { data: {} } }),
-    }).then(res => res.json()).then(data => {
-      if (data.error === 'Bootstrap restore is only available on an empty database') {
-        // DB has users — need admin login
-        setIsBootstrap(false);
-        setStep('login');
-      } else {
-        // DB is empty — skip login
-        setIsBootstrap(true);
-        setStep('file');
-      }
-    }).catch(() => {
-      setIsBootstrap(false);
-      setStep('login');
-    });
-  });
+  useEffect(() => {
+    api('/api/backup/bootstrap-check')
+      .then(res => res.json())
+      .then(data => {
+        if (data.empty) {
+          setIsBootstrap(true);
+          setStep('file');
+        } else {
+          setIsBootstrap(false);
+          setStep('login');
+        }
+      })
+      .catch(() => {
+        // Server not ready — retry after a short delay
+        const timer = setTimeout(() => {
+          api('/api/backup/bootstrap-check')
+            .then(res => res.json())
+            .then(data => {
+              if (data.empty) {
+                setIsBootstrap(true);
+                setStep('file');
+              } else {
+                setIsBootstrap(false);
+                setStep('login');
+              }
+            })
+            .catch(() => {
+              setIsBootstrap(false);
+              setStep('login');
+            });
+        }, 2000);
+        return () => clearTimeout(timer);
+      });
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,7 +105,7 @@ function RestoreModal({ onClose }: { onClose: () => void }) {
         'departments', 'userGroups', 'employeeTypes', 'companies', 'orgPositions',
         'users', 'leaveBalances', 'leaveRequests', 'leaveRules', 'leaveRulePhases',
         'attendanceRecords', 'contractHistory', 'grievances', 'publicHolidays',
-        'notifications', 'settings', 'faceDescriptors',
+        'notifications', 'settings',
       ] as const;
       const counts: Record<string, number> = {};
       for (const k of countKeys) counts[k] = backup.data[k]?.length || 0;

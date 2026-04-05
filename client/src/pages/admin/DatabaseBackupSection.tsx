@@ -8,7 +8,7 @@ const api = (path: string, init?: RequestInit) =>
 import {
   Download, Upload, Database, Users, Building2, FileText, Calendar,
   Clock, Settings, AlertCircle, CheckCircle2, Loader2, ShieldCheck,
-  Network, Briefcase, UserCheck, BookOpen, Bell, ScanFace,
+  Network, Briefcase, UserCheck, BookOpen, Bell,
 } from 'lucide-react';
 
 const INCLUDED_TABLES = [
@@ -27,7 +27,6 @@ const INCLUDED_TABLES = [
   { icon: Calendar,   label: 'Public Holidays' },
   { icon: Bell,       label: 'Notifications' },
   { icon: Settings,   label: 'System Settings' },
-  { icon: ScanFace,   label: 'Face Recognition Data' },
 ];
 
 interface BackupInfo {
@@ -78,7 +77,7 @@ export default function DatabaseBackupSection() {
         'departments', 'userGroups', 'employeeTypes', 'companies', 'orgPositions',
         'users', 'leaveBalances', 'leaveRequests', 'leaveRules', 'leaveRulePhases',
         'attendanceRecords', 'contractHistory', 'grievances', 'publicHolidays',
-        'notifications', 'settings', 'faceDescriptors',
+        'notifications', 'settings',
       ] as const;
       const counts: Record<string, number> = {};
       for (const k of countKeys) counts[k] = backup.data[k]?.length || 0;

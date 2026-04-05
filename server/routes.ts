@@ -3674,6 +3674,16 @@ export async function registerRoutes(
 
   // ===== BOOTSTRAP RESTORE (unauthenticated, only when DB has no users) =====
 
+  app.get("/api/backup/bootstrap-check", async (_req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      return res.json({ empty: users.length === 0 });
+    } catch (error) {
+      console.error("Bootstrap check error:", error);
+      return res.status(500).json({ empty: false });
+    }
+  });
+
   app.post("/api/backup/bootstrap-validate", async (req, res) => {
     try {
       const users = await storage.getAllUsers();
@@ -3857,8 +3867,6 @@ export async function registerRoutes(
       const publicHolidays = await storage.getAllPublicHolidays();
       const notifications = await storage.getAllNotifications();
       const settings = await storage.getAllSettings();
-      const faceDescriptors = await storage.getAllFaceDescriptorsForMatching();
-
       const backup = {
         version: "2.0",
         exportedAt: new Date().toISOString(),
@@ -3879,7 +3887,6 @@ export async function registerRoutes(
           publicHolidays,
           notifications,
           settings,
-          faceDescriptors,
         }
       };
       

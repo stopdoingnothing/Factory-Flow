@@ -1214,7 +1214,7 @@ export const backupApi = {
       'departments', 'userGroups', 'employeeTypes', 'companies', 'orgPositions',
       'users', 'leaveBalances', 'leaveRequests', 'leaveRules', 'leaveRulePhases',
       'attendanceRecords', 'contractHistory', 'grievances', 'publicHolidays',
-      'notifications', 'settings', 'faceDescriptors',
+      'notifications', 'settings',
     ] as const;
     const counts: Record<string, number> = {};
     for (const k of countKeys) counts[k] = (backup.data as any)[k]?.length || 0;
