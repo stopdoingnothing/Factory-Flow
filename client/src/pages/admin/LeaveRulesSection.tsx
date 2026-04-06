@@ -579,26 +579,26 @@ export default function LeaveRulesSection() {
               Custom rules extend SA BCEA minimums for specific employee types or situations.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="ruleName" className="text-right">Name</Label>
+          <div className="space-y-4 py-2 max-h-[65vh] overflow-y-auto pr-1">
+            <div className="space-y-1">
+              <Label htmlFor="ruleName">Name <span className="text-red-500">*</span></Label>
               <Input
                 id="ruleName"
                 value={currentRule.name || ''}
                 onChange={(e) => setCurrentRule({ ...currentRule, name: e.target.value })}
-                className="col-span-3"
                 placeholder="e.g., Annual Leave Accrual"
                 data-testid="input-rule-name"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="leaveType" className="text-right">Leave Type</Label>
-              <div className="col-span-3">
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="leaveType">Leave Type <span className="text-red-500">*</span></Label>
                 <Select
                   value={currentRule.leaveType || ''}
                   onValueChange={(value) => setCurrentRule({ ...currentRule, leaveType: value })}
                 >
-                  <SelectTrigger data-testid="select-rule-leave-type">
+                  <SelectTrigger id="leaveType" data-testid="select-rule-leave-type">
                     <SelectValue placeholder="Select leave type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -610,15 +610,13 @@ export default function LeaveRulesSection() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="ruleEmpType" className="text-right">Employee Type</Label>
-              <div className="col-span-3">
+              <div className="space-y-1">
+                <Label htmlFor="ruleEmpType">Employee Type</Label>
                 <Select
                   value={currentRule.employeeTypeId?.toString() || 'all'}
                   onValueChange={(value) => setCurrentRule({ ...currentRule, employeeTypeId: value === 'all' ? undefined : parseInt(value) })}
                 >
-                  <SelectTrigger data-testid="select-rule-emp-type">
+                  <SelectTrigger id="ruleEmpType" data-testid="select-rule-emp-type">
                     <SelectValue placeholder="Select employee type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -630,32 +628,31 @@ export default function LeaveRulesSection() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="accrualType" className="text-right">Accrual Type</Label>
-              <div className="col-span-3">
-                <Select
-                  value={currentRule.accrualType || 'fixed'}
-                  onValueChange={(value) => setCurrentRule({ ...currentRule, accrualType: value })}
-                >
-                  <SelectTrigger data-testid="select-accrual-type">
-                    <SelectValue placeholder="Select accrual type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="fixed">Fixed (days per year)</SelectItem>
-                    <SelectItem value="monthly">Monthly (days per month)</SelectItem>
-                    <SelectItem value="days_worked">Days Worked (1 day per X days)</SelectItem>
-                    <SelectItem value="cycle">Cycle Based (days per X months)</SelectItem>
-                    <SelectItem value="tiered">Tiered (different rates based on tenure)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="accrualType">Accrual Type</Label>
+              <Select
+                value={currentRule.accrualType || 'fixed'}
+                onValueChange={(value) => setCurrentRule({ ...currentRule, accrualType: value })}
+              >
+                <SelectTrigger id="accrualType" data-testid="select-accrual-type">
+                  <SelectValue placeholder="Select accrual type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed">Fixed (days per year)</SelectItem>
+                  <SelectItem value="monthly">Monthly (days per month)</SelectItem>
+                  <SelectItem value="days_worked">Days Worked (1 day per X days)</SelectItem>
+                  <SelectItem value="cycle">Cycle Based (days per X months)</SelectItem>
+                  <SelectItem value="tiered">Tiered (different rates based on tenure)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {currentRule.accrualType === 'days_worked' && (
-              <div className="col-span-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <p className="text-sm font-medium text-blue-900 mb-3">Earn X days for every Y days worked</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <Label htmlFor="daysEarned" className="text-sm">Days Earned</Label>
                     <Input
                       id="daysEarned"
@@ -665,7 +662,7 @@ export default function LeaveRulesSection() {
                       data-testid="input-days-earned"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <Label htmlFor="periodDaysWorked" className="text-sm">Per Days Worked</Label>
                     <Input
                       id="periodDaysWorked"
@@ -681,68 +678,69 @@ export default function LeaveRulesSection() {
             )}
 
             {currentRule.accrualType === 'tiered' && (
-              <div className="col-span-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                <p className="text-sm font-medium text-amber-900 mb-2">Tiered Accrual</p>
+              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <p className="text-sm font-medium text-amber-900 mb-1">Tiered Accrual</p>
                 <p className="text-xs text-amber-700">
                   Different accrual rates based on employment tenure. Save this rule first, then click "Phases" to configure each tier.
                 </p>
               </div>
             )}
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="accrualRate" className="text-right">Accrual Rate</Label>
-              <Input
-                id="accrualRate"
-                value={currentRule.accrualRate || ''}
-                onChange={(e) => setCurrentRule({ ...currentRule, accrualRate: e.target.value })}
-                className="col-span-3"
-                placeholder="e.g., 1.25 days/month or 15 days/year"
-                data-testid="input-accrual-rate"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="accrualRate">Accrual Rate</Label>
+                <Input
+                  id="accrualRate"
+                  value={currentRule.accrualRate || ''}
+                  onChange={(e) => setCurrentRule({ ...currentRule, accrualRate: e.target.value })}
+                  placeholder="e.g., 1.25 days/month"
+                  data-testid="input-accrual-rate"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="maxAccrual">Max Accrual (days)</Label>
+                <Input
+                  id="maxAccrual"
+                  type="number"
+                  value={currentRule.maxAccrual || ''}
+                  onChange={(e) => setCurrentRule({ ...currentRule, maxAccrual: e.target.value ? parseInt(e.target.value) : undefined })}
+                  placeholder="e.g., 30"
+                  data-testid="input-max-accrual"
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="maxAccrual" className="text-right">Max Accrual</Label>
-              <Input
-                id="maxAccrual"
-                type="number"
-                value={currentRule.maxAccrual || ''}
-                onChange={(e) => setCurrentRule({ ...currentRule, maxAccrual: e.target.value ? parseInt(e.target.value) : undefined })}
-                className="col-span-3"
-                placeholder="Maximum days (e.g., 30)"
-                data-testid="input-max-accrual"
-              />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="waitingPeriod">Waiting Period (days)</Label>
+                <Input
+                  id="waitingPeriod"
+                  type="number"
+                  value={currentRule.waitingPeriodDays || ''}
+                  onChange={(e) => setCurrentRule({ ...currentRule, waitingPeriodDays: e.target.value ? parseInt(e.target.value) : undefined })}
+                  placeholder="e.g., 180"
+                  data-testid="input-waiting-period"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cycleMonths">Cycle Length (months)</Label>
+                <Input
+                  id="cycleMonths"
+                  type="number"
+                  value={currentRule.cycleMonths || ''}
+                  onChange={(e) => setCurrentRule({ ...currentRule, cycleMonths: e.target.value ? parseInt(e.target.value) : undefined })}
+                  placeholder="e.g., 36"
+                  data-testid="input-cycle-months"
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="waitingPeriod" className="text-right">Waiting Period</Label>
-              <Input
-                id="waitingPeriod"
-                type="number"
-                value={currentRule.waitingPeriodDays || ''}
-                onChange={(e) => setCurrentRule({ ...currentRule, waitingPeriodDays: e.target.value ? parseInt(e.target.value) : undefined })}
-                className="col-span-3"
-                placeholder="Days before rule applies (e.g., 180)"
-                data-testid="input-waiting-period"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="cycleMonths" className="text-right">Cycle Months</Label>
-              <Input
-                id="cycleMonths"
-                type="number"
-                value={currentRule.cycleMonths || ''}
-                onChange={(e) => setCurrentRule({ ...currentRule, cycleMonths: e.target.value ? parseInt(e.target.value) : undefined })}
-                className="col-span-3"
-                placeholder="Cycle length in months (e.g., 36)"
-                data-testid="input-cycle-months"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="ruleNotes" className="text-right pt-2">Notes</Label>
+
+            <div className="space-y-1">
+              <Label htmlFor="ruleNotes">Notes</Label>
               <Textarea
                 id="ruleNotes"
                 value={currentRule.notes || ''}
                 onChange={(e) => setCurrentRule({ ...currentRule, notes: e.target.value })}
-                className="col-span-3"
                 placeholder="Additional notes about this rule"
                 data-testid="input-rule-notes"
               />

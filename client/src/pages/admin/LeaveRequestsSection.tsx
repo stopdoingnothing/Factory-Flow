@@ -272,8 +272,8 @@ export default function LeaveRequestsSection() {
   const isAdmin = isHrOrAdmin || isManagerOnly;
   const activeRequests = (leaveRequests as any[]).filter((r: any) => {
     if (r.isHistoric) return false;
-    // Managers only see requests they can act on (pending their recommendation)
-    if (isManagerOnly && r.userId !== user?.id) return r.status === 'pending_manager';
+    // Managers see requests pending their recommendation, plus ones they've already acted on awaiting HR
+    if (isManagerOnly && r.userId !== user?.id) return r.status === 'pending_manager' || (r.status === 'pending_hr' && r.managerApproverId === user?.id);
     return true;
   });
 
@@ -453,17 +453,21 @@ export default function LeaveRequestsSection() {
                     const employee = users.find(u => u.id === userId);
                     const employeeName = employee ? `${employee.firstName} ${employee.surname}` : userId;
                     const today = new Date().toISOString().split('T')[0];
+                    // Deduplicate: keep only the first balance entry per leave type
+                    const uniqueBalances = balances.filter(
+                      (b, i, arr) => arr.findIndex(x => x.leaveType === b.leaveType) === i
+                    );
 
-                    return balances.map((balance, idx) => {
+                    return uniqueBalances.map((balance, idx) => {
                       const carryOver = (balance as any).carryOverDays as number ?? 0;
                       const carryOverExpiry = (balance as any).carryOverExpiry as string | null ?? null;
                       // balance.total = pure entitlement + carryOver (stored together).
                       // Derive pure entitlement for display; available = total - taken - pending (no double-count).
                       const total = balance.total ?? 0;
-                      const pureEntitlement = Math.round((total - carryOver) * 10) / 10;
+                      const pureEntitlement = total - carryOver;
                       const taken = balance.taken ?? 0;
                       const pending = balance.pending ?? 0;
-                      const available = Math.round((total - taken - pending) * 10) / 10;
+                      const available = total - taken - pending;
                       const expiringSoon = carryOver > 0 && carryOverExpiry && carryOverExpiry > today
                         && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
 
@@ -878,11 +882,6 @@ export default function LeaveRequestsSection() {
                         <p className="text-sm text-blue-800">
                           <strong>Current Stage:</strong> {actionInfo.stage}
                         </p>
-                        {actionInfo.role === 'hr' && (
-                          <p className="text-xs text-blue-600 mt-1">
-                            Note: MD can bypass this stage if needed
-                          </p>
-                        )}
                       </div>
                       {actionInfo.role === 'hr' && selectedLeaveRequest.managerDecision === 'not_recommended' && (
                         <div className="bg-red-50 border border-red-300 rounded-lg p-3 mb-4">
@@ -895,7 +894,7 @@ export default function LeaveRequestsSection() {
                       )}
                       <div>
                         <Label htmlFor="adminNotes" className="text-sm">
-                          Review Comments <span className="text-red-500">*</span>
+                          Review Comments
                         </Label>
                         <p className="text-xs text-muted-foreground mb-1">
                           {actionInfo.role === 'manager'
@@ -921,10 +920,6 @@ export default function LeaveRequestsSection() {
                         <Button
                           variant="outline"
                           onClick={() => {
-                            if (!adminNotes.trim()) {
-                              toast({ variant: "destructive", title: "Justification Required", description: "A reason must be provided when not recommending or rejecting a leave request." });
-                              return;
-                            }
                             if (actionInfo.role === 'manager') {
                               managerDecisionMutation.mutate({
                                 id: selectedLeaveRequest.id,

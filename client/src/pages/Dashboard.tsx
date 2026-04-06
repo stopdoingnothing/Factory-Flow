@@ -12,7 +12,7 @@ import type { LeaveBalance, LeaveRequest } from '@shared/schema';
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, AlertCircle, FileText, Eye, X, XCircle, LogIn, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
-import { groupLeaveBalances } from './admin/utils';
+import { groupLeaveBalances, formatLeaveDays } from './admin/utils';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -160,11 +160,11 @@ export default function Dashboard() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-3xl font-bold font-heading text-foreground">{available}</div>
+                        <div className="text-3xl font-bold font-heading text-foreground">{formatLeaveDays(available)}</div>
                         <p className="text-xs text-muted-foreground mb-4">days available</p>
                         <Progress value={(available / balance.total) * 100} className="h-2" />
                         <div className="mt-2 text-xs text-right text-muted-foreground">
-                          {balance.total} total entitlement
+                          {formatLeaveDays(balance.total)} total entitlement
                         </div>
                         {!!carryOver && carryOver > 0 && (
                           <div className="mt-1 text-xs text-blue-600">
@@ -205,11 +205,11 @@ export default function Dashboard() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-3xl font-bold font-heading text-foreground">{available}</div>
+                        <div className="text-3xl font-bold font-heading text-foreground">{formatLeaveDays(available)}</div>
                         <p className="text-xs text-muted-foreground mb-4">days available</p>
                         <Progress value={(available / balance.total) * 100} className="h-2" />
                         <div className="mt-2 text-xs text-right text-muted-foreground">
-                          {balance.total} total entitlement
+                          {formatLeaveDays(balance.total)} total entitlement
                         </div>
                         {!!carryOver && carryOver > 0 && (
                           <div className="mt-1 text-xs text-blue-600">
