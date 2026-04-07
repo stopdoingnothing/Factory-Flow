@@ -541,17 +541,10 @@ export function LeaveRequest() {
                     requestedDays = Math.max(requestedDays, 0);
                     const calDays = differenceInCalendarDays(dateRange.to, dateRange.from) + 1;
                     const excluded = calDays - workDays;
-                    // When a projection is pending or loading, don't flag over-limit — we don't
-                    // yet know if accrual will cover the request. Resolve the effective balance:
-                    //   projection loaded  → projectedAvailable
-                    //   projection loading → treat as unknown (no remaining shown)
-                    //   no projection      → current availableDays
-                    const projectionPending = showProjection && projectionLoading;
-                    const effectiveAvailable = projectionPending
-                      ? null
-                      : (showProjection && projection)
-                        ? projection.projectedAvailable
-                        : availableDays;
+                    // When showProjection is active, the projection panel owns coverage indication.
+                    // Don't show remaining/over-limit here — it would use current balance and
+                    // fire before (or instead of) the projected figure below.
+                    const effectiveAvailable = showProjection ? null : availableDays;
                     const remaining = effectiveAvailable !== null ? Math.round((effectiveAvailable - requestedDays) * 100) / 100 : null;
                     const overLimit = remaining !== null && remaining < 0;
                     return (
