@@ -541,7 +541,11 @@ export function LeaveRequest() {
                     requestedDays = Math.max(requestedDays, 0);
                     const calDays = differenceInCalendarDays(dateRange.to, dateRange.from) + 1;
                     const excluded = calDays - workDays;
-                    const remaining = availableDays !== null ? availableDays - requestedDays : null;
+                    // Use projected balance when available; fall back to current balance
+                    const effectiveAvailable = (showProjection && projection)
+                      ? projection.projectedAvailable
+                      : availableDays;
+                    const remaining = effectiveAvailable !== null ? Math.round((effectiveAvailable - requestedDays) * 100) / 100 : null;
                     const overLimit = remaining !== null && remaining < 0;
                     return (
                       <div className={cn(
@@ -558,11 +562,11 @@ export function LeaveRequest() {
                               {formatLeaveDays(requestedDays)} leave day{requestedDays !== 1 ? 's' : ''} will be deducted
                             </span>
                           </div>
-                          {availableDays !== null && (
+                          {effectiveAvailable !== null && (
                             <span className={cn("text-xs font-medium", overLimit ? "text-destructive" : "text-muted-foreground")}>
                               {overLimit
-                                ? `${Math.abs(remaining!)} day${Math.abs(remaining!) !== 1 ? 's' : ''} over limit`
-                                : `${remaining} day${remaining !== 1 ? 's' : ''} remaining`}
+                                ? `${formatLeaveDays(Math.abs(remaining!))} day${Math.abs(remaining!) !== 1 ? 's' : ''} over limit`
+                                : `${formatLeaveDays(remaining!)} day${remaining !== 1 ? 's' : ''} remaining`}
                             </span>
                           )}
                         </div>
