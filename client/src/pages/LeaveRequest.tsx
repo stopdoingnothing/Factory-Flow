@@ -45,7 +45,7 @@ export function LeaveRequest() {
 
   const selectedBalance = leaveBalances.find(b => b.leaveType === leaveType);
   const availableDays = selectedBalance
-    ? Math.max(0, selectedBalance.total - selectedBalance.taken - selectedBalance.pending)
+    ? Math.max(0, selectedBalance.total + (selectedBalance.carryOverDays ?? 0) - selectedBalance.taken - selectedBalance.pending)
     : null;
 
   // Fetch public holidays for working-day calculation
@@ -101,22 +101,31 @@ export function LeaveRequest() {
     enabled: !!user?.managerId,
   });
 
-  // Projection: fetch when leave type is Annual Leave AND start > 30 days away
-  const projectionStartDate = dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : null;
+  // Projection: show whenever the leave period reaches into the next calendar month or beyond.
+  // Using the END date as asOfDate so accruals that occur *during* the leave are included.
+  const today = new Date();
+  const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const projectionAsOfDate = dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : null;
   const showProjection =
     !!user?.id &&
     !!leaveType &&
     leaveType !== 'Sick Leave' &&
     leaveType !== 'Unpaid Leave' &&
     !!dateRange.from &&
-    differenceInCalendarDays(dateRange.from, new Date()) > 30;
+    !!dateRange.to &&
+    dateRange.to >= nextMonthStart;
 
-  const { data: projection, isLoading: projectionLoading, isError: projectionError } = useQuery({
-    queryKey: ['leave-projection', user?.id, leaveType, projectionStartDate],
-    queryFn: () => leaveBalanceApi.projected(user!.id, leaveType, projectionStartDate!),
+  const { data: projection, isLoading: projectionLoading, isError: projectionError, error: projectionErrorObj } = useQuery({
+    queryKey: ['leave-projection', user?.id, leaveType, projectionAsOfDate],
+    queryFn: () => leaveBalanceApi.projected(user!.id, leaveType, projectionAsOfDate!),
     enabled: showProjection,
     staleTime: 60_000,
-    retry: false,
+    retry: (failureCount, error) => {
+      // Don't retry on 4xx client errors — only on transient server/network errors
+      const msg = (error as Error)?.message ?? '';
+      if (msg.includes('400') || msg.includes('403') || msg.includes('404')) return false;
+      return failureCount < 2;
+    },
   });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -285,7 +294,7 @@ export function LeaveRequest() {
                   const otherBalances = uniqueBalances.filter(b => !standardTypes.includes(b.leaveType));
 
                   const LeaveCard = ({ balance }: { balance: typeof leaveBalances[0] }) => {
-                    const available = Math.max(0, balance.total - balance.taken - balance.pending);
+                    const available = Math.max(0, balance.total + (balance.carryOverDays ?? 0) - balance.taken - balance.pending);
                     const isSelected = balance.leaveType === leaveType;
                     return (
                       <Card
@@ -531,8 +540,16 @@ export function LeaveRequest() {
                     );
                   })()}
 
+                  {/* No leave type selected warning */}
+                  {dateRange.from && dateRange.to && !leaveType && (
+                    <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                      Please select a leave type to check your balance.
+                    </div>
+                  )}
+
                   {/* Leave days summary — shown once both dates are selected, below the calendar */}
-                  {dateRange.from && dateRange.to && (() => {
+                  {dateRange.from && dateRange.to && leaveType && (() => {
                     const isSingleDay = dateRange.from.toDateString() === dateRange.to.toDateString();
                     const workDays = countWorkingDays(dateRange.from, dateRange.to);
                     let requestedDays = workDays;
@@ -598,13 +615,13 @@ export function LeaveRequest() {
                       <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-blue-200">
                         <TrendingUp className="h-4 w-4 text-blue-600 shrink-0" />
                         <span className="font-medium text-blue-800">
-                          Projected balance at {format(dateRange.from, 'dd MMM yyyy')}
+                          Projected balance at {format(dateRange.to ?? dateRange.from, 'dd MMM yyyy')}
                         </span>
                         <span className="ml-auto text-xs font-mono text-blue-600">
                           {projectionLoading
                             ? <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
                             : projectionError
-                              ? <span className="text-red-500">projection error</span>
+                              ? <span className="text-red-500">{(projectionErrorObj as Error)?.message || 'projection error'}</span>
                               : projection
                                 ? `${projection.projectedAvailable.toFixed(2)} days projected`
                                 : <span className="text-amber-500">no data</span>

@@ -3,8 +3,9 @@ import type { User, LeaveBalance, LeaveRequest, AttendanceRecord, Setting, Depar
 const API_BASE = "/api";
 
 // All API calls include credentials so the session cookie is sent automatically.
+// cache: 'no-store' prevents the browser caching stale HTML/error responses.
 const apiFetch: typeof fetch = (input, init) =>
-  fetch(input, { credentials: "include", ...init });
+  fetch(input, { credentials: "include", cache: "no-store", ...init });
 
 // Auth API
 export const authApi = {
@@ -298,11 +299,15 @@ export const leaveBalanceApi = {
     const res = await apiFetch(
       `${API_BASE}/leave-balances/${userId}/projected?leaveType=${encodeURIComponent(leaveType)}&asOfDate=${asOfDate}`
     );
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error((body as any).error || "Failed to fetch leave projection");
+    const text = await res.text();
+    let body: any;
+    try { body = JSON.parse(text); } catch {
+      throw new Error(`Projection unavailable (status ${res.status})`);
     }
-    return res.json();
+    if (!res.ok) {
+      throw new Error(body.error || "Failed to fetch leave projection");
+    }
+    return body;
   },
 };
 

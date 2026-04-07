@@ -117,7 +117,8 @@ export async function projectLeaveBalance(
   }
 
   // ── Current available (shown in UI before projection) ───────────────────────
-  const currentAvailable = annualBalance.total - annualBalance.taken - (annualBalance.pending ?? 0);
+  const currentAvailable = annualBalance.total + (annualBalance.carryOverDays ?? 0)
+    - annualBalance.taken - (annualBalance.pending ?? 0);
 
   // ── Determine last accrued month ────────────────────────────────────────────
   // The accrual engine runs on the 1st and credits the PRIOR month.
@@ -274,6 +275,8 @@ export async function projectLeaveBalance(
   }
 
   // ── Final projected available ───────────────────────────────────────────────
+  const projectedAccrual = breakdown.reduce((sum, e) => sum + e.accrual, 0);
+
   let projectedAvailable: number;
 
   if (cycleResetOccurs && cycleEndDateInWindow) {
@@ -291,15 +294,14 @@ export async function projectLeaveBalance(
     projectedAvailable =
       projectedTotal + carryOverAtDate - effectiveTakenNewCycle - effectivePendingAtDate;
   } else {
-    // No rollover: all active request days reduce available
-    const allActiveDays = activeAnnualRequests
-      .reduce((sum, r) => sum + (requestWorkDays.get(r.id) ?? 0), 0);
-
+    // No rollover: settlement between now and asOfDate is balance-neutral (pending→taken).
+    // Start from current available, swap carry-over for its valid-at-date value, add accrual.
     projectedAvailable =
-      projectedTotal + carryOverAtDate - annualBalance.taken - allActiveDays;
+      currentAvailable
+      - (annualBalance.carryOverDays ?? 0)  // remove current carry-over (may expire)
+      + carryOverAtDate                      // add valid carry-over at asOfDate
+      + projectedAccrual;
   }
-
-  const projectedAccrual = breakdown.reduce((sum, e) => sum + e.accrual, 0);
 
   return {
     currentAvailable,

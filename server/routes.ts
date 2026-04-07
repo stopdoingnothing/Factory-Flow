@@ -1686,12 +1686,13 @@ export async function registerRoutes(
             // Use projection to allow submission with an informational note instead of hard block.
             let projectionNote: string;
             try {
-              const projection = await projectLeaveBalance(validatedData.userId, validatedData.startDate);
+              // Use end date so accruals during the leave period are included in projection
+              const projection = await projectLeaveBalance(validatedData.userId, validatedData.endDate);
               const shortfall = available - requestedDays;
               if (projection.projectedAvailable >= requestedDays) {
-                projectionNote = `[Balance note: Current available insufficient (${shortfall.toFixed(1)} days) but projected balance at ${validatedData.startDate} is +${projection.projectedAvailable.toFixed(1)} days — leave will be covered by accrual and carry-over.]`;
+                projectionNote = `[Balance note: Current available insufficient (${shortfall.toFixed(1)} days) but projected balance at ${validatedData.endDate} is +${projection.projectedAvailable.toFixed(1)} days — leave will be covered by accrual and carry-over.]`;
               } else {
-                projectionNote = `[Balance warning: Insufficient leave. Current: ${shortfall.toFixed(1)} days. Projected at ${validatedData.startDate}: ${projection.projectedAvailable.toFixed(1)} days. HR discretion required.]`;
+                projectionNote = `[Balance warning: Insufficient leave. Current: ${shortfall.toFixed(1)} days. Projected at ${validatedData.endDate}: ${projection.projectedAvailable.toFixed(1)} days. HR discretion required.]`;
               }
             } catch {
               return res.status(400).json({
