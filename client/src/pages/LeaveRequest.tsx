@@ -600,7 +600,16 @@ export function LeaveRequest() {
                         <span className="font-medium text-blue-800">
                           Projected balance at {format(dateRange.from, 'dd MMM yyyy')}
                         </span>
-                        {projectionLoading && <Loader2 className="h-3 w-3 animate-spin text-blue-500 ml-auto" />}
+                        <span className="ml-auto text-xs font-mono text-blue-600">
+                          {projectionLoading
+                            ? <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+                            : projectionError
+                              ? <span className="text-red-500">projection error</span>
+                              : projection
+                                ? `${projection.projectedAvailable.toFixed(2)} days projected`
+                                : <span className="text-amber-500">no data</span>
+                          }
+                        </span>
                       </div>
                       {projectionLoading && (
                         <div className="px-4 py-3 text-muted-foreground text-xs">Calculating projection…</div>
