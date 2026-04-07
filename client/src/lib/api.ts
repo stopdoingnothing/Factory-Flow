@@ -1236,3 +1236,35 @@ export const backupApi = {
     return res.json();
   },
 };
+
+export type FeedbackType = "bug_report" | "feature_request";
+
+export interface FeedbackPayload {
+  type: FeedbackType;
+  title: string;
+  idempotency_key?: string;
+  current_route?: string;
+  // bug fields
+  severity?: "low" | "medium" | "high" | "critical";
+  steps_to_reproduce?: string;
+  actual_behaviour?: string;
+  expected_behaviour?: string;
+  // feature fields
+  priority?: "low" | "medium" | "high";
+  motivation?: string;
+  proposed_behaviour?: string;
+  constraints?: string;
+  open_questions?: string;
+}
+
+export const feedbackApi = {
+  async submit(payload: FeedbackPayload): Promise<{ success: boolean; issue_url?: string; issue_number?: number }> {
+    const res = await apiFetch(`${API_BASE}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Failed to submit feedback");
+    return res.json();
+  },
+};

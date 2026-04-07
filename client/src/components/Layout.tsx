@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
-import { 
-  LayoutDashboard, 
-  CalendarPlus, 
-  Clock, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  CalendarPlus,
+  Clock,
+  LogOut,
   Menu,
   UserCircle,
-  MessageSquareWarning
+  MessageSquareWarning,
+  MessageSquarePlus,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ import { useAuth } from '@/lib/auth-context';
 import { useQuery } from '@tanstack/react-query';
 import { settingsApi } from '@/lib/api';
 import aeceLogo from '@assets/AECE_Logo_1765516911038.png';
+import FeedbackModal from '@/components/FeedbackModal';
+import { flushPendingFeedback } from '@/lib/feedback';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,6 +26,11 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [location] = useLocation();
   const { user, logout, hasRole } = useAuth();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
+  useEffect(() => {
+    flushPendingFeedback().catch(() => {});
+  }, []);
   
   const { data: companyNameSetting } = useQuery({
     queryKey: ['settings', 'company_name'],
@@ -173,6 +181,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </main>
       </div>
+
+      {/* Feedback floating button */}
+      <button
+        onClick={() => setFeedbackOpen(true)}
+        title="Report an issue or request a feature"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-lg transition-all hover:bg-primary/90 hover:shadow-xl active:scale-95"
+      >
+        <MessageSquarePlus className="h-4 w-4" />
+        <span className="hidden sm:inline">Feedback</span>
+      </button>
+
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   );
 };

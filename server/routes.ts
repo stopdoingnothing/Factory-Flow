@@ -118,17 +118,17 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 
 // Decrement pending balance when a non-historic leave request is cancelled or rejected.
 // For historic entries use decrementTaken instead.
+// NOTE: We do not restore carryOverDays here — carryConsumed is not stored on the request
+// record, so restoring it creates phantom carry-over for employees who had none (see issue #10).
+// Carry-over is managed by the annual cycle rollover process, not by request cancellations.
 async function decrementPending(request: { userId: string; leaveType: string; startDate: string; endDate: string; isHistoric: boolean }, religion: string | null) {
   if (request.isHistoric) return;
   const days = await countWorkingDays(request.startDate, request.endDate, religion);
   const balances = await storage.getLeaveBalances(request.userId);
   const balance = balances.find(b => b.leaveType === request.leaveType);
   if (balance) {
-    // Restore carry-over first (reverse of the deduction-first rule on creation).
-    const restoredCarryOver = Math.min(days, (balance.pending ?? 0));
     await storage.updateLeaveBalance(balance.id, {
       pending: Math.max(0, (balance.pending ?? 0) - days),
-      carryOverDays: (balance.carryOverDays ?? 0) + restoredCarryOver,
     });
   }
 }
@@ -1071,14 +1071,37 @@ export async function registerRoutes(
       const sessionRoles: string[] = req.session.userRoles || [];
       const isHrOrAdmin = sessionRoles.includes('hr') || sessionRoles.includes('admin');
 
-      const balances = await storage.getAllLeaveBalances();
+      const [balances, allRequests, allUsers] = await Promise.all([
+        storage.getAllLeaveBalances(),
+        storage.getLeaveRequests(),
+        storage.getAllUsers(),
+      ]);
+
+      const usersById = new Map(allUsers.map(u => [u.id, u]));
+      const AWAITING_STATUSES = new Set(['pending', 'pending_manager', 'pending_hr']);
+
+      const enrichedBalances = await Promise.all(balances.map(async (balance) => {
+        const forType = allRequests.filter(
+          r => r.userId === balance.userId &&
+               r.leaveType === balance.leaveType &&
+               (r.status === 'approved' || AWAITING_STATUSES.has(r.status))
+        );
+        const religion = (usersById.get(balance.userId) as any)?.religion ?? null;
+        let pendingApprovedDays = 0;
+        let pendingAwaitingDays = 0;
+        for (const r of forType) {
+          const days = await countWorkingDays(r.startDate, r.endDate, religion);
+          if (r.status === 'approved') pendingApprovedDays += days;
+          else pendingAwaitingDays += days;
+        }
+        return { ...balance, pendingApprovedDays, pendingAwaitingDays };
+      }));
 
       if (isHrOrAdmin) {
-        return res.json(balances);
+        return res.json(enrichedBalances);
       }
 
       // Manager: scope to direct reports only
-      const allUsers = await storage.getAllUsers();
       const directReportIds = new Set(
         allUsers
           .filter(u => u.managerId === sessionUserId)
@@ -1086,7 +1109,7 @@ export async function registerRoutes(
       );
       // Include the manager's own balances too
       directReportIds.add(sessionUserId);
-      return res.json(balances.filter(b => directReportIds.has(b.userId)));
+      return res.json(enrichedBalances.filter(b => directReportIds.has(b.userId)));
     } catch (error) {
       console.error("Get all balances error:", error);
       return res.status(500).json({ error: "Failed to fetch leave balances" });
@@ -1164,8 +1187,30 @@ export async function registerRoutes(
       // Settle past approved leave: move pending → taken for any approved request whose dates have passed
       await settlePastApprovedLeave(userId);
 
-      const balances = await storage.getLeaveBalances(userId);
-      return res.json(balances);
+      const [balances, userRequests] = await Promise.all([
+        storage.getLeaveBalances(userId),
+        storage.getLeaveRequests(userId),
+      ]);
+
+      const religion = (user as any)?.religion ?? null;
+      const AWAITING_STATUSES = new Set(['pending', 'pending_manager', 'pending_hr']);
+
+      const enrichedBalances = await Promise.all(balances.map(async (balance) => {
+        const forType = userRequests.filter(
+          r => r.leaveType === balance.leaveType &&
+               (r.status === 'approved' || AWAITING_STATUSES.has(r.status))
+        );
+        let pendingApprovedDays = 0;
+        let pendingAwaitingDays = 0;
+        for (const r of forType) {
+          const days = await countWorkingDays(r.startDate, r.endDate, religion);
+          if (r.status === 'approved') pendingApprovedDays += days;
+          else pendingAwaitingDays += days;
+        }
+        return { ...balance, pendingApprovedDays, pendingAwaitingDays };
+      }));
+
+      return res.json(enrichedBalances);
     } catch (error) {
       console.error("Get balances error:", error);
       return res.status(500).json({ error: "Failed to fetch leave balances" });
@@ -1485,12 +1530,23 @@ export async function registerRoutes(
       const activeRequests = existingRequests.filter(
         r => !['rejected', 'cancelled'].includes(r.status)
       );
-      const hasOverlap = activeRequests.some(
-        r => validatedData.startDate <= r.endDate && validatedData.endDate >= r.startDate
+      // Hard block: same leave type cannot overlap (duplicate request)
+      const sameTypeOverlap = activeRequests.find(
+        r => r.leaveType === validatedData.leaveType &&
+             validatedData.startDate <= r.endDate && validatedData.endDate >= r.startDate
       );
-      if (hasOverlap) {
+      if (sameTypeOverlap) {
         return res.status(400).json({ error: "These dates overlap with an existing leave request" });
       }
+      // Soft warn: cross-type overlaps (e.g. annual leave pending while sick leave submitted)
+      // Don't block — HR needs to be able to see and resolve these. Warning appended to adminNotes.
+      const crossTypeOverlaps = activeRequests.filter(
+        r => r.leaveType !== validatedData.leaveType &&
+             validatedData.startDate <= r.endDate && validatedData.endDate >= r.startDate
+      );
+      const overlapWarning = crossTypeOverlaps.length > 0
+        ? `[Overlap warning: employee already has ${crossTypeOverlaps.map(r => `${r.leaveType} (${r.status}, ${r.startDate}–${r.endDate})`).join('; ')} covering some of these dates. Review before approving.]`
+        : null;
 
       // ── Validation 4: sufficient leave balance ─────────────────────────────
       // 'taken' only reflects historic entries; the main approval flow never
@@ -1610,12 +1666,15 @@ export async function registerRoutes(
         initialStatus = 'pending_hr';
       }
 
-      // Override the status with the correct initial status; include med cert flags
+      // Override the status with the correct initial status; include med cert flags and any overlap warning
+      const existingAdminNotes = (validatedData as any).adminNotes || null;
+      const combinedAdminNotes = [existingAdminNotes, overlapWarning].filter(Boolean).join('\n') || null;
       const requestWithStatus = {
         ...validatedData,
         status: initialStatus,
         requiresMedCert,
         medCertFlags: medCertFlagList.length ? JSON.stringify(medCertFlagList) : null,
+        adminNotes: combinedAdminNotes,
       };
       const newRequest = await storage.createLeaveRequest(requestWithStatus);
 
@@ -2085,6 +2144,17 @@ export async function registerRoutes(
       const employee = await storage.getUser(userId);
       const days = await countWorkingDays(startDate, endDate, (employee as any)?.religion || null);
 
+      // Warn if existing active/approved leave overlaps these dates (double-booking detection)
+      const allExistingRequests = await storage.getLeaveRequests(userId);
+      const overlappingRequests = allExistingRequests.filter(
+        r => !['rejected', 'cancelled'].includes(r.status) &&
+             startDate <= r.endDate && endDate >= r.startDate
+      );
+      const historicOverlapNote = overlappingRequests.length > 0
+        ? `[Overlap warning: employee already has ${overlappingRequests.map(r => `${r.leaveType} (${r.status}, ${r.startDate}–${r.endDate})`).join('; ')} covering some of these dates.]`
+        : null;
+      const combinedNotes = [notes, historicOverlapNote].filter(Boolean).join('\n') || null;
+
       const newRequest = await storage.createLeaveRequest({
         userId,
         leaveType,
@@ -2095,7 +2165,7 @@ export async function registerRoutes(
         isHistoric: true,
         authorizedBy: authorizedBy || null,
         referenceNumber: referenceNumber || null,
-        adminNotes: notes || null,
+        adminNotes: combinedNotes,
         finalizedAt: new Date(),
       } as any);
 
@@ -4372,6 +4442,90 @@ export async function registerRoutes(
     } catch (error) {
       console.error("External employees API error:", error);
       return res.status(500).json({ error: "Failed to fetch employee data" });
+    }
+  });
+
+  // Feedback: POST /api/feedback — files a bug report or feature request via the agent gateway
+  app.post("/api/feedback", async (req, res) => {
+    try {
+      const gatewayUrl = process.env.AGENT_GATEWAY_URL || "http://localhost:8787";
+      const apiKey = process.env.AGENT_GATEWAY_API_KEY || "dev-key";
+      const githubToken = process.env.GITHUB_FEEDBACK_TOKEN;
+      const githubOwner = process.env.GITHUB_FEEDBACK_OWNER;
+      const githubRepo = process.env.GITHUB_FEEDBACK_REPO;
+
+      if (!githubToken || !githubOwner || !githubRepo) {
+        return res.status(503).json({ error: "Feedback not configured — set GITHUB_FEEDBACK_TOKEN, GITHUB_FEEDBACK_OWNER, GITHUB_FEEDBACK_REPO" });
+      }
+
+      const {
+        type,
+        title,
+        idempotency_key,
+        current_route,
+        severity,
+        steps_to_reproduce,
+        actual_behaviour,
+        expected_behaviour,
+        priority,
+        motivation,
+        proposed_behaviour,
+        constraints,
+        open_questions,
+      } = req.body;
+
+      if (!type || !title) {
+        return res.status(400).json({ error: "type and title are required" });
+      }
+
+      const environment = process.env.NODE_ENV === "production" ? "prod" : "dev";
+      const affected_service = current_route ? `route: ${current_route}` : undefined;
+
+      const input = type === "bug_report"
+        ? {
+            owner: githubOwner,
+            repo: githubRepo,
+            github_token: githubToken,
+            title,
+            severity: severity || "medium",
+            steps_to_reproduce: steps_to_reproduce || "Not provided",
+            actual_behaviour: actual_behaviour || "Not provided",
+            expected_behaviour: expected_behaviour || "Not provided",
+            affected_service,
+            environment,
+          }
+        : {
+            owner: githubOwner,
+            repo: githubRepo,
+            github_token: githubToken,
+            title,
+            priority: priority || "medium",
+            motivation: motivation || "Not provided",
+            proposed_behaviour: proposed_behaviour || "Not provided",
+            affected_service,
+            constraints,
+            open_questions,
+          };
+
+      const context: Record<string, string> = { app_id: "factory-flow" };
+      if (idempotency_key) context.idempotency_key = idempotency_key;
+
+      const gatewayRes = await fetch(gatewayUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
+        body: JSON.stringify({ service: "github-issues", capability: "create", output_schema: type, input, context }),
+      });
+
+      const gatewayData = await gatewayRes.json() as any;
+      if (!gatewayData.success) {
+        console.error("[feedback] Gateway error:", gatewayData.error);
+        return res.status(502).json({ error: "Failed to file issue", detail: gatewayData.error?.message });
+      }
+
+      return res.json({ success: true, issue_url: gatewayData.data?.issue_url, issue_number: gatewayData.data?.issue_number });
+    } catch (error) {
+      console.error("[feedback] Unexpected error:", error);
+      return res.status(500).json({ error: "Internal error" });
     }
   });
 

@@ -10,9 +10,10 @@ import { useAuth } from '@/lib/auth-context';
 import { leaveBalanceApi, leaveRequestApi, userApi, attendanceApi } from '@/lib/api';
 import type { LeaveBalance, LeaveRequest } from '@shared/schema';
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, AlertCircle, FileText, Eye, X, XCircle, LogIn, LogOut } from 'lucide-react';
+import { Calendar, AlertCircle, FileText, Eye, X, XCircle, LogIn, LogOut, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { groupLeaveBalances, formatLeaveDays } from './admin/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -91,7 +92,7 @@ export default function Dashboard() {
     return ['pending', 'pending_manager', 'pending_hr'].includes(status);
   };
 
-  const { standard: standardBalances, other: otherBalances } = groupLeaveBalances(balances);
+  const { standard: standardBalances, other: otherBalances } = groupLeaveBalances(balances as LeaveBalance[]);
 
   return (
     <Layout>
@@ -139,16 +140,26 @@ export default function Dashboard() {
 
         {/* Balance Cards */}
         <div className="space-y-4">
-          {standardBalances.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Standard</p>
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {standardBalances.map((balance) => {
-                  const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
+          {[
+            { label: 'Standard', grid: 'grid gap-6 md:grid-cols-2 lg:grid-cols-3', items: standardBalances },
+            { label: 'Other',    grid: 'grid gap-6 md:grid-cols-2 lg:grid-cols-4', items: otherBalances },
+          ].filter(g => g.items.length > 0).map(({ label, grid, items }) => (
+            <div key={label} className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+              <div className={grid}>
+                {items.map((balance) => {
+                  const currentBalance = (balance.total ?? 0) - (balance.taken ?? 0);
+                  const pending = balance.pending ?? 0;
+                  const available = currentBalance - pending;
                   const carryOver = (balance as any).carryOverDays as number | undefined;
                   const carryOverExpiry = (balance as any).carryOverExpiry as string | null | undefined;
                   const today = new Date().toISOString().split('T')[0];
                   const expiringSoon = !!carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
+
+                  // Split from server-computed fields: pendingApprovedDays (approved but future) vs pendingAwaitingDays (awaiting approval)
+                  const approvedDaysReserved = (balance as any).pendingApprovedDays ?? 0;
+                  const awaitingApproval = (balance as any).pendingAwaitingDays ?? 0;
+
                   return (
                     <Card key={balance.id} className="industrial-card relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -161,58 +172,33 @@ export default function Dashboard() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-3xl font-bold font-heading text-foreground">{formatLeaveDays(available)}</div>
-                        <p className="text-xs text-muted-foreground mb-4">days available</p>
-                        <Progress value={(available / balance.total) * 100} className="h-2" />
-                        <div className="mt-2 text-xs text-right text-muted-foreground">
-                          {formatLeaveDays(balance.total)} total entitlement
-                        </div>
-                        {!!carryOver && carryOver > 0 && (
-                          <div className="mt-1 text-xs text-blue-600">
-                            +{carryOver} carried over
-                            {carryOverExpiry && (
-                              <span className={expiringSoon ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
-                                {' '}· {expiringSoon ? '⚠ expires ' : 'use by '}
-                                {new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                              </span>
-                            )}
-                          </div>
+                        <p className="text-xs text-muted-foreground mb-1">days available</p>
+                        {pending > 0 && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <p className="text-xs text-amber-600 mb-3 inline-flex items-center gap-1 cursor-default">
+                                  {formatLeaveDays(currentBalance)} balance − {formatLeaveDays(pending)} reserved
+                                  {approvedDaysReserved > 0 && awaitingApproval > 0 && (
+                                    <span className="text-muted-foreground font-normal">
+                                      {' '}({formatLeaveDays(approvedDaysReserved)} approved · {formatLeaveDays(awaitingApproval)} awaiting approval)
+                                    </span>
+                                  )}
+                                  <Info className="h-3 w-3 opacity-60" />
+                                </p>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-[220px] leading-snug">
+                                <p><strong>Approved:</strong> leave confirmed but dates haven't arrived yet.</p>
+                                <p className="mt-1"><strong>Awaiting approval:</strong> still with manager or HR.</p>
+                                <p className="mt-1">Both reduce your available balance.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {otherBalances.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Other</p>
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                {otherBalances.map((balance) => {
-                  const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
-                  const carryOver = (balance as any).carryOverDays as number | undefined;
-                  const carryOverExpiry = (balance as any).carryOverExpiry as string | null | undefined;
-                  const today = new Date().toISOString().split('T')[0];
-                  const expiringSoon = !!carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
-                  return (
-                    <Card key={balance.id} className="industrial-card relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Calendar className="h-16 w-16" />
-                      </div>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-                          {balance.leaveType}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-3xl font-bold font-heading text-foreground">{formatLeaveDays(available)}</div>
-                        <p className="text-xs text-muted-foreground mb-4">days available</p>
-                        <Progress value={(available / balance.total) * 100} className="h-2" />
-                        <div className="mt-2 text-xs text-right text-muted-foreground">
-                          {formatLeaveDays(balance.total)} total entitlement
-                        </div>
+                        {pending === 0 && <div className="mb-3" />}
+                        <Progress value={(available / (balance.total ?? 1)) * 100} className="h-2" />
                         {!!carryOver && carryOver > 0 && (
-                          <div className="mt-1 text-xs text-blue-600">
+                          <div className="mt-2 text-xs text-blue-600">
                             +{carryOver} carried over
                             {carryOverExpiry && (
                               <span className={expiringSoon ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>

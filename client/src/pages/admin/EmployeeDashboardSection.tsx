@@ -149,7 +149,7 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
         const { standard, other } = groupLeaveBalances(balances);
         const renderCard = (balance: any) => {
           const carryOver = balance.carryOverDays as number | undefined;
-          const available = Math.round(((balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0)) * 10) / 10;
+          const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
           const carryOverExpiry = balance.carryOverExpiry as string | null | undefined;
           const today = new Date().toISOString().split('T')[0];
           const expiringSoon = !!carryOver && carryOver > 0 && carryOverExpiry && carryOverExpiry > today && new Date(carryOverExpiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;

@@ -152,6 +152,7 @@ export function LeaveRequest() {
     mutationFn: leaveRequestApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
       toast({
         title: "Application Submitted",
         description: "Your leave request has been sent for approval.",
