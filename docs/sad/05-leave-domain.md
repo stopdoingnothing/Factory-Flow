@@ -280,6 +280,55 @@ Carry-over days are displayed separately with their expiry date.
 
 ---
 
+## Future Leave Accrual Projection
+
+When an employee selects a leave start date more than 30 days in the future on the request form, the system displays a **projected balance** for that date. This prevents false "insufficient balance" warnings caused by comparing today's balance against future leave.
+
+### 12-month booking limit
+
+Leave requests with a start date more than 12 months from today are **rejected** at both the backend (`POST /api/leave-requests`) and blocked on the frontend calendar. This bound guarantees the projection window crosses at most one annual cycle boundary.
+
+### Projection algorithm
+
+Implemented in `server/leave-projection.ts`. The function `projectLeaveBalance(userId, asOfDate)` mirrors the monthly accrual loop exactly — it processes each future month individually using the same `determineAccrualRate`, `calculateActiveDays`, and `calculateAnnualLeaveAccrual` functions as the real engine.
+
+**Loop:** Iterates from (last accrued month + 1) to (month before `asOfDate`). For each month:
+1. Compute accrual using exact BCEA formula
+2. If the month is the annual cycle end month → simulate cycle rollover (see below)
+
+**Cycle rollover simulation:** At the cycle-end month the rollover logic from `index.ts` is replicated in-memory:
+- Consumed through cycle end = `balance.taken` + working days of approved annual leave requests with `startDate ≤ cycle_end_date`
+- `carry_over = max(0, projected_total − consumed_through_cycle_end − days_after_cycle_end)`
+- `projected_total` resets to 0; `carry_over` and its expiry are tracked for the final calculation
+
+**Final available:**
+- *No cycle reset:* `projected_total + carry_over_at_date − balance.taken − all_active_annual_leave_days`
+- *With cycle reset:* `projected_total_new_cycle + carry_over_at_date − settled_days_in_new_cycle − pending_at_asOfDate`
+
+### API endpoint
+
+`GET /api/leave-balances/:userId/projected?leaveType=...&asOfDate=yyyy-MM-dd`
+
+Returns `{ currentAvailable, projectedAvailable, projectedAccrual, cycleResetOccurs, carryOverCreated, carryOverExpiry, monthsProjected, breakdown[] }`.
+
+Sick Leave → 400. Past dates → 400. > 12 months → 400.
+
+### Backend submission behaviour
+
+`POST /api/leave-requests` uses the projection when the current Annual Leave balance is insufficient:
+
+| Situation | Behaviour |
+|-----------|-----------|
+| Projected available ≥ requested days | Allow submission; append `[Balance note: …]` to `adminNotes` |
+| Both current and projected insufficient | Allow submission (HR discretion); append `[Balance warning: …]` to `adminNotes` |
+| Non-Annual Leave type insufficient | Hard 400 (unchanged) |
+
+### Frontend
+
+Shown in `LeaveRequest.tsx` when leave type ≠ Sick/Unpaid and start date > 30 days away. Displays current available, per-month accruals, cycle reset details (if any), and projected available with coverage indicator. Calendar dates beyond the 12-month limit are disabled.
+
+---
+
 ## Leave Calendar
 
 The leave calendar (`/leave-calendar`) shows a visual timeline of all approved leave requests. Admins see the full organisation; employees see their own leave plus colleagues in their department. Public holidays are overlaid, with religion-specific holidays shown only to employees of the matching religion.

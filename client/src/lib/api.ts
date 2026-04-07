@@ -274,6 +274,36 @@ export const leaveBalanceApi = {
     if (!res.ok) throw new Error("Failed to fetch SA preview");
     return res.json();
   },
+
+  async projected(userId: string, leaveType: string, asOfDate: string): Promise<{
+    currentAvailable: number;
+    projectedAvailable: number;
+    projectedAccrual: number;
+    cycleResetOccurs: boolean;
+    carryOverCreated?: number;
+    carryOverExpiry?: string;
+    monthsProjected: number;
+    breakdown: Array<{
+      month: string;
+      accrual: number;
+      rate: number;
+      activeDays: number;
+      totalDays: number;
+      tierNote: string;
+      event?: 'cycle_reset';
+      carryOverCreated?: number;
+      carryOverExpiry?: string;
+    }>;
+  }> {
+    const res = await apiFetch(
+      `${API_BASE}/leave-balances/${userId}/projected?leaveType=${encodeURIComponent(leaveType)}&asOfDate=${asOfDate}`
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as any).error || "Failed to fetch leave projection");
+    }
+    return res.json();
+  },
 };
 
 // Leave Request API

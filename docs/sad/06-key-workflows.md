@@ -36,7 +36,9 @@ sequenceDiagram
 
     E->>Client: Fills leave request form
     Client->>API: POST /api/leave-requests
+    API->>DB: Validate: start ≤ today+12months (else 400)
     API->>DB: Check leave balance (total + carryOver - taken - pending >= days)
+    Note over API: Annual Leave shortfall → run projection;<br/>allow with adminNote instead of hard 400
     API->>DB: Count business days (exclude weekends + public holidays)
     API->>DB: INSERT leaveRequests (status=pending_manager)
     API->>DB: UPDATE leaveBalances SET pending += days

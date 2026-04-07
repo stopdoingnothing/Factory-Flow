@@ -61,6 +61,7 @@ import { insertUserSchema, insertLeaveRequestSchema, insertAttendanceRecordSchem
 import { sendLeaveRequestNotification, sendLateAttendanceNotification, sendAdminWelcomeEmail, sendLeaveStatusNotification, sendPasswordResetEmail, sendAdminCredentialsEmail, sendManagerMissedClockOutAlert, sendLeaveStageNotification, sendLeaveEscalationReminder, sendAWOLAlert } from "./email";
 import { STATUTORY_LEAVE_ENTITLEMENTS, completedMonths, isFrlEligible, determineAccrualRate } from "./bcea";
 import { processTerminationSettlement, backfillUserAccrual } from "./leave-accrual";
+import { projectLeaveBalance } from "./leave-projection";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 
@@ -1468,8 +1469,65 @@ export async function registerRoutes(
     }
   });
 
+  // ── Projected leave balance ────────────────────────────────────────────────
+  // GET /api/leave-balances/:userId/projected?leaveType=...&asOfDate=yyyy-MM-dd
+  app.get("/api/leave-balances/:userId/projected", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { leaveType, asOfDate } = req.query as { leaveType?: string; asOfDate?: string };
+
+      // ── Input validation ──────────────────────────────────────────────────
+      if (!leaveType || !asOfDate) {
+        return res.status(400).json({ error: "leaveType and asOfDate query parameters are required" });
+      }
+      if (leaveType === 'Sick Leave') {
+        return res.status(400).json({ error: "Sick leave cannot be projected — current balance only" });
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split('T')[0];
+      if (asOfDate <= todayStr) {
+        return res.status(400).json({ error: "asOfDate must be a future date" });
+      }
+      const maxDate = new Date(today);
+      maxDate.setMonth(maxDate.getMonth() + 12);
+      const maxDateStr = maxDate.toISOString().split('T')[0];
+      if (asOfDate > maxDateStr) {
+        return res.status(400).json({ error: "Leave can only be projected up to 12 months in advance" });
+      }
+
+      // ── Authorisation: own record, direct manager, or hr/admin ───────────
+      const sessionUserId = req.session.userId!;
+      const sessionRoles: string[] = req.session.userRoles || [];
+      const isHrOrAdmin = sessionRoles.includes('hr') || sessionRoles.includes('admin');
+      const isManager = sessionRoles.includes('manager') && !isHrOrAdmin;
+      if (!isHrOrAdmin && sessionUserId !== userId) {
+        if (isManager) {
+          const allUsers = await storage.getAllUsers();
+          const targetUser = allUsers.find(u => u.id === userId);
+          if (targetUser?.managerId !== sessionUserId) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+        } else {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "Employee not found" });
+      if (!user.startDate) return res.status(400).json({ error: "Employee has no start date" });
+
+      const result = await projectLeaveBalance(userId, asOfDate);
+      return res.json(result);
+    } catch (error) {
+      console.error("Leave projection error:", error);
+      return res.status(500).json({ error: "Failed to calculate leave projection" });
+    }
+  });
+
   // ========== LEAVE REQUEST ROUTES ==========
-  
+
   // Get all leave requests (or by user)
   app.get("/api/leave-requests", async (req, res) => {
     try {
@@ -1523,6 +1581,20 @@ export async function registerRoutes(
       // ── Validation 2: cannot start before employment start date ────────────
       if (user?.startDate && validatedData.startDate < user.startDate) {
         return res.status(400).json({ error: "Leave cannot start before your employment start date" });
+      }
+
+      // ── Validation 2b: 12-month booking limit ─────────────────────────────
+      {
+        const todayLimit = new Date();
+        todayLimit.setHours(0, 0, 0, 0);
+        const maxBooking = new Date(todayLimit);
+        maxBooking.setMonth(maxBooking.getMonth() + 12);
+        const maxBookingStr = maxBooking.toISOString().split('T')[0];
+        if (validatedData.startDate > maxBookingStr) {
+          return res.status(400).json({
+            error: "Leave cannot be booked more than 12 months in advance",
+          });
+        }
       }
 
       // ── Validation 3: overlap with existing active requests ────────────────
@@ -1579,9 +1651,29 @@ export async function registerRoutes(
         // Do NOT add carryOverDays again — it would double-count.
         available = (balance.total ?? 0) - totalConsumed;
         if (available < requestedDays) {
-          return res.status(400).json({
-            error: `Insufficient ${validatedData.leaveType} balance. Available: ${available.toFixed(1)} day(s), requested: ${requestedDays} day(s)`,
-          });
+          if (validatedData.leaveType === 'Annual Leave') {
+            // Use projection to allow submission with an informational note instead of hard block.
+            let projectionNote: string;
+            try {
+              const projection = await projectLeaveBalance(validatedData.userId, validatedData.startDate);
+              const shortfall = available - requestedDays;
+              if (projection.projectedAvailable >= requestedDays) {
+                projectionNote = `[Balance note: Current available insufficient (${shortfall.toFixed(1)} days) but projected balance at ${validatedData.startDate} is +${projection.projectedAvailable.toFixed(1)} days — leave will be covered by accrual and carry-over.]`;
+              } else {
+                projectionNote = `[Balance warning: Insufficient leave. Current: ${shortfall.toFixed(1)} days. Projected at ${validatedData.startDate}: ${projection.projectedAvailable.toFixed(1)} days. HR discretion required.]`;
+              }
+            } catch {
+              return res.status(400).json({
+                error: `Insufficient ${validatedData.leaveType} balance. Available: ${available.toFixed(1)} day(s), requested: ${requestedDays} day(s)`,
+              });
+            }
+            const existingBalanceNote = (validatedData as any).adminNotes;
+            (validatedData as any).adminNotes = [existingBalanceNote, projectionNote].filter(Boolean).join('\n');
+          } else {
+            return res.status(400).json({
+              error: `Insufficient ${validatedData.leaveType} balance. Available: ${available.toFixed(1)} day(s), requested: ${requestedDays} day(s)`,
+            });
+          }
         }
       }
 

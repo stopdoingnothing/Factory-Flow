@@ -7,8 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { format, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, Upload, X, CheckCircle2, FileText, UserCheck, AlertTriangle } from "lucide-react";
+import { format, differenceInCalendarDays, addMonths } from "date-fns";
+import { CalendarIcon, Upload, X, CheckCircle2, FileText, UserCheck, AlertTriangle, TrendingUp, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/lib/auth-context';
@@ -97,6 +97,24 @@ export function LeaveRequest() {
     queryKey: ['manager', user?.managerId],
     queryFn: () => user?.managerId ? userApi.getById(user.managerId) : null,
     enabled: !!user?.managerId,
+  });
+
+  // Projection: fetch when leave type is Annual Leave AND start > 30 days away
+  const projectionStartDate = dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : null;
+  const showProjection =
+    !!user?.id &&
+    !!leaveType &&
+    leaveType !== 'Sick Leave' &&
+    leaveType !== 'Unpaid Leave' &&
+    !!dateRange.from &&
+    differenceInCalendarDays(dateRange.from, new Date()) > 30;
+
+  const { data: projection, isLoading: projectionLoading } = useQuery({
+    queryKey: ['leave-projection', user?.id, leaveType, projectionStartDate],
+    queryFn: () => leaveBalanceApi.projected(user!.id, leaveType, projectionStartDate!),
+    enabled: showProjection,
+    staleTime: 60_000,
+    retry: false,
   });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -354,7 +372,10 @@ export function LeaveRequest() {
 
                 {/* Date Picker — Inline */}
                 <div className="space-y-2">
-                  <Label>Duration <span className="text-destructive">*</span></Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Duration <span className="text-destructive">*</span></Label>
+                    <span className="text-xs text-muted-foreground">Leave can be booked up to 12 months in advance.</span>
+                  </div>
 
                   {/* FROM / TO summary row */}
                   <div className={cn(
@@ -400,6 +421,7 @@ export function LeaveRequest() {
                       mode="range"
                       month={calendarMonth}
                       onMonthChange={setCalendarMonth}
+                      disabled={(date: Date) => date > addMonths(new Date(), 12)}
                       selected={
                         dateRange.from && dateRange.to
                           ? dateRange
@@ -489,6 +511,81 @@ export function LeaveRequest() {
                       </div>
                     );
                   })()}
+
+                  {/* Projection panel — shown when leave starts > 30 days away */}
+                  {showProjection && dateRange.from && (
+                    <div className="rounded-md border border-blue-200 overflow-hidden text-sm">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-blue-200">
+                        <TrendingUp className="h-4 w-4 text-blue-600 shrink-0" />
+                        <span className="font-medium text-blue-800">
+                          Projected balance at {format(dateRange.from, 'dd MMM yyyy')}
+                        </span>
+                        {projectionLoading && <Loader2 className="h-3 w-3 animate-spin text-blue-500 ml-auto" />}
+                      </div>
+                      {projectionLoading && (
+                        <div className="px-4 py-3 text-muted-foreground text-xs">Calculating projection…</div>
+                      )}
+                      {projection && !projectionLoading && (() => {
+                        const workDays = dateRange.from && dateRange.to
+                          ? countWorkingDays(dateRange.from, dateRange.to)
+                          : 0;
+                        const isCovered = projection.projectedAvailable >= workDays;
+                        return (
+                          <div className="px-4 py-3 space-y-1.5 bg-white">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Current available</span>
+                              <span className="font-medium">{projection.currentAvailable.toFixed(2)} days</span>
+                            </div>
+                            {!projection.cycleResetOccurs && projection.projectedAccrual > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Accrual over {projection.monthsProjected} month{projection.monthsProjected !== 1 ? 's' : ''}</span>
+                                <span className="font-medium text-green-700">+{projection.projectedAccrual.toFixed(2)} days</span>
+                              </div>
+                            )}
+                            {projection.cycleResetOccurs && projection.breakdown.map(entry => (
+                              entry.event === 'cycle_reset' ? (
+                                <div key={entry.month} className="space-y-1">
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">{entry.month} accrual</span>
+                                    <span className="font-medium text-green-700">+{entry.accrual.toFixed(2)} days</span>
+                                  </div>
+                                  <div className="flex justify-between text-blue-700">
+                                    <span>Annual cycle reset → {(entry.carryOverCreated ?? 0).toFixed(2)} days carried over</span>
+                                    {entry.carryOverExpiry && (
+                                      <span className="text-xs text-muted-foreground">(expires {entry.carryOverExpiry})</span>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div key={entry.month} className="flex justify-between">
+                                  <span className="text-muted-foreground">{entry.month} accrual (new cycle)</span>
+                                  <span className="font-medium text-green-700">+{entry.accrual.toFixed(2)} days</span>
+                                </div>
+                              )
+                            ))}
+                            <div className={cn(
+                              "flex justify-between font-semibold pt-1 border-t",
+                              isCovered ? "text-green-700 border-green-200" : "text-destructive border-destructive/20"
+                            )}>
+                              <span>Projected available</span>
+                              <span>{projection.projectedAvailable.toFixed(2)} days {isCovered ? '✓' : '✗'}</span>
+                            </div>
+                            {workDays > 0 && (
+                              <p className={cn(
+                                "text-xs pt-0.5",
+                                isCovered ? "text-green-600" : "text-muted-foreground"
+                              )}>
+                                {isCovered
+                                  ? `This request (${workDays} days) will be covered.`
+                                  : `Projected available is insufficient for this request (${workDays} days). You can still submit — HR will review.`
+                                }
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {fieldErrors.date && (
                     <p className="text-xs text-destructive flex items-center gap-1">
