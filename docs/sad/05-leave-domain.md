@@ -215,10 +215,11 @@ BCEA-managed types (`Annual Leave`, `Sick Leave`, `Family Responsibility`, and t
 
 1. Client sends `POST /api/leave-requests`
 2. Server calculates business days (excludes weekends and public holidays matching employee's religion)
-3. Checks available balance: `total + carryOverDays - taken - pending >= days`
-4. Creates record with `status = 'pending_manager'`
-5. Increments `leaveBalances.pending`
-6. Notifies manager by email
+3. Applies half-day adjustments: `requestedDays = workingDays - 0.5 × (startHalfDay ? 1 : 0) - 0.5 × (endHalfDay && !isSingleDay ? 1 : 0)`
+4. Checks available balance: `total + carryOverDays - taken - pending >= requestedDays`
+5. Creates record with `status = 'pending_manager'`
+6. Increments `leaveBalances.pending` by `requestedDays`
+7. Notifies manager by email
 
 ### Approval stages
 
@@ -240,6 +241,16 @@ stateDiagram-v2
 ```
 
 The manager's role is **recommendation only** — they cannot approve or reject outright. HR sees the recommendation and can override a "not recommended" decision (shown with a red warning banner). HR and MD hold final approval/rejection authority.
+
+### Half-Day Leave
+
+A leave request can mark the first day (`startHalfDay`) and/or the last day (`endHalfDay`) as a half-day. The value is `'AM'` or `'PM'` (informational for managers; does not affect the deduction amount).
+
+- Each marked half-day deducts **0.5 working days** instead of a full day.
+- `endHalfDay` is only valid for multi-day requests (`startDate ≠ endDate`). The API rejects it with HTTP 400 on single-day requests.
+- `calcRequestedDays(workingDays, startHalfDay, endHalfDay, isSingleDay)` in `server/routes.ts` is the single source of truth for this calculation, used by: the POST handler, `decrementPending()`, and `settlePastApprovedLeave()`.
+- The employee request form shows AM/PM toggles below the date picker. The end toggle is hidden when a single day is selected.
+- The admin review dialog and calendar event chips both reflect the half-day markers.
 
 ### Settlement
 

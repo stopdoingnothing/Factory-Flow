@@ -661,11 +661,16 @@ export default function LeaveRequestsSection() {
               : leaveBalances.filter((b: LeaveBalance) => b.userId === selectedLeaveRequest.userId);
             const relevantBalance = employeeLeaveBalances.find((b: LeaveBalance) => b.leaveType === selectedLeaveRequest.leaveType);
             const availableDays = relevantBalance ? (relevantBalance.total ?? 0) - (relevantBalance.taken ?? 0) - (relevantBalance.pending ?? 0) : 0;
-            const requestedDays = countWorkingDays(
+            const _workingDays = countWorkingDays(
               selectedLeaveRequest.startDate,
               selectedLeaveRequest.endDate,
               employee?.religion ?? null
             );
+            const _isSingleDay = selectedLeaveRequest.startDate === selectedLeaveRequest.endDate;
+            let requestedDays = _workingDays;
+            if (selectedLeaveRequest.startHalfDay) requestedDays -= 0.5;
+            if (selectedLeaveRequest.endHalfDay && !_isSingleDay) requestedDays -= 0.5;
+            requestedDays = Math.max(requestedDays, 0);
             
             return (
               <div className="space-y-6">
@@ -699,6 +704,14 @@ export default function LeaveRequestsSection() {
                   <div>
                     <Label className="text-muted-foreground text-sm">Working Days</Label>
                     <p className="font-medium">{formatLeaveDays(requestedDays)} day{requestedDays !== 1 ? 's' : ''}</p>
+                    {(selectedLeaveRequest.startHalfDay || (selectedLeaveRequest.endHalfDay && !_isSingleDay)) && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {[
+                          selectedLeaveRequest.startHalfDay && `start: ${selectedLeaveRequest.startHalfDay} half-day`,
+                          selectedLeaveRequest.endHalfDay && !_isSingleDay && `end: ${selectedLeaveRequest.endHalfDay} half-day`,
+                        ].filter(Boolean).join(', ')}
+                      </p>
+                    )}
                   </div>
                 </div>
 

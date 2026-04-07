@@ -32,6 +32,8 @@ export function LeaveRequest() {
   const [fieldErrors, setFieldErrors] = useState<{ leaveType?: boolean; date?: boolean; reason?: boolean }>({});
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [calendarKey, setCalendarKey] = useState(0);
+  const [startHalfDay, setStartHalfDay] = useState<'AM' | 'PM' | null>(null);
+  const [endHalfDay, setEndHalfDay] = useState<'AM' | 'PM' | null>(null);
 
 
   // Fetch the user's leave balances
@@ -182,6 +184,8 @@ export function LeaveRequest() {
       setFiles([]);
       setFileContents([]);
       setDateRange({ from: undefined, to: undefined });
+      setStartHalfDay(null);
+      setEndHalfDay(null);
       setCalendarMonth(new Date());
       setFieldErrors({});
     },
@@ -216,15 +220,20 @@ export function LeaveRequest() {
     }
     setFieldErrors({});
 
+    const submitStartDate = format(dateRange.from, 'yyyy-MM-dd');
+    const submitEndDate = dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : submitStartDate;
+    const submitIsSingleDay = submitStartDate === submitEndDate;
     createRequestMutation.mutate({
       userId: user.id,
       leaveType,
-      startDate: format(dateRange.from, 'yyyy-MM-dd'),
-      endDate: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : format(dateRange.from, 'yyyy-MM-dd'),
+      startDate: submitStartDate,
+      endDate: submitEndDate,
       reason,
       comments: comments || undefined,
       status: (user.reportsToPositionId || user.managerId) ? 'pending_manager' : 'pending_hr',
       documents: fileContents.map(f => f.data),
+      startHalfDay: startHalfDay ?? null,
+      endHalfDay: (!submitIsSingleDay && endHalfDay) ? endHalfDay : null,
     });
   };
 
@@ -410,7 +419,7 @@ export function LeaveRequest() {
                           variant="ghost"
                           size="sm"
                           className="h-6 text-xs text-muted-foreground hover:text-destructive px-2"
-                          onClick={() => { setDateRange({ from: undefined, to: undefined }); setCalendarKey(k => k + 1); setFieldErrors(err => ({ ...err, date: false })); }}
+                          onClick={() => { setDateRange({ from: undefined, to: undefined }); setStartHalfDay(null); setEndHalfDay(null); setCalendarKey(k => k + 1); setFieldErrors(err => ({ ...err, date: false })); }}
                         >
                           Clear
                         </Button>
@@ -463,12 +472,76 @@ export function LeaveRequest() {
                     />
                   </div>
 
+                  {/* Half-day toggles — shown once a start date is selected */}
+                  {dateRange.from && (() => {
+                    const isSingleDay = !dateRange.to || dateRange.from.toDateString() === dateRange.to.toDateString();
+                    const HalfDayToggle = ({
+                      label, value, onChange,
+                    }: { label: string; value: 'AM' | 'PM' | null; onChange: (v: 'AM' | 'PM' | null) => void }) => (
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => onChange(value ? null : 'AM')}
+                          className={cn(
+                            "flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border transition-colors",
+                            value
+                              ? "border-primary bg-primary/10 text-primary font-medium"
+                              : "border-border text-muted-foreground hover:border-primary/50"
+                          )}
+                        >
+                          <span className={cn("w-3 h-3 rounded-sm border", value ? "bg-primary border-primary" : "border-muted-foreground")} />
+                          {label}
+                        </button>
+                        {value && (
+                          <div className="flex gap-1">
+                            {(['AM', 'PM'] as const).map(half => (
+                              <button
+                                key={half}
+                                type="button"
+                                onClick={() => onChange(half)}
+                                className={cn(
+                                  "text-xs px-2.5 py-1 rounded border transition-colors",
+                                  value === half
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "border-border text-muted-foreground hover:border-primary/50"
+                                )}
+                              >
+                                {half}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                    return (
+                      <div className="flex flex-wrap gap-4 px-1 pt-1">
+                        <HalfDayToggle
+                          label="Start as half-day"
+                          value={startHalfDay}
+                          onChange={setStartHalfDay}
+                        />
+                        {!isSingleDay && (
+                          <HalfDayToggle
+                            label="End as half-day"
+                            value={endHalfDay}
+                            onChange={setEndHalfDay}
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Leave days summary — shown once both dates are selected, below the calendar */}
                   {dateRange.from && dateRange.to && (() => {
+                    const isSingleDay = dateRange.from.toDateString() === dateRange.to.toDateString();
                     const workDays = countWorkingDays(dateRange.from, dateRange.to);
+                    let requestedDays = workDays;
+                    if (startHalfDay) requestedDays -= 0.5;
+                    if (endHalfDay && !isSingleDay) requestedDays -= 0.5;
+                    requestedDays = Math.max(requestedDays, 0);
                     const calDays = differenceInCalendarDays(dateRange.to, dateRange.from) + 1;
                     const excluded = calDays - workDays;
-                    const remaining = availableDays !== null ? availableDays - workDays : null;
+                    const remaining = availableDays !== null ? availableDays - requestedDays : null;
                     const overLimit = remaining !== null && remaining < 0;
                     return (
                       <div className={cn(
@@ -482,7 +555,7 @@ export function LeaveRequest() {
                           <div className="flex items-center gap-2">
                             <CalendarIcon className={cn("h-4 w-4", overLimit ? "text-destructive" : "text-primary")} />
                             <span className={cn("font-medium", overLimit ? "text-destructive" : "text-primary")}>
-                              {workDays} leave day{workDays !== 1 ? 's' : ''} will be deducted
+                              {formatLeaveDays(requestedDays)} leave day{requestedDays !== 1 ? 's' : ''} will be deducted
                             </span>
                           </div>
                           {availableDays !== null && (
@@ -526,9 +599,12 @@ export function LeaveRequest() {
                         <div className="px-4 py-3 text-muted-foreground text-xs">Calculating projection…</div>
                       )}
                       {projection && !projectionLoading && (() => {
-                        const workDays = dateRange.from && dateRange.to
-                          ? countWorkingDays(dateRange.from, dateRange.to)
-                          : 0;
+                        const _wds = dateRange.from && dateRange.to ? countWorkingDays(dateRange.from, dateRange.to) : 0;
+                        const _isSingle = dateRange.from && dateRange.to ? dateRange.from.toDateString() === dateRange.to.toDateString() : true;
+                        let workDays = _wds;
+                        if (startHalfDay) workDays -= 0.5;
+                        if (endHalfDay && !_isSingle) workDays -= 0.5;
+                        workDays = Math.max(workDays, 0);
                         const isCovered = projection.projectedAvailable >= workDays;
                         return (
                           <div className="px-4 py-3 space-y-1.5 bg-white">

@@ -166,13 +166,18 @@ export default function LeaveCalendar() {
                     <div className="space-y-1 overflow-y-auto max-h-[70px]">
                       {dayLeaves.slice(0, 3).map((leave: LeaveRequest) => {
                         const employee = users.find((u: User) => u.id === leave.userId);
+                        const dayStr = format(day, 'yyyy-MM-dd');
+                        const halfDaySuffix =
+                          dayStr === leave.startDate && leave.startHalfDay ? ` (${leave.startHalfDay})`
+                          : dayStr === leave.endDate && leave.endHalfDay && leave.startDate !== leave.endDate ? ` (${leave.endHalfDay})`
+                          : '';
                         return (
                           <div
                             key={leave.id}
                             className={`text-xs p-1 rounded text-white truncate ${getLeaveTypeColor(leave.leaveType)}`}
-                            title={`${employee?.firstName} ${employee?.surname} - ${leave.leaveType}`}
+                            title={`${employee?.firstName} ${employee?.surname} - ${leave.leaveType}${halfDaySuffix}`}
                           >
-                            {employee?.firstName} {employee?.surname?.charAt(0)}.
+                            {employee?.firstName} {employee?.surname?.charAt(0)}.{halfDaySuffix}
                           </div>
                         );
                       })}

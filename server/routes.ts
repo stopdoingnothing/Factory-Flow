@@ -117,14 +117,31 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
   return bcrypt.compare(password, hash);
 }
 
+// Calculate the number of days to deduct for a leave request, accounting for half-days.
+// Each marked half-day (start or end) reduces the deduction by 0.5.
+// endHalfDay is ignored when the request is a single day (startDate === endDate).
+function calcRequestedDays(
+  workingDays: number,
+  startHalfDay: string | null | undefined,
+  endHalfDay: string | null | undefined,
+  isSingleDay: boolean,
+): number {
+  let days = workingDays;
+  if (startHalfDay) days -= 0.5;
+  if (endHalfDay && !isSingleDay) days -= 0.5;
+  return Math.max(days, 0);
+}
+
 // Decrement pending balance when a non-historic leave request is cancelled or rejected.
 // For historic entries use decrementTaken instead.
 // NOTE: We do not restore carryOverDays here — carryConsumed is not stored on the request
 // record, so restoring it creates phantom carry-over for employees who had none (see issue #10).
 // Carry-over is managed by the annual cycle rollover process, not by request cancellations.
-async function decrementPending(request: { userId: string; leaveType: string; startDate: string; endDate: string; isHistoric: boolean }, religion: string | null) {
+async function decrementPending(request: { userId: string; leaveType: string; startDate: string; endDate: string; isHistoric: boolean; startHalfDay?: string | null; endHalfDay?: string | null }, religion: string | null) {
   if (request.isHistoric) return;
-  const days = await countWorkingDays(request.startDate, request.endDate, religion);
+  const workingDays = await countWorkingDays(request.startDate, request.endDate, religion);
+  const isSingleDay = request.startDate === request.endDate;
+  const days = calcRequestedDays(workingDays, request.startHalfDay ?? null, request.endHalfDay ?? null, isSingleDay);
   const balances = await storage.getLeaveBalances(request.userId);
   const balance = balances.find(b => b.leaveType === request.leaveType);
   if (balance) {
@@ -157,7 +174,9 @@ export async function settlePastApprovedLeave(userId: string): Promise<void> {
   const balances = await storage.getLeaveBalances(userId);
 
   for (const req of unsettled) {
-    const days = await countWorkingDays(req.startDate, req.endDate, religion);
+    const workingDays = await countWorkingDays(req.startDate, req.endDate, religion);
+    const isSingleDay = req.startDate === req.endDate;
+    const days = calcRequestedDays(workingDays, req.startHalfDay ?? null, req.endHalfDay ?? null, isSingleDay);
     const balance = balances.find(b => b.leaveType === req.leaveType);
     if (balance) {
       await storage.updateLeaveBalance(balance.id, {
@@ -1597,6 +1616,11 @@ export async function registerRoutes(
         }
       }
 
+      // ── Validation 2c: endHalfDay invalid for single-day requests ──────────
+      if (validatedData.endHalfDay && validatedData.startDate === validatedData.endDate) {
+        return res.status(400).json({ error: "End half-day cannot be set on a single-day request — use startHalfDay instead" });
+      }
+
       // ── Validation 3: overlap with existing active requests ────────────────
       const existingRequests = await storage.getLeaveRequests(validatedData.userId);
       const activeRequests = existingRequests.filter(
@@ -1624,10 +1648,17 @@ export async function registerRoutes(
       // 'taken' only reflects historic entries; the main approval flow never
       // updates it. So we compute consumed days from live pending/approved
       // requests and add the stored 'taken' (historic) on top.
-      const requestedDays = await countWorkingDays(
+      const _workingDays = await countWorkingDays(
         validatedData.startDate,
         validatedData.endDate,
         user?.religion ?? null
+      );
+      const _isSingleDay = validatedData.startDate === validatedData.endDate;
+      const requestedDays = calcRequestedDays(
+        _workingDays,
+        validatedData.startHalfDay ?? null,
+        validatedData.endHalfDay ?? null,
+        _isSingleDay,
       );
       const balances = await storage.getLeaveBalances(validatedData.userId);
       const balance = balances.find(b => b.leaveType === validatedData.leaveType);

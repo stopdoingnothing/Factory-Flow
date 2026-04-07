@@ -235,6 +235,10 @@ export const leaveRequests = pgTable("leave_requests", {
   authorizedBy: text("authorized_by"), // Name of the person who authorized in the old system
   referenceNumber: text("reference_number"), // Reference number from the physical leave book
   
+  // Half-day markers: non-null means that day is a half-day; value indicates AM or PM portion
+  startHalfDay: text("start_half_day"),  // 'AM' | 'PM' | null
+  endHalfDay:   text("end_half_day"),    // 'AM' | 'PM' | null — must be null when startDate === endDate
+
   // Set when an approved request's dates have passed and pending days have been moved to taken
   settledAt: timestamp("settled_at"),
 
@@ -246,6 +250,9 @@ export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  startHalfDay: z.enum(['AM', 'PM']).optional().nullable(),
+  endHalfDay:   z.enum(['AM', 'PM']).optional().nullable(),
 });
 export type InsertLeaveRequest = z.infer<typeof insertLeaveRequestSchema>;
 export type LeaveRequest = typeof leaveRequests.$inferSelect;

@@ -180,6 +180,8 @@ One row per employee. Tracks state needed for the 6-month graduated accrual phas
 | `medCertFlags` | text | JSON array: `["exceeds_2_days","fri_mon_pattern","public_holiday_adjacent"]` |
 | `isHistoric` | boolean | Backfilled from physical records |
 | `authorizedBy`, `referenceNumber` | text | Historic entry fields |
+| `startHalfDay` | text | `'AM'` or `'PM'` — non-null means the first day is a half-day (0.5 days deducted) |
+| `endHalfDay` | text | `'AM'` or `'PM'` — non-null means the last day is a half-day (0.5 days deducted); must be null when `startDate = endDate` |
 | `settledAt` | timestamp | Set when approved request's dates have passed and days moved from pending → taken |
 | `createdAt`, `updatedAt` | timestamp | |
 
@@ -302,6 +304,7 @@ After migrations, the entrypoint also runs an idempotent SQL block to create unm
 | `0001_soft_tempest.sql` | Adds `audit_logs` table |
 | `0002_leave_settled_at.sql` | Adds `settled_at` to `leave_requests` |
 | `0003_leave_accrual_v2.sql` | Adds `work_days_per_week` and `annual_leave_override_days` to `users`; adds `pauses_annual_accrual` and `cycle_anchor` to `leave_rules`; creates `accrual_rate_tiers` (seeded), `sick_leave_tracking`, and `leave_accrual_records` |
+| `0004_half_day_leave.sql` | Adds `start_half_day` and `end_half_day` to `leave_requests` |
 
 ---
 
