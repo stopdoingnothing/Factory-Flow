@@ -293,7 +293,7 @@ Carry-over days are displayed separately with their expiry date.
 
 ## Future Leave Accrual Projection
 
-When an employee selects a leave start date more than 30 days in the future on the request form, the system displays a **projected balance** for that date. This prevents false "insufficient balance" warnings caused by comparing today's balance against future leave.
+When an employee selects a leave date range whose **end date** falls in the next calendar month or beyond, the system displays a **projected balance** for that end date. This prevents false "insufficient balance" warnings caused by comparing today's balance against future leave that will be covered by accrual.
 
 ### 12-month booking limit
 
@@ -313,8 +313,10 @@ Implemented in `server/leave-projection.ts`. The function `projectLeaveBalance(u
 - `projected_total` resets to 0; `carry_over` and its expiry are tracked for the final calculation
 
 **Final available:**
-- *No cycle reset:* `projected_total + carry_over_at_date − balance.taken − all_active_annual_leave_days`
+- *No cycle reset:* `current_available − current_carry_over + carry_over_at_date + projected_accrual`
 - *With cycle reset:* `projected_total_new_cycle + carry_over_at_date − settled_days_in_new_cycle − pending_at_asOfDate`
+
+`current_available` includes `carryOverDays` in both the server projection and the client balance display.
 
 ### API endpoint
 
@@ -336,7 +338,7 @@ Sick Leave → 400. Past dates → 400. > 12 months → 400.
 
 ### Frontend
 
-Shown in `LeaveRequest.tsx` when leave type ≠ Sick/Unpaid and start date > 30 days away. Displays current available, per-month accruals, cycle reset details (if any), and projected available with coverage indicator. Calendar dates beyond the 12-month limit are disabled.
+Shown in `LeaveRequest.tsx` when leave type ≠ Sick/Unpaid and the selected **end date** is in the next calendar month or beyond. The `asOfDate` passed to the API is the leave end date (not start date), so accruals that occur during the leave period are included. Displays current available, per-month accruals, cycle reset details (if any), and projected available with coverage indicator. Calendar dates beyond the 12-month limit are disabled. A warning is shown if a date range is selected but no leave type has been chosen.
 
 ---
 
