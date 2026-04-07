@@ -541,10 +541,11 @@ export function LeaveRequest() {
                     requestedDays = Math.max(requestedDays, 0);
                     const calDays = differenceInCalendarDays(dateRange.to, dateRange.from) + 1;
                     const excluded = calDays - workDays;
-                    // When projection is active: use projectedAvailable once loaded,
-                    // null while loading (show spinner), fall back to current if errored.
-                    const effectiveAvailable = showProjection
-                      ? (projectionLoading ? null : projection?.projectedAvailable ?? availableDays)
+                    // Use projectedAvailable once loaded; fall back to current balance
+                    // while loading or on error. The badge always shows immediately —
+                    // a spinner appears alongside it while the projection is in-flight.
+                    const effectiveAvailable = (showProjection && projection)
+                      ? projection.projectedAvailable
                       : availableDays;
                     const remaining = effectiveAvailable !== null ? Math.round((effectiveAvailable - requestedDays) * 100) / 100 : null;
                     const overLimit = remaining !== null && remaining < 0;
@@ -563,16 +564,14 @@ export function LeaveRequest() {
                               {formatLeaveDays(requestedDays)} leave day{requestedDays !== 1 ? 's' : ''} will be deducted
                             </span>
                           </div>
-                          {showProjection && projectionLoading
-                            ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                            : effectiveAvailable !== null && (
-                              <span className={cn("text-xs font-medium", overLimit ? "text-destructive" : "text-muted-foreground")}>
-                                {overLimit
-                                  ? `${formatLeaveDays(Math.abs(remaining!))} day${Math.abs(remaining!) !== 1 ? 's' : ''} over limit`
-                                  : `${formatLeaveDays(remaining!)} day${remaining !== 1 ? 's' : ''} remaining`}
-                              </span>
-                            )
-                          }
+                          {effectiveAvailable !== null && (
+                            <span className={cn("flex items-center gap-1 text-xs font-medium", overLimit ? "text-destructive" : "text-muted-foreground")}>
+                              {showProjection && projectionLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                              {overLimit
+                                ? `${formatLeaveDays(Math.abs(remaining!))} day${Math.abs(remaining!) !== 1 ? 's' : ''} over limit`
+                                : `${formatLeaveDays(remaining!)} day${remaining !== 1 ? 's' : ''} remaining`}
+                            </span>
+                          )}
                         </div>
                         {excluded > 0 && (
                           <div className="px-4 py-1.5 bg-muted/40 border-t text-xs text-muted-foreground">
