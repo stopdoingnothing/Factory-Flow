@@ -238,6 +238,29 @@ Architecture Decision Records for Factory Flow. Each entry captures a non-obviou
 
 ---
 
+### ADR-013: Semantic CSS Tokens for Dark/Light Theme (No Per-Class `dark:` Variants)
+
+**Status:** Accepted  
+**Date:** 2026-04-08  
+**Context:** The app has a user-selectable dark/light/system theme. Early development applied `dark:` variants inline on individual Tailwind palette classes (e.g. `bg-green-100 dark:bg-green-900/40`). This approach broke down quickly: ~550 hardcoded palette color classes across 23 files had no dark counterpart at all, making large portions of the UI unreadable in dark mode.
+
+**Options considered:**
+1. Retroactively add `dark:` pairs to every hardcoded palette class (fragile, high maintenance)
+2. Define semantic CSS custom property tokens in `index.css`; use token-backed Tailwind classes everywhere (chosen)
+3. Use a CSS-in-JS theming solution (adds runtime overhead, conflicts with Tailwind v4)
+
+**Decision:** All theme-sensitive colors are expressed as semantic tokens backed by CSS custom properties (e.g. `bg-status-success-muted`, `bg-card`, `text-destructive`). The token values resolve automatically in both `:root` (light) and `.dark {}` (dark) — no `dark:` variant is needed at the usage site.
+
+**Rationale:** A single token definition in `index.css` governs every usage across the entire app. Adding a new dark value requires changing one line, not hunting down every call site. Hardcoded palette classes (`bg-green-100`) are invisible to the CSS variable system — they will always render the same color regardless of theme. The token approach is the only one that scales.
+
+**Consequences:**
+- New components must use semantic tokens, not palette classes
+- Exception: categorical color distinctions (leave type calendar, org chart department dots) where color encodes distinct identity rather than semantic state. These use paired `dark:` variants (`bg-blue-100 dark:bg-blue-900/40`) since no semantic token exists for "this department is Finance"
+- SVG inline styles must use `hsl(var(--token))` syntax — SVG cannot consume Tailwind class utilities
+- The 8 `bg-status-*` tokens (`success`, `success-muted`, `warning`, `warning-muted`, `info`, `info-muted`, `neutral`, `neutral-muted`) cover status/state UI; core tokens (`card`, `muted`, `primary`, `destructive`, `foreground`, `border`) cover structural UI
+
+---
+
 ### ADR-012: Per-Employee Annual Leave Override
 
 **Status:** Accepted  
