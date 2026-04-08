@@ -155,15 +155,14 @@ export default function AdminDashboard() {
             </div>
           )}
           {user && <NotificationBell userId={user.id} />}
+          <ThemeToggle />
           <button
             onClick={() => setFeedbackOpen(true)}
             title="Report an issue or request a feature"
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            className="flex items-center justify-center rounded-md p-2 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
           >
             <MessageSquarePlus className="h-4 w-4" />
-            <span className="hidden sm:inline">Feedback</span>
           </button>
-          <ThemeToggle />
         </div>
       </header>
 

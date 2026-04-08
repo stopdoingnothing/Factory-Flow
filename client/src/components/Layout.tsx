@@ -18,6 +18,7 @@ import { settingsApi } from '@/lib/api';
 import aeceLogo from '@assets/AECE_Logo_1765516911038.png';
 import FeedbackModal from '@/components/FeedbackModal';
 import { flushPendingFeedback } from '@/lib/feedback';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -81,15 +82,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           )}
 
-          <button
-            onClick={() => setFeedbackOpen(true)}
-            title="Report an issue or request a feature"
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-          >
-            <MessageSquarePlus className="h-4 w-4" />
-            <span className="hidden sm:inline">Feedback</span>
-          </button>
-
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden text-sidebar-foreground">
@@ -140,6 +132,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </SheetContent>
           </Sheet>
+          <ThemeToggle />
+          <button
+            onClick={() => setFeedbackOpen(true)}
+            title="Report an issue or request a feature"
+            className="flex items-center justify-center rounded-md p-2 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+          </button>
         </div>
       </header>
 
