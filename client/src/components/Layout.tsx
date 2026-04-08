@@ -133,13 +133,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </SheetContent>
           </Sheet>
           <ThemeToggle />
-          <button
-            onClick={() => setFeedbackOpen(true)}
-            title="Report an issue or request a feature"
-            className="flex items-center justify-center rounded-md p-2 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-          >
+          <Button variant="outline" size="icon" onClick={() => setFeedbackOpen(true)} title="Report an issue or request a feature">
             <MessageSquarePlus className="h-4 w-4" />
-          </button>
+            <span className="sr-only">Feedback</span>
+          </Button>
         </div>
       </header>
 
