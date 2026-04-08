@@ -12,10 +12,11 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/lib/auth-context';
-import { 
-  Settings, Shield, Palette, Mail, Download, Upload, Save, 
-  UserCog, Plus, Pencil, Trash2, Key, Copy, RefreshCw, Eye, EyeOff
+import {
+  Settings, Shield, Palette, Mail, Download, Upload, Save,
+  UserCog, Plus, Pencil, Trash2, Key, Copy, RefreshCw, Eye, EyeOff, Lock, AlertTriangle
 } from 'lucide-react';
+import { useRolePermissions, ROLE_PERMISSION_DEFAULTS, type RolePermissionsMap } from '@/hooks/use-role-permissions';
 import { 
   settingsApi, userApi, userGroupApi, backupApi, leaveBalanceApi 
 } from '@/lib/api';
@@ -27,7 +28,29 @@ export default function SettingsSection() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const [settingsTab, setSettingsTab] = useState<'general' | 'user-groups' | 'branding' | 'api'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'user-groups' | 'branding' | 'api' | 'role-permissions'>('general');
+
+  // Role Permissions state
+  const { permissions: currentPermissions } = useRolePermissions();
+  const [rolePerms, setRolePerms] = useState<RolePermissionsMap>(ROLE_PERMISSION_DEFAULTS);
+
+  const { data: rolePermsSetting } = useQuery({
+    queryKey: ['settings', 'role_permissions'],
+    queryFn: () => settingsApi.get('role_permissions'),
+  });
+
+  useEffect(() => {
+    if (rolePermsSetting?.value) {
+      try {
+        const saved = JSON.parse(rolePermsSetting.value);
+        setRolePerms({ ...ROLE_PERMISSION_DEFAULTS, ...saved });
+      } catch {
+        setRolePerms(currentPermissions);
+      }
+    } else {
+      setRolePerms(ROLE_PERMISSION_DEFAULTS);
+    }
+  }, [rolePermsSetting]);
 
   // External API Key state
   const [apiKey, setApiKey] = useState<string>('');
@@ -237,6 +260,29 @@ export default function SettingsSection() {
     },
   });
 
+  // Role Permissions helpers
+  const togglePerm = (role: string, permission: string) => {
+    setRolePerms(prev => {
+      const current = prev[role] ?? [];
+      const next = current.includes(permission)
+        ? current.filter(p => p !== permission)
+        : [...current, permission];
+      return { ...prev, [role]: next };
+    });
+  };
+
+  const hasZeroPermsRole = Object.entries(rolePerms).some(([, perms]) => perms.length === 0);
+
+  const handleSaveRolePermissions = async () => {
+    try {
+      await updateSettingMutation.mutateAsync({ key: 'role_permissions', value: JSON.stringify(rolePerms) });
+      queryClient.invalidateQueries({ queryKey: ['settings', 'role_permissions'] });
+      toast({ title: "Permissions Saved", description: "Role permissions have been updated." });
+    } catch {
+      toast({ variant: "destructive", title: "Error", description: "Failed to save role permissions." });
+    }
+  };
+
   // Handlers
   const handleSaveSettings = async () => {
     try {
@@ -357,14 +403,26 @@ export default function SettingsSection() {
         <button
           onClick={() => setSettingsTab('api')}
           className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
-            settingsTab === 'api' 
-              ? 'bg-primary text-white' 
+            settingsTab === 'api'
+              ? 'bg-primary text-white'
               : 'bg-muted text-muted-foreground hover:bg-muted/70'
           }`}
           data-testid="settings-tab-api"
         >
           <Key className="inline h-4 w-4 mr-2" />
           API Access
+        </button>
+        <button
+          onClick={() => setSettingsTab('role-permissions')}
+          className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
+            settingsTab === 'role-permissions'
+              ? 'bg-primary text-white'
+              : 'bg-muted text-muted-foreground hover:bg-muted/70'
+          }`}
+          data-testid="settings-tab-role-permissions"
+        >
+          <Lock className="inline h-4 w-4 mr-2" />
+          Role Permissions
         </button>
       </div>
       
@@ -1300,6 +1358,135 @@ export default function SettingsSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Role Permissions Tab */}
+      {settingsTab === 'role-permissions' && (() => {
+        const CONFIGURABLE_ROLES = ['employee', 'manager', 'hr'] as const;
+        const ROLE_LABELS: Record<string, string> = { employee: 'Employee', manager: 'Manager', hr: 'HR' };
+
+        const NAV_GROUPS = [
+          {
+            label: 'My Tools',
+            items: [
+              { key: 'nav.apply-leave', label: 'Apply for Leave' },
+              { key: 'nav.my-attendance', label: 'My Attendance' },
+              { key: 'nav.profile', label: 'My Profile' },
+              { key: 'nav.grievances', label: 'Grievances' },
+            ],
+          },
+          {
+            label: 'Management',
+            items: [
+              { key: 'nav.admin-insights', label: 'Admin Insights' },
+              { key: 'nav.personnel', label: 'Personnel (full list)' },
+              { key: 'nav.my-team', label: 'My Team (direct reports)' },
+              { key: 'nav.org-chart', label: 'Organization Chart' },
+              { key: 'nav.leave-requests', label: 'Leave Requests' },
+              { key: 'nav.attendance', label: 'Attendance' },
+              { key: 'nav.reports', label: 'Attendance Reports' },
+              { key: 'nav.leave-calendar', label: 'Leave Calendar' },
+            ],
+          },
+        ];
+
+        const PERSONNEL_ITEMS = [
+          { key: 'personnel.add-person', label: 'Add Person' },
+          { key: 'personnel.export-pdf', label: 'Export PDF' },
+          { key: 'personnel.missing-info', label: 'Missing Information Report' },
+          { key: 'personnel.edit', label: 'Edit Employee' },
+          { key: 'personnel.terminate', label: 'Terminate / Reactivate' },
+          { key: 'personnel.delete', label: 'Delete Employee' },
+          { key: 'personnel.assign-roles', label: 'Assign Roles' },
+        ];
+
+        const CheckboxCell = ({ role, permKey }: { role: string; permKey: string }) => (
+          <TableCell className="text-center">
+            <input
+              type="checkbox"
+              className="h-4 w-4 cursor-pointer accent-primary"
+              checked={(rolePerms[role] ?? []).includes(permKey)}
+              onChange={() => togglePerm(role, permKey)}
+            />
+          </TableCell>
+        );
+
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Lock className="h-5 w-5" /> Role Permissions</CardTitle>
+              <CardDescription>Control which pages and capabilities each role can access. Admin always has full access.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {hasZeroPermsRole && (
+                <div className="flex items-center gap-2 p-3 rounded-lg border border-status-warning/40 bg-status-warning-muted text-sm text-status-warning">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                  One or more roles have zero permissions — those users will see a blank sidebar.
+                </div>
+              )}
+
+              {/* Navigation permissions */}
+              <div>
+                <h3 className="font-semibold text-sm text-foreground mb-3">Navigation</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-64">Page</TableHead>
+                      {CONFIGURABLE_ROLES.map(r => (
+                        <TableHead key={r} className="text-center w-24">{ROLE_LABELS[r]}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {NAV_GROUPS.map(group => (
+                      <>
+                        <TableRow key={group.label} className="bg-muted/30">
+                          <TableCell colSpan={4} className="py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            {group.label}
+                          </TableCell>
+                        </TableRow>
+                        {group.items.map(item => (
+                          <TableRow key={item.key}>
+                            <TableCell className="pl-6 text-sm">{item.label}</TableCell>
+                            {CONFIGURABLE_ROLES.map(r => <CheckboxCell key={r} role={r} permKey={item.key} />)}
+                          </TableRow>
+                        ))}
+                      </>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Personnel capabilities */}
+              <div>
+                <h3 className="font-semibold text-sm text-foreground mb-1">Personnel Capabilities</h3>
+                <p className="text-xs text-muted-foreground mb-3">Only applies to roles with Personnel page access. My Team is always read-only. "Add Admin" is always admin-only.</p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-64">Capability</TableHead>
+                      {CONFIGURABLE_ROLES.map(r => (
+                        <TableHead key={r} className="text-center w-24">{ROLE_LABELS[r]}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {PERSONNEL_ITEMS.map(item => (
+                      <TableRow key={item.key}>
+                        <TableCell className="text-sm">{item.label}</TableCell>
+                        {CONFIGURABLE_ROLES.map(r => <CheckboxCell key={r} role={r} permKey={item.key} />)}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <Button onClick={handleSaveRolePermissions} className="w-full" data-testid="button-save-role-permissions">
+                <Save className="mr-2 h-4 w-4" /> Save Permissions
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

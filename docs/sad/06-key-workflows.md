@@ -57,13 +57,7 @@ sequenceDiagram
     Note over Client: Red warning banner shown if manager did not recommend
     HR->>Client: Approves or rejects
     Client->>API: POST /api/leave-requests/:id/hr-decision
-    API->>DB: UPDATE leaveRequests SET status=pending_md (or rejected)
-    API->>Email: Notify MD (if approved) or employee (if rejected)
-    API-->>Client: 200 OK
-
-    MD->>Client: Final approval
-    Client->>API: POST /api/leave-requests/:id/md-decision {decision: "approved"}
-    API->>DB: UPDATE leaveRequests SET status=approved, finalizedById, finalizedAt
+    API->>DB: UPDATE leaveRequests SET status=approved (or rejected), finalizedById, finalizedAt
     API->>DB: UPDATE leaveBalances SET taken += days, pending -= days
     API->>Email: Send approval email to employee
     API-->>Client: 200 OK

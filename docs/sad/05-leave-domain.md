@@ -228,11 +228,8 @@ stateDiagram-v2
     [*] --> pending_manager: Employee submits\n(has manager)
     [*] --> pending_hr: Employee submits\n(no manager)
     pending_manager --> pending_hr: Manager recommends or not
-    pending_manager --> pending_md: Manager forwards\n(HR stage disabled)
-    pending_hr --> pending_md: HR approves
+    pending_hr --> approved: HR approves
     pending_hr --> rejected: HR rejects
-    pending_md --> approved: MD approves
-    pending_md --> rejected: MD rejects
     pending_manager --> cancelled: Employee cancels
     pending_hr --> cancelled: Admin cancels
     approved --> [*]
@@ -240,7 +237,7 @@ stateDiagram-v2
     cancelled --> [*]
 ```
 
-The manager's role is **recommendation only** — they cannot approve or reject outright. HR sees the recommendation and can override a "not recommended" decision (shown with a red warning banner). HR and MD hold final approval/rejection authority.
+The manager's role is **recommendation only** — they cannot approve or reject outright. HR sees the recommendation and can override a "not recommended" decision (shown with a red warning banner). HR holds final approval/rejection authority.
 
 ### Half-Day Leave
 

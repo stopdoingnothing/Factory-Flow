@@ -59,7 +59,7 @@ The central entity. Every employee is a user record.
 | `role` | text | **Legacy** — kept for backwards compatibility; use `roles[]` as source of truth |
 | `adminRole` | text | **Legacy** — kept for backwards compatibility |
 | `hasFullAdminAccess` | text | **Legacy** — kept for backwards compatibility |
-| `roles` | text[] | Current role set: `['employee', 'manager', 'hr', 'md', 'admin']`. Additive; `admin` satisfies all guards |
+| `roles` | text[] | Current role set: `['employee', 'manager', 'hr', 'admin']`. Additive; `admin` satisfies all guards |
 | `department` | text | Department name |
 | `userGroupId` | FK → `userGroups` | Admin grouping |
 | `employeeTypeId` | FK → `employeeTypes` | |
@@ -172,9 +172,6 @@ One row per employee. Tracks state needed for the 6-month graduated accrual phas
 | `hrApproverId` | FK → `users` | Who acted at HR stage |
 | `hrDecision` | text | `approved` or `rejected` |
 | `hrNotes`, `hrDecisionAt` | | |
-| `mdApproverId` | FK → `users` | Who acted at MD stage |
-| `mdDecision` | text | `approved` or `rejected` |
-| `mdNotes`, `mdDecisionAt` | | |
 | `finalizedById`, `finalizedAt` | | Who/when the final decision was made |
 | `requiresMedCert` | boolean | Flagged for sick leave > 2 days or Fri/Mon pattern |
 | `medCertFlags` | text | JSON array: `["exceeds_2_days","fri_mon_pattern","public_holiday_adjacent"]` |
@@ -185,7 +182,7 @@ One row per employee. Tracks state needed for the 6-month graduated accrual phas
 | `settledAt` | timestamp | Set when approved request's dates have passed and days moved from pending → taken |
 | `createdAt`, `updatedAt` | timestamp | |
 
-**Status values:** `pending_manager` → `pending_hr` → `pending_md` → `approved` / `rejected` / `cancelled`
+**Status values:** `pending_manager` → `pending_hr` → `approved` / `rejected` / `cancelled`
 
 ### `leaveRules`
 

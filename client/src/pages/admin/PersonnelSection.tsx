@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/lib/auth-context';
+import { useRolePermissions } from '@/hooks/use-role-permissions';
 import WebcamCapture from '@/components/WebcamCapture';
 import MultiAngleFaceCapture from '@/components/MultiAngleFaceCapture';
 import { loadFaceModels, extractFaceDescriptorFromBase64, descriptorToJson } from '@/lib/face-recognition';
@@ -25,7 +26,7 @@ import { formatDateForDisplay, getEmploymentDuration, generatePassword, isValidD
 export default function PersonnelSection() {
   const { toast } = useToast();
   const { user, hasRole } = useAuth();
-  const isAdminUser = hasRole('admin') || hasRole('hr');
+  const { canDo } = useRolePermissions();
   const queryClient = useQueryClient();
 
   const { data: users = [] } = useQuery({
@@ -262,7 +263,7 @@ export default function PersonnelSection() {
       return;
     }
 
-    if (isAdminUser && ((currentUser as any).roles || []).length === 0) {
+    if (canDo('personnel.assign-roles') && ((currentUser as any).roles || []).length === 0) {
       toast({ variant: "destructive", title: "Error", description: "At least one role must be assigned" });
       return;
     }
@@ -508,16 +509,6 @@ export default function PersonnelSection() {
   };
 
   const filteredUsers = users
-    .filter(u => {
-      // Non-admin managers see only their direct reports (position-based takes precedence)
-      if (!isAdminUser) {
-        if ((u as any).reportsToPositionId != null) {
-          return (user as any)?.orgPositionId != null && (u as any).reportsToPositionId === (user as any).orgPositionId;
-        }
-        return u.managerId === user?.id;
-      }
-      return true;
-    })
     .filter(u => {
       if (employeeStatusFilter === 'active') return !u.terminationDate && !(u as any).excludeFromLeave;
       if (employeeStatusFilter === 'terminated') return !!u.terminationDate;
@@ -936,30 +927,38 @@ export default function PersonnelSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-foreground">{isAdminUser ? 'Personnel' : 'My Team'}</h1>
-        <p className="text-muted-foreground">{isAdminUser ? 'Manage personnel access, IDs, and leave balances' : 'View your direct reports'}</p>
+        <h1 className="text-3xl font-heading font-bold text-foreground">Personnel</h1>
+        <p className="text-muted-foreground">Manage personnel access, IDs, and leave balances</p>
       </div>
       <Card>
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>{isAdminUser ? 'Personnel' : 'My Team'}</CardTitle>
-              <CardDescription>{isAdminUser ? 'Manage personnel access, IDs, and leave balances' : 'Your direct reports'}</CardDescription>
+              <CardTitle>Personnel</CardTitle>
+              <CardDescription>Manage personnel access, IDs, and leave balances</CardDescription>
             </div>
-            {isAdminUser && (
+            {(hasRole('admin') || canDo('personnel.add-person') || canDo('personnel.export-pdf') || canDo('personnel.missing-info')) && (
               <div className="flex gap-2">
-                <Button onClick={handleOpenCreateAdmin} variant="outline" className="btn-industrial">
-                  <Shield className="mr-2 h-4 w-4" /> Add Admin
-                </Button>
-                <Button variant="outline" onClick={handleExportPdf} data-testid="button-export-pdf">
-                  <FileText className="mr-2 h-4 w-4" /> Export PDF
-                </Button>
-                <Button variant="outline" onClick={handleExportMissingInfoPdf} data-testid="button-missing-info-report">
-                  <ClipboardList className="mr-2 h-4 w-4" /> Missing Information
-                </Button>
-                <Button onClick={handleOpenCreate} className="btn-industrial bg-primary text-white">
-                  <Plus className="mr-2 h-4 w-4" /> Add Person
-                </Button>
+                {hasRole('admin') && (
+                  <Button onClick={handleOpenCreateAdmin} variant="outline" className="btn-industrial">
+                    <Shield className="mr-2 h-4 w-4" /> Add Admin
+                  </Button>
+                )}
+                {canDo('personnel.export-pdf') && (
+                  <Button variant="outline" onClick={handleExportPdf} data-testid="button-export-pdf">
+                    <FileText className="mr-2 h-4 w-4" /> Export PDF
+                  </Button>
+                )}
+                {canDo('personnel.missing-info') && (
+                  <Button variant="outline" onClick={handleExportMissingInfoPdf} data-testid="button-missing-info-report">
+                    <ClipboardList className="mr-2 h-4 w-4" /> Missing Information
+                  </Button>
+                )}
+                {canDo('personnel.add-person') && (
+                  <Button onClick={handleOpenCreate} className="btn-industrial bg-primary text-white">
+                    <Plus className="mr-2 h-4 w-4" /> Add Person
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -1114,12 +1113,14 @@ export default function PersonnelSection() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        {isAdminUser && (
+                        {(canDo('personnel.edit') || canDo('personnel.terminate') || canDo('personnel.delete')) && (
                           <>
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(emp)} title="Edit" data-testid={`button-edit-${emp.id}`}>
-                              <Pencil className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                            {!emp.terminationDate ? (
+                            {canDo('personnel.edit') && (
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(emp)} title="Edit" data-testid={`button-edit-${emp.id}`}>
+                                <Pencil className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            )}
+                            {canDo('personnel.terminate') && (!emp.terminationDate ? (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1146,10 +1147,12 @@ export default function PersonnelSection() {
                               >
                                 <CheckCircle2 className="h-4 w-4 text-status-success" />
                               </Button>
+                            ))}
+                            {canDo('personnel.delete') && (
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(emp.id)} title="Delete" data-testid={`button-delete-${emp.id}`}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
                             )}
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(emp.id)} title="Delete" data-testid={`button-delete-${emp.id}`}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
                           </>
                         )}
                       </TableCell>
@@ -1696,7 +1699,7 @@ export default function PersonnelSection() {
                 />
               </div>
             </div>
-            {isAdminUser && (
+            {canDo('personnel.assign-roles') && (
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label className="text-right pt-2">Roles</Label>
                 <div className="col-span-3 space-y-2">

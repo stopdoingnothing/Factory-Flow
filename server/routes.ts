@@ -6,7 +6,7 @@ declare module "express-session" {
   interface SessionData {
     userId: string;
     userRole: string;       // legacy — kept for compat
-    userRoles: string[];    // source of truth: ['employee','manager','hr','md','admin']
+    userRoles: string[];    // source of truth: ['employee','manager','hr','admin']
   }
 }
 

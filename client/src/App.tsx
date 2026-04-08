@@ -91,7 +91,7 @@ function Router() {
       <Route path="/attendance-tile" component={AttendanceTileMode} />
       <Route path="/reset-password" component={ResetPassword} />
       {/* Main app — single dashboard for all authenticated users */}
-      <Route path="/dashboard">{() => <RoleRoute roles={['employee','manager','hr','md','admin']} component={AdminDashboard} />}</Route>
+      <Route path="/dashboard">{() => <RoleRoute roles={['employee','manager','hr','admin']} component={AdminDashboard} />}</Route>
       <Route path="/maintainer/dashboard">{() => <RoleRoute roles={['admin']} component={MaintainerDashboard} />}</Route>
       <Route component={NotFound} />
     </Switch>

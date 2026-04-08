@@ -261,6 +261,29 @@ Architecture Decision Records for Factory Flow. Each entry captures a non-obviou
 
 ---
 
+### ADR-014: Configurable Role Permissions via Settings Table (Not Hardcoded `hasRole()`)
+
+**Status:** Accepted
+**Date:** 2026-04-08
+**Context:** Nav section visibility and in-page capabilities were hardcoded via `hasRole()` checks and an `isAdminUser` flag in `PersonnelSection`. Changing what any non-admin role could see or do required a code change and redeployment. HR users also had no way to view the Personnel page (which required `isAdminUser`), even though that was the intended access pattern.
+
+**Options considered:**
+1. Keep hardcoded role checks; grant HR explicit access to each guarded section individually (still code-only)
+2. Store a permission map in the `settings` table; evaluate at runtime via a React Query-cached hook
+3. Move to a full RBAC database schema with roles, permissions, and role-permission join table
+
+**Decision:** Option 2 — a single `role_permissions` JSON blob in the `settings` table, read by a `useRolePermissions()` hook that exposes `canSee()` and `canDo()` helpers. Option 3 was over-engineered for three non-admin roles with a fixed permission vocabulary.
+
+**Rationale:** The settings table already exists with a generic key/value pattern and admin-only write protection. A JSON blob is sufficient for a fixed set of roles and a bounded set of permission keys (12 nav + 7 personnel capabilities). Storing it there means no schema migration, the existing settings audit log captures before/after on every change, and the React Query cache ensures the permission map is loaded once per session with 5-minute stale time. The hardcoded defaults fallback means existing deployments are unaffected until an admin first saves the config.
+
+**Consequences:**
+- Permission changes take effect immediately for any user who reloads or whose cache expires — no redeploy
+- Permissions are UI-only; server-side authorization remains hardcoded role checks (a future hardening step could add `canDo()` enforcement server-side)
+- `PersonnelSection` and `MyTeamSection` are separate components — the filter-by-manager logic is no longer interleaved with the full-list logic; `isAdminUser` is eliminated entirely
+- Admin role always returns true from `canSee()`/`canDo()` regardless of the stored config — admin permissions are not configurable
+
+---
+
 ### ADR-012: Per-Employee Annual Leave Override
 
 **Status:** Accepted  

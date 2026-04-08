@@ -16,14 +16,13 @@ The system is a single deployable unit: one Docker container serves both the Rea
 
 ## Users and Roles
 
-Users hold one or more roles from the set `['employee', 'manager', 'hr', 'md', 'admin']`. Roles are additive — no implicit inheritance. The `admin` role implicitly satisfies any role requirement.
+Users hold one or more roles from the set `['employee', 'manager', 'hr', 'admin']`. Roles are additive — no implicit inheritance. The `admin` role implicitly satisfies any role requirement.
 
 | Role | Who | What they can do |
 |------|-----|-----------------|
 | **employee** | Standard staff | Submit leave, view own balances, clock in/out, view org chart, submit grievances, edit own profile |
 | **manager** | Team leads | Everything an employee can do + recommend/action leave requests for their reports, view team attendance |
 | **hr** | HR staff | Full leave workflow management, grievance handling, personnel admin, leave rule configuration, manual balance adjustments |
-| **md** | Managing Director | Final leave approval, full system visibility |
 | **admin** | System owners | Full access: settings, audit logs, database backup, user management — implicitly satisfies all other roles |
 
 A single user can hold multiple roles simultaneously (e.g. `['employee', 'manager']`). All authentication uses **email + password** (bcrypt). The attendance kiosk uses **face recognition or employee ID** — no session required.
@@ -37,7 +36,6 @@ graph TD
     Employee["Employee"]
     Manager["Manager\n(team lead)"]
     HR["HR / Admin"]
-    MD["MD / Director"]
     Kiosk["Attendance Kiosk\n(shared device)"]
 
     FactoryFlow["Factory Flow\n(AECE Checkpoint)\n─────────────────\nLeave management\nAttendance tracking\nOrg structure\nHR administration"]
@@ -48,7 +46,6 @@ graph TD
     Employee -->|"Leave requests\nProfile\nAttendance"| FactoryFlow
     Manager -->|"Leave recommendations\nTeam view"| FactoryFlow
     HR -->|"Leave approvals\nPersonnel admin\nBalance adjustments"| FactoryFlow
-    MD -->|"Final approvals\nSystem visibility"| FactoryFlow
     Kiosk -->|"Face / ID clock-in"| FactoryFlow
 
     FactoryFlow -->|"Reads / writes"| Postgres

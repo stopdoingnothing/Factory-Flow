@@ -105,7 +105,7 @@ These routes bypass the `requireAuth` middleware:
 ```typescript
 function requireAuth(req, res, next) { ... }              // Any authenticated user
 function requireRole(...roles)(req, res, next) { ... }    // Must hold at least one of the given roles
-function requireAdmin(req, res, next) { ... }             // admin, hr, or md
+function requireAdmin(req, res, next) { ... }             // admin or hr
 function requireAdminOnly(req, res, next) { ... }         // admin role only
 ```
 

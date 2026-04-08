@@ -136,7 +136,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("worker"), // legacy — kept for compat; use roles[] as source of truth
   adminRole: text("admin_role"), // legacy — kept for compat; use roles[] as source of truth
   hasFullAdminAccess: text("has_full_admin_access"), // legacy
-  // Explicit role set: 'employee' | 'manager' | 'hr' | 'md' | 'admin'
+  // Explicit role set: 'employee' | 'manager' | 'hr' | 'admin'
   // A user can hold multiple roles. Roles are additive — no implicit inheritance.
   roles: text("roles").array().notNull().default(sql`ARRAY['employee']::text[]`),
   department: text("department"), // for workers

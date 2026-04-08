@@ -54,7 +54,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { href: '/grievances', label: 'Grievances', icon: MessageSquareWarning },
   ];
 
-  const hasManagerDashboard = hasRole('manager') || hasRole('hr') || hasRole('md') || hasRole('admin');
+  const hasManagerDashboard = hasRole('manager') || hasRole('hr') || hasRole('admin');
   const navItems = workerNav;
   
   const isAdminPage = location.startsWith('/admin');

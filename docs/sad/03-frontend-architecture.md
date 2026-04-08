@@ -65,23 +65,34 @@ All authenticated users land on a single dashboard (`AdminDashboard.tsx`) with a
 | My Profile | `MyProfileSection` | Edit own profile, photo capture, password change |
 | My Attendance | `MyAttendanceSection` | Own clock-in/out history |
 
-**Role-gated tabs:**
-| Tab | Roles | Component |
-|-----|-------|-----------|
-| Personnel | hr, admin | `PersonnelSection` |
+**Role-gated tabs (configurable via Settings → Role Permissions):**
+| Tab | Default roles | Component |
+|-----|---------------|-----------|
+| Admin Insights | hr, admin | `DashboardSection` |
+| Personnel | hr, admin | `PersonnelSection` — full employee list, capability-gated actions |
+| My Team | manager | `MyTeamSection` — direct reports only, read-only |
+| Organization Chart | manager, hr, admin | `OrgChart` |
 | Leave Requests | manager, hr, admin | `LeaveRequestsSection` |
 | Attendance | manager, hr, admin | `AttendanceSection` |
-| Leave Calendar | hr, admin | `LeaveCalendarSection` |
-| Leave Rules | admin | `LeaveRulesSection` (includes custom leave rule phases) |
-| Org Positions | admin | `OrgPositionsSection` |
-| Departments | admin | `DepartmentsSection` |
-| Companies | admin | `CompaniesSection` |
-| Employee Types | admin | `EmployeeTypesSection` |
-| Grievances | hr, admin | `GrievancesSection` |
-| Public Holidays | admin | `PublicHolidaysSection` |
-| Settings | admin | `SettingsSection` (includes `annual_leave_cycle_start`, branding, etc.) |
-| Database Backup | admin | `DatabaseBackupSection` |
-| Admin Insights | admin | `DashboardSection` |
+| Attendance Reports | manager, hr, admin | (reports page) |
+| Leave Calendar | manager, hr, admin | `LeaveCalendarSection` |
+| Apply for Leave | employee | (leave request form) |
+| My Attendance | employee | `MyAttendanceSection` |
+| Grievances | employee | `GrievancesSection` |
+
+Nav visibility for employee/manager/hr roles is stored in the `settings` table under the `role_permissions` key and evaluated at runtime via the `useRolePermissions()` hook — no redeploy needed when an admin changes permissions. Admin-only items (Leave Rules, Org Positions, Departments, Companies, Employee Types, Public Holidays, Settings, Database Backup) are hardcoded and not configurable.
+
+**Fixed admin-only tabs:**
+| Tab | Component |
+|-----|-----------|
+| Leave Rules | `LeaveRulesSection` (includes custom leave rule phases) |
+| Org Positions | `OrgPositionsSection` |
+| Departments | `DepartmentsSection` |
+| Companies | `CompaniesSection` |
+| Employee Types | `EmployeeTypesSection` |
+| Public Holidays | `PublicHolidaysSection` |
+| Settings | `SettingsSection` (includes `annual_leave_cycle_start`, branding, role permissions) |
+| Database Backup | `DatabaseBackupSection` |
 
 > **Note:** Accrual rate tiers (`accrual_rate_tiers` table) are currently managed only via direct DB or API — there is no dedicated frontend UI for editing them. Default tiers (Tier 1: 15 days, Tier 2 at 24 months: 20 days) are seeded on first migration.
 
@@ -143,7 +154,8 @@ client/src/
 │       ├── MyProfileSection.tsx
 │       ├── MyAttendanceSection.tsx
 │       ├── EmployeeDashboardSection.tsx
-│       ├── PersonnelSection.tsx
+│       ├── PersonnelSection.tsx    # Full employee list (hr/admin)
+│       ├── MyTeamSection.tsx       # Direct reports only, read-only (manager)
 │       ├── LeaveRequestsSection.tsx
 │       ├── AttendanceSection.tsx
 │       ├── LeaveCalendarSection.tsx
@@ -164,7 +176,8 @@ client/src/
 │   ├── NotificationBell.tsx
 │   ├── WebcamCapture.tsx           # Single-shot photo capture
 │   └── MultiAngleFaceCapture.tsx   # Multi-angle face capture for recognition training
-└── hooks/                  # Custom React hooks
+└── hooks/
+    └── use-role-permissions.ts     # Fetches role_permissions setting; exposes canSee()/canDo()
 ```
 
 ---
