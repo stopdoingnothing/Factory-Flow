@@ -80,7 +80,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </div>
           )}
-          
+
+          <button
+            onClick={() => setFeedbackOpen(true)}
+            title="Report an issue or request a feature"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+            <span className="hidden sm:inline">Feedback</span>
+          </button>
+
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden text-sidebar-foreground">
@@ -181,16 +190,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </main>
       </div>
-
-      {/* Feedback floating button */}
-      <button
-        onClick={() => setFeedbackOpen(true)}
-        title="Report an issue or request a feature"
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-lg transition-all hover:bg-primary/90 hover:shadow-xl active:scale-95"
-      >
-        <MessageSquarePlus className="h-4 w-4" />
-        <span className="hidden sm:inline">Feedback</span>
-      </button>
 
       <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>

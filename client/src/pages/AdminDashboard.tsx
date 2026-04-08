@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, Settings, Camera, Building2, Loader2, CheckCircle2, Calendar, Clock, FileText, LayoutDashboard, LogOut, Network, MessageSquareWarning, CalendarDays, TrendingUp, Briefcase, Database } from 'lucide-react';
+import { Users, Settings, Camera, Building2, Loader2, CheckCircle2, Calendar, Clock, FileText, LayoutDashboard, LogOut, Network, MessageSquareWarning, CalendarDays, TrendingUp, Briefcase, Database, MessageSquarePlus } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,7 @@ import MyProfileSection from './admin/MyProfileSection';
 import EmployeeDashboardSection from './admin/EmployeeDashboardSection';
 import OrgChart from './OrgChart';
 import AttendanceReports from './AttendanceReports';
+import FeedbackModal from '@/components/FeedbackModal';
 
 type ActiveSection = 'dashboard' | 'admin-insights' | 'employees' | 'leave-requests' | 'attendance' | 'departments' | 'employee-types' | 'leave-rules' | 'grievances' | 'holidays' | 'leave-calendar' | 'positions' | 'companies' | 'settings' | 'backup' | 'apply-leave' | 'employee-grievances' | 'my-attendance' | 'profile' | 'org-chart' | 'reports';
 
@@ -42,6 +43,7 @@ export default function AdminDashboard() {
   const queryClient = useQueryClient();
 
   const [activeSection, setActiveSection] = useState<ActiveSection>('dashboard');
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const { data: leaveRequests = [] } = useQuery({
     queryKey: ['leave-requests'],
@@ -153,9 +155,19 @@ export default function AdminDashboard() {
             </div>
           )}
           {user && <NotificationBell userId={user.id} />}
+          <button
+            onClick={() => setFeedbackOpen(true)}
+            title="Report an issue or request a feature"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+            <span className="hidden sm:inline">Feedback</span>
+          </button>
           <ThemeToggle />
         </div>
       </header>
+
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 
       <AlertDialog open={showPhotoSetup}>
         <AlertDialogContent className="max-w-lg">
