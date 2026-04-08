@@ -4,11 +4,9 @@ services:
     environment:
       POSTGRES_DB: factoryflow
       POSTGRES_USER: factoryflow
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${UAT_POSTGRES_PASSWORD:-changeme-uat}
     volumes:
-      # Bind mount keeps DB files on the host filesystem, independent of Docker.
-      # This survives Docker reinstalls, volume corruption, and container rebuilds.
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./data/postgres-uat:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U factoryflow -d factoryflow"]
       interval: 5s
@@ -19,10 +17,10 @@ services:
   app:
     build: .
     ports:
-      - "5000:5000"
+      - "5002:5000"
     environment:
-      DATABASE_URL: postgres://factoryflow:${POSTGRES_PASSWORD:-changeme}@db:5432/factoryflow
-      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-in-production}
+      DATABASE_URL: postgres://factoryflow:${UAT_POSTGRES_PASSWORD:-changeme-uat}@db:5432/factoryflow
+      SESSION_SECRET: ${UAT_SESSION_SECRET:-uat-session-secret-change-me}
       POSTMARK_API_KEY: ${POSTMARK_API_KEY:-}
       AGENT_GATEWAY_URL: ${AGENT_GATEWAY_URL:-http://host.docker.internal:8787}
       AGENT_GATEWAY_API_KEY: ${AGENT_GATEWAY_API_KEY:-dev-key}
@@ -39,19 +37,15 @@ services:
   backup:
     image: postgres:16-alpine
     environment:
-      PGPASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      PGPASSWORD: ${UAT_POSTGRES_PASSWORD:-changeme-uat}
     volumes:
-      # Backups also land on the host, in a separate directory from live data.
-      - ./data/backups:/backups
-    # Runs pg_dump every 6 hours (4x/day). Keeps the last 90 days of dumps (360 files max).
-    # Each dump is named with a timestamp for easy point-in-time recovery.
+      - ./data/backups-uat:/backups
     entrypoint: >
       sh -c "
         while true; do
           FILENAME=/backups/factoryflow_$$(date +%Y%m%d_%H%M%S).sql.gz
           echo \"[backup] dumping to $$FILENAME\"
           pg_dump -h db -U factoryflow factoryflow | gzip > $$FILENAME
-          # Delete dumps older than 90 days
           find /backups -name 'factoryflow_*.sql.gz' -mtime +90 -delete
           echo \"[backup] done. sleeping 6h\"
           sleep 21600
