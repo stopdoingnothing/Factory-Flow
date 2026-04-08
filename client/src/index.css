@@ -52,6 +52,16 @@
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
+  /* Semantic status tokens */
+  --color-status-success: hsl(var(--status-success));
+  --color-status-success-muted: hsl(var(--status-success-muted));
+  --color-status-warning: hsl(var(--status-warning));
+  --color-status-warning-muted: hsl(var(--status-warning-muted));
+  --color-status-info: hsl(var(--status-info));
+  --color-status-info-muted: hsl(var(--status-info-muted));
+  --color-status-neutral: hsl(var(--status-neutral));
+  --color-status-neutral-muted: hsl(var(--status-neutral-muted));
+
   --font-sans: 'Inter', sans-serif;
   --font-heading: 'Oswald', sans-serif;
   
@@ -102,6 +112,16 @@
   --sidebar-accent-foreground: 0 0% 98%;
   --sidebar-border: 0 0% 15%;
   --sidebar-ring: 0 0% 80%;
+
+  /* Status tokens — light */
+  --status-success: 142 60% 40%;
+  --status-success-muted: 142 60% 93%;
+  --status-warning: 35 85% 45%;
+  --status-warning-muted: 35 85% 93%;
+  --status-info: 213 80% 48%;
+  --status-info-muted: 213 80% 93%;
+  --status-neutral: 0 0% 46%;
+  --status-neutral-muted: 0 0% 93%;
 }
 
 .dark {
@@ -132,6 +152,16 @@
   --border: 0 0% 15%;
   --input: 0 0% 15%;
   --ring: 0 72% 50%;
+
+  /* Status tokens — dark */
+  --status-success: 142 50% 50%;
+  --status-success-muted: 142 50% 12%;
+  --status-warning: 35 75% 55%;
+  --status-warning-muted: 35 75% 12%;
+  --status-info: 213 75% 60%;
+  --status-info-muted: 213 75% 12%;
+  --status-neutral: 0 0% 55%;
+  --status-neutral-muted: 0 0% 18%;
 }
 
 @layer base {
@@ -149,7 +179,7 @@
 /* Custom Utilities for AECE Theme */
 @layer utilities {
   .glass-panel {
-    @apply bg-white/90 backdrop-blur-md border border-white/20 shadow-xl;
+    @apply bg-card/90 backdrop-blur-md border border-border/20 shadow-xl;
   }
   
   .industrial-card {

@@ -71,12 +71,12 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'approved': return 'bg-green-100 text-green-700';
-      case 'rejected': return 'bg-red-100 text-red-700';
-      case 'cancelled': return 'bg-gray-100 text-gray-700';
-      case 'pending_manager': return 'bg-orange-100 text-orange-700';
-      case 'pending_hr': return 'bg-blue-100 text-blue-700';
-      default: return 'bg-yellow-100 text-yellow-700';
+      case 'approved': return 'bg-status-success-muted text-status-success';
+      case 'rejected': return 'bg-destructive/10 text-destructive';
+      case 'cancelled': return 'bg-status-neutral-muted text-status-neutral';
+      case 'pending_manager': return 'bg-status-warning-muted text-status-warning';
+      case 'pending_hr': return 'bg-status-info-muted text-status-info';
+      default: return 'bg-status-warning-muted text-status-warning';
     }
   };
 
@@ -112,11 +112,11 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
       </div>
 
       {clockStatus && (
-        <Card className={`border-2 ${clockStatus.isClockedIn ? 'border-green-500 bg-green-50' : 'border-slate-300 bg-slate-50'}`}>
+        <Card className={`border-2 ${clockStatus.isClockedIn ? 'border-status-success bg-status-success-muted' : 'border-border bg-muted'}`}>
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-full ${clockStatus.isClockedIn ? 'bg-green-500' : 'bg-slate-400'}`}>
+                <div className={`p-3 rounded-full ${clockStatus.isClockedIn ? 'bg-status-success' : 'bg-muted-foreground'}`}>
                   {clockStatus.isClockedIn ? (
                     <LogIn className="h-6 w-6 text-white" />
                   ) : (
@@ -124,7 +124,7 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
                   )}
                 </div>
                 <div>
-                  <p className={`text-lg font-semibold ${clockStatus.isClockedIn ? 'text-green-700' : 'text-slate-700'}`}>
+                  <p className={`text-lg font-semibold ${clockStatus.isClockedIn ? 'text-status-success' : 'text-muted-foreground'}`}>
                     {clockStatus.isClockedIn ? 'Currently Clocked In' : 'Not Clocked In'}
                   </p>
                   {clockStatus.lastRecord && (
@@ -172,7 +172,7 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
                   <span>{formatLeaveDays(balance.taken ?? 0)} taken{(balance.pending ?? 0) > 0 ? `, ${formatLeaveDays(balance.pending)} pending` : ''}</span>
                 </div>
                 {!!carryOver && carryOver > 0 && carryOverExpiry && (
-                  <div className={`mt-1 text-xs ${expiringSoon ? 'text-orange-600 font-medium' : 'text-blue-600'}`}>
+                  <div className={`mt-1 text-xs ${expiringSoon ? 'text-status-warning font-medium' : 'text-status-info'}`}>
                     {expiringSoon ? '⚠ Carry-over expires ' : 'Carry-over use by '}
                     {new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </div>
@@ -222,10 +222,10 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
                   <div key={req.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-4">
                       <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        req.status === 'approved' ? 'bg-green-100 text-green-600' :
-                        req.status === 'rejected' ? 'bg-red-100 text-red-600' :
-                        req.status === 'cancelled' ? 'bg-gray-100 text-gray-600' :
-                        'bg-yellow-100 text-yellow-600'
+                        req.status === 'approved' ? 'bg-status-success-muted text-status-success' :
+                        req.status === 'rejected' ? 'bg-destructive/10 text-destructive' :
+                        req.status === 'cancelled' ? 'bg-status-neutral-muted text-status-neutral' :
+                        'bg-status-warning-muted text-status-warning'
                       }`}>
                         {getStatusIcon(req.status)}
                       </div>
@@ -247,7 +247,7 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
                           onClick={() => { setSelectedRequest(req); setIsViewDialogOpen(true); }}
                           title="View Details"
                         >
-                          <Eye className="h-4 w-4 text-blue-500" />
+                          <Eye className="h-4 w-4 text-status-info" />
                         </Button>
                         {isPending(req.status) && (
                           <Button
@@ -256,7 +256,7 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
                             onClick={() => { setSelectedRequest(req); setIsCancelDialogOpen(true); }}
                             title="Cancel Request"
                           >
-                            <X className="h-4 w-4 text-red-500" />
+                            <X className="h-4 w-4 text-destructive" />
                           </Button>
                         )}
                       </div>
@@ -305,10 +305,10 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className={`flex flex-col px-2 py-1 rounded text-xs ${
                       selectedRequest.status === 'pending_manager'
-                        ? 'bg-orange-100 text-orange-700 font-medium'
+                        ? 'bg-status-warning-muted text-status-warning font-medium'
                         : ['pending_hr', 'approved'].includes(selectedRequest.status)
-                          ? 'bg-green-100 text-green-700'
-                          : selectedRequest.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+                          ? 'bg-status-success-muted text-status-success'
+                          : selectedRequest.status === 'rejected' ? 'bg-destructive/10 text-destructive' : 'bg-status-neutral-muted text-status-neutral'
                     }`}>
                       <span>1. Manager</span>
                       {resolvedManager && (
@@ -318,10 +318,10 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
                     <span className="text-muted-foreground">→</span>
                     <div className={`px-2 py-1 rounded text-xs ${
                       selectedRequest.status === 'pending_hr'
-                        ? 'bg-blue-100 text-blue-700 font-medium'
+                        ? 'bg-status-info-muted text-status-info font-medium'
                         : selectedRequest.status === 'approved'
-                          ? 'bg-green-100 text-green-700'
-                          : selectedRequest.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+                          ? 'bg-status-success-muted text-status-success'
+                          : selectedRequest.status === 'rejected' ? 'bg-destructive/10 text-destructive' : 'bg-status-neutral-muted text-status-neutral'
                     }`}>
                       2. HR
                     </div>
@@ -342,23 +342,23 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Reason</p>
-                <div className="mt-1 p-3 bg-slate-50 rounded-lg border">
+                <div className="mt-1 p-3 bg-muted/50 rounded-lg border">
                   <p>{selectedRequest.reason || 'No reason provided'}</p>
                 </div>
               </div>
               {selectedRequest.comments && (
                 <div>
                   <p className="text-sm text-muted-foreground">Your Additional Comments</p>
-                  <div className="mt-1 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-blue-800">{selectedRequest.comments}</p>
+                  <div className="mt-1 p-3 bg-status-info-muted rounded-lg border border-status-info/30">
+                    <p className="text-status-info">{selectedRequest.comments}</p>
                   </div>
                 </div>
               )}
               {selectedRequest.adminNotes && (
                 <div>
                   <p className="text-sm text-muted-foreground">Admin Notes</p>
-                  <div className="mt-1 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                    <p className="text-amber-800">{selectedRequest.adminNotes}</p>
+                  <div className="mt-1 p-3 bg-status-warning-muted rounded-lg border border-status-warning/30">
+                    <p className="text-status-warning">{selectedRequest.adminNotes}</p>
                   </div>
                 </div>
               )}
@@ -381,7 +381,7 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
       <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
+            <DialogTitle className="flex items-center gap-2 text-destructive">
               <XCircle className="h-5 w-5" />
               Cancel Leave Request
             </DialogTitle>
@@ -391,7 +391,7 @@ export default function EmployeeDashboardSection({ setActiveSection }: Props) {
           </DialogHeader>
           {selectedRequest && (
             <div className="py-4">
-              <div className="p-4 bg-slate-50 rounded-lg border">
+              <div className="p-4 bg-muted/50 rounded-lg border">
                 <p className="font-medium capitalize">{selectedRequest.leaveType.replace('_', ' ')}</p>
                 <p className="text-sm text-muted-foreground">
                   {format(new Date(selectedRequest.startDate), 'd MMM')} - {format(new Date(selectedRequest.endDate), 'd MMM yyyy')}

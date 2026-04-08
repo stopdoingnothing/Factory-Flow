@@ -51,7 +51,7 @@ export function GrievancesSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-slate-900">Grievances</h1>
+        <h1 className="text-3xl font-heading font-bold text-foreground">Grievances</h1>
         <p className="text-muted-foreground">Review and manage employee grievances and complaints</p>
       </div>
 
@@ -104,21 +104,21 @@ export function GrievancesSection() {
                       </TableCell>
                       <TableCell>
                         <Badge className={
-                          grievance.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                          grievance.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                          grievance.priority === 'normal' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
+                          grievance.priority === 'urgent' ? 'bg-destructive/10 text-destructive' :
+                          grievance.priority === 'high' ? 'bg-status-warning-muted text-status-warning' :
+                          grievance.priority === 'normal' ? 'bg-status-info-muted text-status-info' :
+                          'bg-status-neutral-muted text-status-neutral'
                         }>
                           {grievance.priority}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge className={
-                          grievance.status === 'submitted' ? 'bg-yellow-100 text-yellow-700' :
-                          grievance.status === 'in_review' ? 'bg-blue-100 text-blue-700' :
-                          grievance.status === 'resolved' ? 'bg-green-100 text-green-700' :
-                          grievance.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'
+                          grievance.status === 'submitted' ? 'bg-status-warning-muted text-status-warning' :
+                          grievance.status === 'in_review' ? 'bg-status-info-muted text-status-info' :
+                          grievance.status === 'resolved' ? 'bg-status-success-muted text-status-success' :
+                          grievance.status === 'rejected' ? 'bg-destructive/10 text-destructive' :
+                          'bg-status-neutral-muted text-status-neutral'
                         }>
                           {grievance.status.replace('_', ' ')}
                         </Badge>
@@ -182,10 +182,10 @@ export function GrievancesSection() {
                   <div>
                     <Label className="text-muted-foreground text-sm">Priority</Label>
                     <Badge className={
-                      selectedGrievance.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                      selectedGrievance.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                      selectedGrievance.priority === 'normal' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-700'
+                      selectedGrievance.priority === 'urgent' ? 'bg-destructive/10 text-destructive' :
+                      selectedGrievance.priority === 'high' ? 'bg-status-warning-muted text-status-warning' :
+                      selectedGrievance.priority === 'normal' ? 'bg-status-info-muted text-status-info' :
+                      'bg-status-neutral-muted text-status-neutral'
                     }>
                       {selectedGrievance.priority}
                     </Badge>
@@ -193,11 +193,11 @@ export function GrievancesSection() {
                   <div>
                     <Label className="text-muted-foreground text-sm">Status</Label>
                     <Badge className={
-                      selectedGrievance.status === 'submitted' ? 'bg-yellow-100 text-yellow-700' :
-                      selectedGrievance.status === 'in_review' ? 'bg-blue-100 text-blue-700' :
-                      selectedGrievance.status === 'resolved' ? 'bg-green-100 text-green-700' :
-                      selectedGrievance.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-700'
+                      selectedGrievance.status === 'submitted' ? 'bg-status-warning-muted text-status-warning' :
+                      selectedGrievance.status === 'in_review' ? 'bg-status-info-muted text-status-info' :
+                      selectedGrievance.status === 'resolved' ? 'bg-status-success-muted text-status-success' :
+                      selectedGrievance.status === 'rejected' ? 'bg-destructive/10 text-destructive' :
+                      'bg-status-neutral-muted text-status-neutral'
                     }>
                       {selectedGrievance.status.replace('_', ' ')}
                     </Badge>
@@ -211,7 +211,7 @@ export function GrievancesSection() {
 
                 <div>
                   <Label className="text-muted-foreground text-sm">Description</Label>
-                  <div className="mt-1 p-3 bg-slate-50 rounded-lg border whitespace-pre-wrap">
+                  <div className="mt-1 p-3 bg-muted/50 rounded-lg border whitespace-pre-wrap">
                     {selectedGrievance.description}
                   </div>
                 </div>
@@ -256,7 +256,7 @@ export function GrievancesSection() {
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      className="text-red-600 border-red-200 hover:bg-red-50"
+                      className="text-destructive border-destructive/30 hover:bg-destructive/10"
                       onClick={() => updateGrievanceStatusMutation.mutate({
                         id: selectedGrievance.id,
                         status: 'rejected',
@@ -266,7 +266,7 @@ export function GrievancesSection() {
                       <X className="mr-2 h-4 w-4" /> Reject
                     </Button>
                     <Button
-                      className="bg-green-600 hover:bg-green-700"
+                      className="bg-status-success hover:bg-status-success/80 text-white"
                       onClick={() => updateGrievanceStatusMutation.mutate({
                         id: selectedGrievance.id,
                         status: 'resolved',

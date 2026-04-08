@@ -155,7 +155,7 @@ export default function OrgPositionsSection() {
                     {(() => {
                       const t = (pos as any).tier || 1;
                       return t > 1
-                        ? <Badge variant="outline" className="text-xs border-slate-400 text-slate-600">Tier {t}</Badge>
+                        ? <Badge variant="outline" className="text-xs">Tier {t}</Badge>
                         : <span className="text-muted-foreground text-xs">1</span>;
                     })()}
                   </TableCell>
@@ -169,26 +169,26 @@ export default function OrgPositionsSection() {
                           ))}
                       </div>
                     ) : isOutsourced ? (
-                      <span className="text-amber-600 italic">Outsourced</span>
+                      <span className="text-status-warning italic">Outsourced</span>
                     ) : (
-                      <span className="text-red-500 italic">Vacant</span>
+                      <span className="text-destructive italic">Vacant</span>
                     )}
                   </TableCell>
                   <TableCell>
                     {isFilled ? (
-                      <Badge variant="default" className="bg-green-600">{assignedUsers.length} assigned</Badge>
+                      <Badge variant="default" className="bg-status-success text-white">{assignedUsers.length} assigned</Badge>
                     ) : isOutsourced ? (
-                      <Badge className="bg-amber-500 text-white">Outsourced</Badge>
+                      <Badge className="bg-status-warning text-white">Outsourced</Badge>
                     ) : (
                       <Badge variant="destructive">Vacant</Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => handleOpenEditPosition(pos)} data-testid={`button-edit-position-${pos.id}`}>
-                      <Pencil className="h-4 w-4 text-slate-500" />
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => handleDeletePosition(pos.id)} data-testid={`button-delete-position-${pos.id}`}>
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                      <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -335,7 +335,7 @@ export default function OrgPositionsSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-slate-900 dark:text-slate-100">Organisation Setup</h1>
+        <h1 className="text-3xl font-heading font-bold text-foreground">Organisation Setup</h1>
         <p className="text-muted-foreground">Manage positions, departments, and employee classifications.</p>
       </div>
 
@@ -410,7 +410,7 @@ export default function OrgPositionsSection() {
                           </TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="icon" onClick={() => handleOpenEditDept(dept)} data-testid={`button-edit-dept-${dept.id}`}>
-                              <Pencil className="h-4 w-4 text-slate-500" />
+                              <Pencil className="h-4 w-4 text-muted-foreground" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -420,7 +420,7 @@ export default function OrgPositionsSection() {
                               title={employeeCount > 0 ? "Cannot delete department with personnel" : "Delete department"}
                               data-testid={`button-delete-dept-${dept.id}`}
                             >
-                              <Trash2 className={`h-4 w-4 ${employeeCount > 0 ? 'text-slate-300' : 'text-red-500'}`} />
+                              <Trash2 className={`h-4 w-4 ${employeeCount > 0 ? 'text-muted-foreground/40' : 'text-destructive'}`} />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -469,9 +469,9 @@ export default function OrgPositionsSection() {
                       </TableCell>
                       <TableCell>
                         {type.hasLeaveEntitlement === 'true' ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          <CheckCircle2 className="h-4 w-4 text-status-success" />
                         ) : (
-                          <X className="h-4 w-4 text-red-500" />
+                          <X className="h-4 w-4 text-destructive" />
                         )}
                       </TableCell>
                       <TableCell>
@@ -488,7 +488,7 @@ export default function OrgPositionsSection() {
                           disabled={type.isDefault === 'true'}
                           data-testid={`button-delete-type-${type.id}`}
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -547,11 +547,11 @@ export default function OrgPositionsSection() {
               />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded p-2">
+              <p className="text-xs text-muted-foreground bg-status-info-muted border border-status-info/30 rounded p-2">
                 Employees are assigned to positions from the employee edit page, not here. This page is for defining position names and hierarchy only.
               </p>
             </div>
-            <div className="flex items-start gap-3 p-3 border rounded-lg bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+            <div className="flex items-start gap-3 p-3 border rounded-lg bg-status-warning-muted border-status-warning/30">
               <Checkbox
                 id="pos-outsourced"
                 checked={positionForm.isOutsourced}

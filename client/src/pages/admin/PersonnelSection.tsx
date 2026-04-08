@@ -936,7 +936,7 @@ export default function PersonnelSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-gray-900">{isAdminUser ? 'Personnel' : 'My Team'}</h1>
+        <h1 className="text-3xl font-heading font-bold text-foreground">{isAdminUser ? 'Personnel' : 'My Team'}</h1>
         <p className="text-muted-foreground">{isAdminUser ? 'Manage personnel access, IDs, and leave balances' : 'View your direct reports'}</p>
       </div>
       <Card>
@@ -1018,19 +1018,19 @@ export default function PersonnelSection() {
               .sort((a: any, b: any) => `${a.emp.firstName} ${a.emp.surname}`.localeCompare(`${b.emp.firstName} ${b.emp.surname}`));
             if (withMissing.length === 0) return null;
             return (
-              <div className="mb-4 border border-amber-200 rounded-lg bg-amber-50 p-3">
+              <div className="mb-4 border border-status-warning/30 rounded-lg bg-status-warning-muted p-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                  <span className="text-sm font-semibold text-amber-800">{withMissing.length} employee(s) have incomplete records</span>
-                  <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs text-amber-700" onClick={handleExportMissingInfoPdf}>
+                  <AlertTriangle className="h-4 w-4 text-status-warning flex-shrink-0" />
+                  <span className="text-sm font-semibold text-status-warning">{withMissing.length} employee(s) have incomplete records</span>
+                  <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs text-status-warning" onClick={handleExportMissingInfoPdf}>
                     Export PDF
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
                   {withMissing.map(({ emp, missing }: any) => (
-                    <div key={emp.id} className="flex items-center gap-1 bg-white border border-amber-200 rounded px-2 py-0.5 text-xs" title={`Missing: ${missing.join(', ')}`}>
+                    <div key={emp.id} className="flex items-center gap-1 bg-card border border-status-warning/30 rounded px-2 py-0.5 text-xs" title={`Missing: ${missing.join(', ')}`}>
                       <span className="font-medium">{emp.firstName} {emp.surname}</span>
-                      <span className="text-amber-600">· {missing.length} field{missing.length > 1 ? 's' : ''}</span>
+                      <span className="text-status-warning">· {missing.length} field{missing.length > 1 ? 's' : ''}</span>
                     </div>
                   ))}
                 </div>
@@ -1041,23 +1041,23 @@ export default function PersonnelSection() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8"></TableHead>
-                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleSort('id')} data-testid="sort-id">
+                <TableHead className="cursor-pointer select-none hover:bg-muted/30" onClick={() => handleSort('id')} data-testid="sort-id">
                   ID Number <SortIcon field="id" />
                 </TableHead>
-                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleSort('name')} data-testid="sort-name">
+                <TableHead className="cursor-pointer select-none hover:bg-muted/30" onClick={() => handleSort('name')} data-testid="sort-name">
                   Name <SortIcon field="name" />
                 </TableHead>
-                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleSort('department')} data-testid="sort-department">
+                <TableHead className="cursor-pointer select-none hover:bg-muted/30" onClick={() => handleSort('department')} data-testid="sort-department">
                   Department <SortIcon field="department" />
                 </TableHead>
                 <TableHead>Company</TableHead>
-                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleSort('tenure')} data-testid="sort-tenure">
+                <TableHead className="cursor-pointer select-none hover:bg-muted/30" onClick={() => handleSort('tenure')} data-testid="sort-tenure">
                   Tenure <SortIcon field="tenure" />
                 </TableHead>
-                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleSort('leave')} data-testid="sort-leave">
+                <TableHead className="cursor-pointer select-none hover:bg-muted/30" onClick={() => handleSort('leave')} data-testid="sort-leave">
                   Leave Balance <SortIcon field="leave" />
                 </TableHead>
-                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleSort('role')} data-testid="sort-role">
+                <TableHead className="cursor-pointer select-none hover:bg-muted/30" onClick={() => handleSort('role')} data-testid="sort-role">
                   Role <SortIcon field="role" />
                 </TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -1073,18 +1073,18 @@ export default function PersonnelSection() {
                 const isExpanded = expandedEmployees.has(emp.id);
                 return (
                   <React.Fragment key={emp.id}>
-                    <TableRow className="cursor-pointer hover:bg-slate-50" onClick={() => toggleEmployeeExpanded(emp.id)}>
+                    <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => toggleEmployeeExpanded(emp.id)}>
                       <TableCell className="w-8">
                         {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 text-slate-400" />
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         ) : (
-                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         )}
                       </TableCell>
                       <TableCell className="font-mono font-medium">{emp.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full overflow-hidden bg-slate-100">
+                          <div className="h-8 w-8 rounded-full overflow-hidden bg-muted">
                             <img src={emp.photoUrl || 'https://github.com/shadcn.png'} alt={`${emp.firstName} ${emp.surname}`} className="h-full w-full object-cover" />
                           </div>
                           {emp.firstName} {emp.surname}
@@ -1117,7 +1117,7 @@ export default function PersonnelSection() {
                         {isAdminUser && (
                           <>
                             <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(emp)} title="Edit" data-testid={`button-edit-${emp.id}`}>
-                              <Pencil className="h-4 w-4 text-slate-500" />
+                              <Pencil className="h-4 w-4 text-muted-foreground" />
                             </Button>
                             {!emp.terminationDate ? (
                               <Button
@@ -1131,7 +1131,7 @@ export default function PersonnelSection() {
                                 title="Terminate"
                                 data-testid={`button-terminate-${emp.id}`}
                               >
-                                <UserX className="h-4 w-4 text-amber-600" />
+                                <UserX className="h-4 w-4 text-status-warning" />
                               </Button>
                             ) : (
                               <Button
@@ -1144,21 +1144,21 @@ export default function PersonnelSection() {
                                 title="Reactivate"
                                 data-testid={`button-reactivate-${emp.id}`}
                               >
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                <CheckCircle2 className="h-4 w-4 text-status-success" />
                               </Button>
                             )}
                             <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(emp.id)} title="Delete" data-testid={`button-delete-${emp.id}`}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
+                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </>
                         )}
                       </TableCell>
                     </TableRow>
                     {isExpanded && (
-                      <TableRow key={`${emp.id}-expanded`} className="bg-slate-50">
+                      <TableRow key={`${emp.id}-expanded`} className="bg-muted/50">
                         <TableCell colSpan={8} className="py-4">
                           <div className="pl-8 space-y-4">
-                            <div className="flex flex-wrap gap-8 p-3 bg-white rounded-lg border mb-4">
+                            <div className="flex flex-wrap gap-8 p-3 bg-card rounded-lg border mb-4">
                               <div>
                                 <p className="text-xs text-muted-foreground">Start Date</p>
                                 <p className="font-medium">{emp.startDate ? formatDateForDisplay(emp.startDate) : 'Not set'}</p>
@@ -1192,7 +1192,7 @@ export default function PersonnelSection() {
                               {emp.terminationDate && (
                                 <div>
                                   <p className="text-xs text-muted-foreground">Termination Date</p>
-                                  <p className="font-medium text-red-600">{formatDateForDisplay(emp.terminationDate)}</p>
+                                  <p className="font-medium text-destructive">{formatDateForDisplay(emp.terminationDate)}</p>
                                 </div>
                               )}
                               {(() => {
@@ -1203,9 +1203,9 @@ export default function PersonnelSection() {
                                     <>
                                       <div>
                                         <p className="text-xs text-muted-foreground">Contract End Date</p>
-                                        <p className={`font-medium ${isExpired ? 'text-red-600' : ''}`}>
+                                        <p className={`font-medium ${isExpired ? 'text-destructive' : ''}`}>
                                           {emp.contractEndDate ? formatDateForDisplay(emp.contractEndDate) : 'Not set'}
-                                          {isExpired && <span className="ml-2 text-red-600 text-xs">(Expired)</span>}
+                                          {isExpired && <span className="ml-2 text-destructive text-xs">(Expired)</span>}
                                         </p>
                                       </div>
                                       <div className="flex items-end">
@@ -1233,13 +1233,13 @@ export default function PersonnelSection() {
                               })()}
                             </div>
 
-                            <p className="text-sm font-medium text-slate-700">Leave Balance Details</p>
+                            <p className="text-sm font-medium text-foreground">Leave Balance Details</p>
                             <div className="grid grid-cols-4 gap-4">
                               {['Annual Leave', 'Sick Leave', 'Family Responsibility', 'Study Leave'].map(leaveType => {
                                 const balance = empBalances.find((b: LeaveBalance) => b.leaveType === leaveType);
                                 const available = balance ? (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0) : 0;
                                 return (
-                                  <div key={leaveType} className="p-3 bg-white rounded-lg border">
+                                  <div key={leaveType} className="p-3 bg-card rounded-lg border">
                                     <p className="text-xs text-muted-foreground mb-1">{leaveType}</p>
                                     {balance ? (
                                       <>
@@ -1271,11 +1271,11 @@ export default function PersonnelSection() {
                                             const expiringSoon = expiry && expiry > today && new Date(expiry).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
                                             return (
                                               <div className="space-y-0.5">
-                                                <div className="flex justify-between text-blue-600 font-medium">
+                                                <div className="flex justify-between text-status-info font-medium">
                                                   <span>Carried over:</span><span>+{formatLeaveDays(balance.carryOverDays)}</span>
                                                 </div>
                                                 {expiry && (
-                                                  <div className={`text-xs ${expiringSoon ? 'text-orange-600 font-medium' : 'text-muted-foreground'}`}>
+                                                  <div className={`text-xs ${expiringSoon ? 'text-status-warning font-medium' : 'text-muted-foreground'}`}>
                                                     {expiringSoon ? '⚠ Expires: ' : 'Use by: '}{new Date(expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                   </div>
                                                 )}
@@ -1328,7 +1328,7 @@ export default function PersonnelSection() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <UserX className="h-5 w-5 text-slate-500" />
+              <UserX className="h-5 w-5 text-muted-foreground" />
               Excluded from Leave
             </CardTitle>
             <CardDescription>
@@ -1348,14 +1348,14 @@ export default function PersonnelSection() {
               </TableHeader>
               <TableBody>
                 {users.filter(u => !u.terminationDate && (u as any).excludeFromLeave).map((emp) => (
-                  <TableRow key={emp.id} className="bg-slate-50/50">
+                  <TableRow key={emp.id} className="bg-muted/50/50">
                     <TableCell className="font-mono font-medium text-muted-foreground">{emp.id}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full overflow-hidden bg-slate-100">
+                        <div className="h-8 w-8 rounded-full overflow-hidden bg-muted">
                           <img src={emp.photoUrl || 'https://github.com/shadcn.png'} alt={`${emp.firstName} ${emp.surname}`} className="h-full w-full object-cover" />
                         </div>
-                        <span className="text-slate-600">{emp.firstName} {emp.surname}</span>
+                        <span className="text-muted-foreground">{emp.firstName} {emp.surname}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{emp.department || '-'}</TableCell>
@@ -1364,10 +1364,10 @@ export default function PersonnelSection() {
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(emp)} title="Edit" data-testid={`button-edit-excluded-${emp.id}`}>
-                        <Pencil className="h-4 w-4 text-slate-400" />
+                        <Pencil className="h-4 w-4 text-muted-foreground" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(emp.id)} title="Delete" data-testid={`button-delete-excluded-${emp.id}`}>
-                        <Trash2 className="h-4 w-4 text-red-400" />
+                        <Trash2 className="h-4 w-4 text-destructive/70" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -1393,7 +1393,7 @@ export default function PersonnelSection() {
                 const pendingDays = typeBalances.reduce((sum: number, b: LeaveBalance) => sum + (b.pending ?? 0), 0);
                 const available = Math.round(totalDays - takenDays - pendingDays);
                 return (
-                  <div key={leaveType} className="p-4 bg-slate-50 rounded-lg border">
+                  <div key={leaveType} className="p-4 bg-muted/50 rounded-lg border">
                     <p className="text-sm text-muted-foreground">{leaveType}</p>
                     <p className="text-2xl font-bold">{formatLeaveDays(available)}</p>
                     <p className="text-xs text-muted-foreground">Available ({formatLeaveDays(Math.round(takenDays))} taken, {formatLeaveDays(Math.round(pendingDays))} pending)</p>
@@ -1403,18 +1403,18 @@ export default function PersonnelSection() {
             </div>
             
             <div>
-              <p className="text-sm font-medium mb-2 text-amber-600">Low Leave Balance Alerts</p>
+              <p className="text-sm font-medium mb-2 text-status-warning">Low Leave Balance Alerts</p>
               <div className="space-y-2">
                 {users.filter(u => !isManagerOrAbove(u)).map(emp => {
                   const empBalances = leaveBalances.filter((b: LeaveBalance) => b.userId === emp.id);
                   const lowBalances = empBalances.filter((b: LeaveBalance) => ((b.total ?? 0) - (b.taken ?? 0) - (b.pending ?? 0)) <= 2 && (b.total ?? 0) > 0);
                   if (lowBalances.length === 0) return null;
                   return (
-                    <div key={emp.id} className="flex items-center justify-between p-2 bg-amber-50 rounded border border-amber-200">
+                    <div key={emp.id} className="flex items-center justify-between p-2 bg-status-warning-muted rounded border border-status-warning/30">
                       <span className="font-medium text-sm">{emp.firstName} {emp.surname}</span>
                       <div className="flex gap-2">
                         {lowBalances.map((b: LeaveBalance) => (
-                          <Badge key={b.id} variant="outline" className="border-amber-400 text-amber-700 text-[10px]">
+                          <Badge key={b.id} variant="outline" className="border-status-warning text-status-warning text-[10px]">
                             {b.leaveType}: {formatLeaveDays(Math.round((b.total ?? 0) - (b.taken ?? 0) - (b.pending ?? 0)))} left
                           </Badge>
                         ))}
@@ -1438,7 +1438,7 @@ export default function PersonnelSection() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <UserX className="h-5 w-5 text-amber-600" />
+              <UserX className="h-5 w-5 text-status-warning" />
               Terminated Personnel
             </CardTitle>
             <CardDescription>
@@ -1459,11 +1459,11 @@ export default function PersonnelSection() {
               </TableHeader>
               <TableBody>
                 {users.filter(u => u.terminationDate).map((emp) => (
-                  <TableRow key={emp.id} className="bg-slate-50/50">
+                  <TableRow key={emp.id} className="bg-muted/50/50">
                     <TableCell className="font-mono font-medium text-muted-foreground">{emp.id}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full overflow-hidden bg-slate-100 opacity-60">
+                        <div className="h-8 w-8 rounded-full overflow-hidden bg-muted opacity-60">
                           <img src={emp.photoUrl || 'https://github.com/shadcn.png'} alt={`${emp.firstName} ${emp.surname}`} className="h-full w-full object-cover grayscale" />
                         </div>
                         <span className="text-muted-foreground">{emp.firstName} {emp.surname}</span>
@@ -1471,7 +1471,7 @@ export default function PersonnelSection() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{emp.department}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="border-amber-400 text-amber-700">
+                      <Badge variant="outline" className="border-status-warning text-status-warning">
                         {emp.terminationDate ? formatDateForDisplay(emp.terminationDate) : '-'}
                       </Badge>
                     </TableCell>
@@ -1494,10 +1494,10 @@ export default function PersonnelSection() {
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(emp)} title="View Details" data-testid={`button-edit-terminated-${emp.id}`}>
-                        <Pencil className="h-4 w-4 text-slate-400" />
+                        <Pencil className="h-4 w-4 text-muted-foreground" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(emp.id)} title="Delete Permanently" data-testid={`button-delete-terminated-${emp.id}`}>
-                        <Trash2 className="h-4 w-4 text-red-400" />
+                        <Trash2 className="h-4 w-4 text-destructive/70" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -1563,10 +1563,10 @@ export default function PersonnelSection() {
                         className={isDuplicate ? 'border-red-500 focus-visible:ring-red-500' : ''}
                       />
                       {isDuplicate && (
-                        <p className="text-xs text-red-600">✕ Employee ID <strong>{currentUser.id}</strong> is already in use. Choose a different ID.</p>
+                        <p className="text-xs text-destructive">✕ Employee ID <strong>{currentUser.id}</strong> is already in use. Choose a different ID.</p>
                       )}
                       {idChanged && !isDuplicate && (
-                        <p className="text-xs text-amber-600">⚠ ID will change from <strong>{originalId}</strong> to <strong>{currentUser.id}</strong>. All linked records will be updated.</p>
+                        <p className="text-xs text-status-warning">⚠ ID will change from <strong>{originalId}</strong> to <strong>{currentUser.id}</strong>. All linked records will be updated.</p>
                       )}
                     </>
                   );
@@ -1678,7 +1678,7 @@ export default function PersonnelSection() {
                   placeholder="Select a department"
                 />
                 {departments.length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">No departments found. Please add them in the Departments section.</p>
+                  <p className="text-xs text-status-warning mt-1">No departments found. Please add them in the Departments section.</p>
                 )}
               </div>
             </div>
@@ -1709,7 +1709,7 @@ export default function PersonnelSection() {
                     const currentRoles: string[] = (currentUser as any).roles || [];
                     const checked = currentRoles.includes(value);
                     return (
-                      <div key={value} className="flex items-start gap-3 p-2 rounded-md hover:bg-slate-50">
+                      <div key={value} className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50">
                         <Checkbox
                           id={`role-${value}`}
                           checked={checked}
@@ -1729,7 +1729,7 @@ export default function PersonnelSection() {
                     );
                   })}
                   {((currentUser as any).roles || []).length === 0 && (
-                    <p className="text-xs text-amber-600">At least one role must be assigned.</p>
+                    <p className="text-xs text-status-warning">At least one role must be assigned.</p>
                   )}
                 </div>
               </div>
@@ -1805,7 +1805,7 @@ export default function PersonnelSection() {
                   type="date"
                   value={currentUser.contractEndDate ? currentUser.contractEndDate.split('T')[0] : ''}
                   onChange={(e) => setCurrentUser({...currentUser, contractEndDate: e.target.value})}
-                  className="col-span-3 border-amber-300 bg-amber-50"
+                  className="col-span-3 border-status-warning/50 bg-status-warning-muted"
                   data-testid="input-contract-end-date"
                 />
               </div>
@@ -1917,7 +1917,7 @@ export default function PersonnelSection() {
               <Label className="text-right">Profile Photo</Label>
               <div className="col-span-3">
                 <div className="flex items-center gap-4">
-                  <div className="w-24 h-24 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden bg-slate-50">
+                  <div className="w-24 h-24 rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden bg-muted/50">
                     {currentUser.photoUrl ? (
                       <div className="relative group w-full h-full">
                         <img src={currentUser.photoUrl} alt="Preview" className="w-full h-full object-cover" />
@@ -1933,7 +1933,7 @@ export default function PersonnelSection() {
                         </div>
                       </div>
                     ) : (
-                      <Camera className="h-8 w-8 text-slate-300" />
+                      <Camera className="h-8 w-8 text-muted-foreground/50" />
                     )}
                   </div>
                   
@@ -1958,7 +1958,7 @@ export default function PersonnelSection() {
                         onClick={() => setIsMultiAngleCapture(true)}
                         disabled={extractingFace}
                       >
-                        <Shield className="h-4 w-4 text-blue-600" />
+                        <Shield className="h-4 w-4 text-status-info" />
                         <div className="text-left">
                           <div className="font-medium">Secure Face Registration</div>
                           <div className="text-xs text-muted-foreground">Captures multiple angles for better recognition</div>
@@ -2066,7 +2066,7 @@ export default function PersonnelSection() {
                 </Select>
               </div>
             </div>
-            <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+            <div className="p-3 bg-status-info-muted rounded-lg text-sm text-status-info">
               <Mail className="inline h-4 w-4 mr-2" />
               Login credentials will be emailed to the admin after creation.
             </div>
@@ -2096,7 +2096,7 @@ export default function PersonnelSection() {
               <div className="space-y-6">
                 {/* Active balances */}
                 <div>
-                  <p className="text-sm font-semibold text-slate-700 mb-3">Active Leave Types</p>
+                  <p className="text-sm font-semibold text-foreground mb-3">Active Leave Types</p>
                   {employeeBalances.length === 0 ? (
                     <p className="text-muted-foreground text-sm text-center py-4">No leave balances set for this employee.</p>
                   ) : (
@@ -2104,7 +2104,7 @@ export default function PersonnelSection() {
                       {employeeBalances.map((balance: LeaveBalance) => {
                         const available = (balance.total ?? 0) - (balance.taken ?? 0) - (balance.pending ?? 0);
                         return (
-                          <div key={balance.id} className="p-4 bg-slate-50 rounded-lg border">
+                          <div key={balance.id} className="p-4 bg-muted/50 rounded-lg border">
                             <div className="flex items-center justify-between mb-2">
                               <span className="font-medium capitalize">{balance.leaveType.replace('_', ' ')}</span>
                               <Badge variant={available > 0 ? 'default' : 'destructive'}>
@@ -2112,17 +2112,17 @@ export default function PersonnelSection() {
                               </Badge>
                             </div>
                             <div className="grid grid-cols-3 gap-2 text-sm">
-                              <div className="text-center p-2 bg-white rounded">
+                              <div className="text-center p-2 bg-muted/50 rounded">
                                 <p className="text-muted-foreground text-xs">Total</p>
                                 <p className="font-semibold">{formatLeaveDays(balance.total)}</p>
                               </div>
-                              <div className="text-center p-2 bg-white rounded">
+                              <div className="text-center p-2 bg-muted/50 rounded">
                                 <p className="text-muted-foreground text-xs">Taken</p>
-                                <p className="font-semibold text-amber-600">{formatLeaveDays(balance.taken)}</p>
+                                <p className="font-semibold text-status-warning">{formatLeaveDays(balance.taken)}</p>
                               </div>
-                              <div className="text-center p-2 bg-white rounded">
+                              <div className="text-center p-2 bg-muted/50 rounded">
                                 <p className="text-muted-foreground text-xs">Pending</p>
-                                <p className="font-semibold text-blue-600">{formatLeaveDays(balance.pending)}</p>
+                                <p className="font-semibold text-status-info">{formatLeaveDays(balance.pending)}</p>
                               </div>
                             </div>
                           </div>
@@ -2135,13 +2135,13 @@ export default function PersonnelSection() {
                 {/* Restricted types available to activate */}
                 {notActivated.length > 0 && (
                   <div>
-                    <p className="text-sm font-semibold text-slate-700 mb-1">Activate Restricted Leave</p>
+                    <p className="text-sm font-semibold text-foreground mb-1">Activate Restricted Leave</p>
                     <p className="text-xs text-muted-foreground mb-3">
                       The following leave types require HR/Admin activation per employee.
                     </p>
                     <div className="space-y-2">
                       {notActivated.map(t => (
-                        <div key={t.leaveType} className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div key={t.leaveType} className="flex items-center justify-between p-3 bg-status-warning-muted border border-status-warning/30 rounded-lg">
                           <div>
                             <p className="text-sm font-medium">{t.leaveType}</p>
                             <p className="text-xs text-muted-foreground">{t.description}</p>
@@ -2149,7 +2149,7 @@ export default function PersonnelSection() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="border-amber-400 text-amber-700 hover:bg-amber-100"
+                            className="border-status-warning text-status-warning hover:bg-status-warning-muted"
                             disabled={createLeaveBalanceMutation.isPending}
                             onClick={() =>
                               createLeaveBalanceMutation.mutate({
@@ -2294,7 +2294,7 @@ export default function PersonnelSection() {
       <Dialog open={isTerminationDialogOpen} onOpenChange={setIsTerminationDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-600">
+            <DialogTitle className="flex items-center gap-2 text-status-warning">
               <UserX className="h-5 w-5" />
               Terminate Personnel
             </DialogTitle>

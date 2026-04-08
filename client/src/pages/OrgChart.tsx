@@ -81,12 +81,14 @@ function ManagerNode({ data, x, y, showAttendance, clockedInUserIds }: { data: O
   return (
     <g transform={`translate(${x - NODE_WIDTH / 2}, ${y})`} style={{ opacity }}>
       <foreignObject width={NODE_WIDTH} height={MANAGER_NODE_HEIGHT}>
-        <div 
+        <div
+          xmlns="http://www.w3.org/1999/xhtml"
           className={`h-full rounded-lg border-2 shadow-md overflow-hidden ${
-            isVacant ? 'border-dashed border-red-400 bg-red-50' :
-            isOutsourced ? 'border-dashed border-amber-400 bg-amber-50' :
-            isRoot ? 'border-amber-500 bg-amber-50' : 'border-primary bg-primary/5'
+            isVacant ? 'border-dashed border-destructive bg-destructive/10' :
+            isOutsourced ? 'border-dashed border-status-warning bg-status-warning-muted' :
+            isRoot ? 'border-status-warning bg-status-warning-muted' : 'bg-card'
           }`}
+          style={!isVacant && !isOutsourced && !isRoot ? { borderColor: deptColor } : undefined}
         >
           {/* Department header at top */}
           <div 
@@ -99,11 +101,11 @@ function ManagerNode({ data, x, y, showAttendance, clockedInUserIds }: { data: O
           {/* Manager content */}
           <div className="flex items-center gap-2 p-2 pb-3">
             {isVacant ? (
-              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-red-200 text-red-600 border-2 border-dashed border-red-400">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-destructive/20 text-destructive border-2 border-dashed border-destructive/60">
                 <UserIcon className="h-4 w-4" />
               </div>
             ) : isOutsourced ? (
-              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-amber-200 text-amber-700 border-2 border-dashed border-amber-400">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-status-warning-muted text-status-warning border-2 border-dashed border-status-warning/60">
                 <Briefcase className="h-4 w-4" />
               </div>
             ) : data.photoUrl ? (
@@ -114,18 +116,18 @@ function ManagerNode({ data, x, y, showAttendance, clockedInUserIds }: { data: O
               />
             ) : (
               <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-                isRoot ? 'bg-amber-500 text-white' : 'bg-primary text-white'
+                isRoot ? 'bg-status-warning text-white' : 'bg-primary text-white'
               }`}>
                 <Crown className={isRoot ? "h-4 w-4" : "h-3.5 w-3.5"} />
               </div>
             )}
             <div className="flex-1 min-w-0 overflow-hidden">
-              <p className={`font-semibold text-[15px] truncate leading-tight ${isVacant ? 'text-red-600 italic' : isOutsourced ? 'text-amber-700 italic' : ''}`}>
+              <p className={`font-semibold text-[15px] truncate leading-tight ${isVacant ? 'text-destructive italic' : isOutsourced ? 'text-status-warning italic' : ''}`}>
                 {isVacant ? 'VACANT' : isOutsourced ? 'OUTSOURCED' : data.name}
               </p>
               <Badge 
                 variant={isVacant ? "destructive" : "default"} 
-                className={`text-[10px] px-1.5 py-0 h-4 mt-1 ${isOutsourced ? 'bg-amber-500 text-white' : ''}`}
+                className={`text-[10px] px-1.5 py-0 h-4 mt-1 ${isOutsourced ? 'bg-status-warning text-white' : ''}`}
               >
                 {isVacant ? 'Vacant' : isOutsourced ? 'Outsourced' : 'Manager'}
               </Badge>
@@ -145,7 +147,8 @@ function DepartmentGroupNode({ data, x, y, showAttendance, clockedInUserIds }: {
   return (
     <g transform={`translate(${x - NODE_WIDTH / 2}, ${y})`}>
       <foreignObject width={NODE_WIDTH} height={data.nodeHeight}>
-        <div 
+        <div
+          xmlns="http://www.w3.org/1999/xhtml"
           className="h-full rounded-lg border-2 shadow-sm overflow-hidden"
           style={{ borderColor: deptColor }}
         >
@@ -160,15 +163,15 @@ function DepartmentGroupNode({ data, x, y, showAttendance, clockedInUserIds }: {
             </span>
           </div>
           
-          <div className="bg-white">
+          <div className="bg-card">
             {workers.map((worker, idx) => {
               const isClockedIn = clockedInUserIds.has(worker.id);
               const workerOpacity = showAttendance ? (isClockedIn ? 1 : 0.3) : 1;
-              
+
               return (
-                <div 
+                <div
                   key={worker.id}
-                  className={`flex items-center gap-2 px-2 py-1 ${idx > 0 ? 'border-t border-slate-100' : ''}`}
+                  className={`flex items-center gap-2 px-2 py-1 ${idx > 0 ? 'border-t border-border/40' : ''}`}
                   style={{ height: WORKER_ROW_HEIGHT, opacity: workerOpacity }}
                 >
                   <img 
@@ -1083,7 +1086,7 @@ export default function OrgChart() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-slate-900">Organization Chart</h1>
+          <h1 className="text-3xl font-heading font-bold text-foreground">Organization Chart</h1>
           <p className="text-muted-foreground">Managers with department-grouped teams</p>
         </div>
         <div className="flex items-center gap-4">
@@ -1171,12 +1174,12 @@ export default function OrgChart() {
                   >
                     <Maximize2 className="h-4 w-4" />
                   </Button>
-                  <div className="h-6 w-px bg-slate-200 mx-1" />
+                  <div className="h-6 w-px bg-border mx-1" />
                   <Button 
                     variant={showAttendance ? "default" : "outline"} 
                     size="sm" 
                     onClick={() => setShowAttendance(!showAttendance)}
-                    className={showAttendance ? "bg-green-600 hover:bg-green-700" : ""}
+                    className={showAttendance ? "bg-status-success hover:bg-status-success/80 text-white" : ""}
                     data-testid="button-show-attendance"
                   >
                     {showAttendance ? (
@@ -1225,7 +1228,7 @@ export default function OrgChart() {
                   width={dimensions.width * zoom} 
                   height={dimensions.height * zoom}
                   className="min-w-full"
-                  style={{ minHeight: '400px', backgroundColor: '#ffffff' }}
+                  style={{ minHeight: '400px', backgroundColor: 'hsl(var(--card))' }}
                 >
                   <g transform={`scale(${zoom}) translate(${dimensions.offsetX || 0}, 30)`}>
                     {treeData.links().map((link, i) => (
@@ -1264,9 +1267,9 @@ export default function OrgChart() {
         )}
 
         {unassignedEmployees.length > 0 && (
-          <Card className="mt-4 border-amber-200">
+          <Card className="mt-4 border-status-warning/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-amber-700 flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-status-warning flex items-center gap-2">
                 <UserIcon className="h-4 w-4" />
                 {unassignedEmployees.length} employee{unassignedEmployees.length !== 1 ? 's' : ''} not assigned to a position
               </CardTitle>
@@ -1275,9 +1278,9 @@ export default function OrgChart() {
             <CardContent>
               <div className="flex flex-wrap gap-2">
                 {unassignedEmployees.map(u => (
-                  <div key={u.id} className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded px-2 py-1 text-xs text-amber-800">
+                  <div key={u.id} className="flex items-center gap-2 bg-status-warning-muted border border-status-warning/30 rounded px-2 py-1 text-xs text-status-warning">
                     <span className="font-medium">{u.firstName} {u.surname}</span>
-                    {u.department && <span className="text-amber-600">({u.department})</span>}
+                    {u.department && <span className="text-status-warning/80">({u.department})</span>}
                   </div>
                 ))}
               </div>

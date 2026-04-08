@@ -10,14 +10,14 @@ import type { LeaveRequest, PublicHoliday, User } from '@shared/schema';
 import PublicHolidaysSection from './PublicHolidaysSection';
 
 const LEAVE_TYPE_COLORS: Record<string, { bg: string; dot: string }> = {
-  'Annual Leave':           { bg: 'bg-blue-100',   dot: 'bg-blue-500' },
-  'Sick Leave':             { bg: 'bg-red-100',    dot: 'bg-red-500' },
-  'Family Responsibility':  { bg: 'bg-purple-100', dot: 'bg-purple-500' },
-  'Maternity Leave':        { bg: 'bg-pink-100',   dot: 'bg-pink-500' },
-  'Study Leave':            { bg: 'bg-green-100',  dot: 'bg-green-500' },
-  'Unpaid Leave':           { bg: 'bg-gray-100',   dot: 'bg-gray-500' },
+  'Annual Leave':           { bg: 'bg-blue-100 dark:bg-blue-900/40',   dot: 'bg-blue-500' },
+  'Sick Leave':             { bg: 'bg-red-100 dark:bg-red-900/40',     dot: 'bg-red-500' },
+  'Family Responsibility':  { bg: 'bg-purple-100 dark:bg-purple-900/40', dot: 'bg-purple-500' },
+  'Maternity Leave':        { bg: 'bg-pink-100 dark:bg-pink-900/40',   dot: 'bg-pink-500' },
+  'Study Leave':            { bg: 'bg-green-100 dark:bg-green-900/40', dot: 'bg-green-500' },
+  'Unpaid Leave':           { bg: 'bg-gray-100 dark:bg-gray-800/60',   dot: 'bg-gray-500' },
 };
-const DEFAULT_LEAVE = { bg: 'bg-emerald-100', dot: 'bg-emerald-500' };
+const DEFAULT_LEAVE = { bg: 'bg-emerald-100 dark:bg-emerald-900/40', dot: 'bg-emerald-500' };
 
 export default function LeaveCalendarSection() {
   const [displayDate, setDisplayDate] = useState(() => startOfMonth(new Date()));
@@ -61,7 +61,7 @@ export default function LeaveCalendarSection() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-slate-900 dark:text-slate-100">Leave Calendar</h1>
+        <h1 className="text-3xl font-heading font-bold text-foreground">Leave Calendar</h1>
         <p className="text-muted-foreground">Visual overview of employee leave schedules and public holidays</p>
       </div>
 
@@ -98,14 +98,14 @@ export default function LeaveCalendarSection() {
               {/* Legend */}
               <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded ring-2 ring-primary ring-offset-1 bg-white"></div>
+                  <div className="w-3 h-3 rounded ring-2 ring-primary ring-offset-1 bg-card"></div>
                   Today
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 bg-orange-100 border border-orange-300 rounded"></div>
+                  <div className="w-3 h-3 bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700 rounded"></div>
                   Public Holiday
                 </span>
-                <span className="text-slate-300 select-none">|</span>
+                <span className="text-border select-none">|</span>
                 {Object.entries(LEAVE_TYPE_COLORS).map(([type, colors]) => (
                   <span key={type} className="flex items-center gap-1.5">
                     <div className={`w-2.5 h-2.5 ${colors.dot} rounded-full`}></div>
@@ -141,8 +141,8 @@ export default function LeaveCalendarSection() {
                   const isToday = currentMonth === today.getMonth() && currentYear === today.getFullYear() && day === today.getDate();
                   const isWeekendDay = [0, 6].includes(new Date(dateStr).getDay());
 
-                  let cellBg = isWeekendDay ? 'bg-slate-50' : 'bg-muted/20';
-                  if (holiday) cellBg = 'bg-orange-100 border border-orange-300';
+                  let cellBg = isWeekendDay ? 'bg-muted/40' : 'bg-muted/20';
+                  if (holiday) cellBg = 'bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700';
                   else if (leavesOnDay.length > 0) {
                     const firstType = leavesOnDay[0].leaveType;
                     cellBg = (LEAVE_TYPE_COLORS[firstType] || DEFAULT_LEAVE).bg;
@@ -160,15 +160,15 @@ export default function LeaveCalendarSection() {
                         leavesOnDay.length > 0 ? `${leavesOnDay.length} on leave` : null,
                       ].filter(Boolean).join(' | ') || undefined}
                     >
-                      <span className={`text-xs font-medium ${isToday ? 'font-bold text-primary' : isWeekendDay ? 'text-slate-400' : ''}`}>
+                      <span className={`text-xs font-medium ${isToday ? 'font-bold text-primary' : isWeekendDay ? 'text-muted-foreground/60' : ''}`}>
                         {day}
                       </span>
 
                       {holiday && (
-                        <div className="text-orange-700 text-[9px] leading-tight mt-0.5 truncate font-medium">
+                        <div className="text-orange-700 dark:text-orange-400 text-[9px] leading-tight mt-0.5 truncate font-medium">
                           {holiday.name}
                           {holiday.religionGroup && (
-                            <span className="ml-1 text-[8px] bg-orange-200 text-orange-800 rounded px-0.5">
+                            <span className="ml-1 text-[8px] bg-orange-200 dark:bg-orange-900 text-orange-800 dark:text-orange-300 rounded px-0.5">
                               {holiday.religionGroup}
                             </span>
                           )}
@@ -184,7 +184,7 @@ export default function LeaveCalendarSection() {
                               title={type}
                             />
                           ))}
-                          <span className="text-[9px] font-bold text-slate-600 ml-0.5">{leavesOnDay.length}</span>
+                          <span className="text-[9px] font-bold text-foreground ml-0.5">{leavesOnDay.length}</span>
                         </div>
                       )}
                     </div>

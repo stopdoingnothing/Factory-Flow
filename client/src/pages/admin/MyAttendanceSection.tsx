@@ -67,14 +67,14 @@ export default function MyAttendanceSection() {
       </div>
 
       {status === 'success' ? (
-        <Card className="max-w-md mx-auto bg-green-50 border-green-200 animate-in zoom-in-95">
+        <Card className="max-w-md mx-auto bg-status-success-muted border-status-success/30 animate-in zoom-in-95">
           <CardContent className="pt-6 text-center space-y-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600">
+            <div className="w-16 h-16 bg-status-success-muted rounded-full flex items-center justify-center mx-auto text-status-success">
               <CheckCircle className="h-8 w-8" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-green-800">Success!</h3>
-              <p className="text-green-700">Successfully {lastAction} at {format(new Date(), 'HH:mm')}</p>
+              <h3 className="text-xl font-bold text-status-success">Success!</h3>
+              <p className="text-status-success">Successfully {lastAction} at {format(new Date(), 'HH:mm')}</p>
             </div>
           </CardContent>
         </Card>
@@ -123,7 +123,7 @@ export default function MyAttendanceSection() {
                   {attendanceLog.map((log: any) => (
                     <div key={log.id} className="flex items-center justify-between p-3 bg-muted/40 rounded border border-border">
                       <div className="flex items-center gap-3">
-                        <div className={`w-2 h-10 rounded ${log.type === 'in' ? 'bg-green-500' : 'bg-amber-500'}`} />
+                        <div className={`w-2 h-10 rounded ${log.type === 'in' ? 'bg-status-success' : 'bg-status-warning'}`} />
                         <div>
                           <div className="font-bold text-sm uppercase">{log.type === 'in' ? 'Clock In' : 'Clock Out'}</div>
                           <div className="text-xs text-muted-foreground flex items-center gap-1">

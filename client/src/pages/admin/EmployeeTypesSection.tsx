@@ -112,7 +112,7 @@ export default function EmployeeTypesSection() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-slate-900">Employee Types</h1>
+          <h1 className="text-3xl font-heading font-bold text-foreground">Employee Types</h1>
           <p className="text-muted-foreground">Manage employee classifications and their leave settings</p>
         </div>
         <Button onClick={handleOpenCreateType} data-testid="button-create-type">
@@ -148,9 +148,9 @@ export default function EmployeeTypesSection() {
                   </TableCell>
                   <TableCell>
                     {type.hasLeaveEntitlement === 'true' ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <CheckCircle2 className="h-4 w-4 text-status-success" />
                     ) : (
-                      <X className="h-4 w-4 text-red-500" />
+                      <X className="h-4 w-4 text-destructive" />
                     )}
                   </TableCell>
                   <TableCell>
@@ -169,7 +169,7 @@ export default function EmployeeTypesSection() {
                       data-testid={`button-delete-type-${type.id}`}
                       disabled={type.isDefault === 'true'}
                     >
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                      <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </TableCell>
                 </TableRow>

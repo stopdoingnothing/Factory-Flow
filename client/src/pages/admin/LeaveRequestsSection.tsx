@@ -280,7 +280,7 @@ export default function LeaveRequestsSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-slate-900">Leave Requests</h1>
+        <h1 className="text-3xl font-heading font-bold text-foreground">Leave Requests</h1>
         <p className="text-muted-foreground">Review and approve/reject employee leave requests</p>
       </div>
 
@@ -349,7 +349,7 @@ export default function LeaveRequestsSection() {
                           data-testid={`button-review-${request.id}`}
                           title="Review"
                         >
-                          <FileText className="h-4 w-4 text-blue-500" />
+                          <FileText className="h-4 w-4 text-status-info" />
                         </Button>
                         {actionInfo.canAct && (() => {
                           const canActHere =
@@ -371,7 +371,7 @@ export default function LeaveRequestsSection() {
                                 data-testid={`button-approve-${request.id}`}
                                 title={actionInfo.role === 'manager' ? 'Recommend' : 'Approve'}
                               >
-                                <Check className="h-4 w-4 text-green-500" />
+                                <Check className="h-4 w-4 text-status-success" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -386,7 +386,7 @@ export default function LeaveRequestsSection() {
                                 data-testid={`button-reject-${request.id}`}
                                 title={actionInfo.role === 'manager' ? 'Not Recommend' : 'Reject'}
                               >
-                                <X className="h-4 w-4 text-red-500" />
+                                <X className="h-4 w-4 text-destructive" />
                               </Button>
                             </>
                           );
@@ -402,7 +402,7 @@ export default function LeaveRequestsSection() {
                           data-testid={`button-delete-${request.id}`}
                           title="Permanently Delete"
                         >
-                          <Trash2 className="h-4 w-4 text-red-600" />
+                          <Trash2 className="h-4 w-4 text-destructive00" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -473,7 +473,7 @@ export default function LeaveRequestsSection() {
 
                       return (
                         <TableRow key={balance.id} data-testid={`row-balance-detail-${balance.id}`}
-                          className={idx === 0 ? 'border-t-2 border-t-slate-200' : ''}>
+                          className={idx === 0 ? 'border-t-2 border-t-border' : ''}>
                           <TableCell className="font-medium align-top">
                             {idx === 0 ? employeeName : ''}
                           </TableCell>
@@ -483,7 +483,7 @@ export default function LeaveRequestsSection() {
                           <TableCell className="text-right">{formatLeaveDays(pureEntitlement)}</TableCell>
                           <TableCell className="text-right">
                             {carryOver > 0 ? (
-                              <span className={`text-blue-600 font-medium${expiringSoon ? ' text-orange-600' : ''}`}>
+                              <span className={`text-status-info font-medium${expiringSoon ? ' text-status-warning' : ''}`}>
                                 +{formatLeaveDays(carryOver)}
                                 {carryOverExpiry && (
                                   <span className="block text-[10px] font-normal text-muted-foreground">
@@ -521,7 +521,7 @@ export default function LeaveRequestsSection() {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <CardTitle className="flex items-center gap-2">
-                      <BookOpen className="h-5 w-5 text-amber-600" />
+                      <BookOpen className="h-5 w-5 text-status-warning" />
                       Historic Leave Entries
                     </CardTitle>
                     <CardDescription>
@@ -618,7 +618,7 @@ export default function LeaveRequestsSection() {
                                     data-testid={`button-edit-historic-${request.id}`}
                                     title="Edit"
                                   >
-                                    <Pencil className="h-4 w-4 text-blue-500" />
+                                    <Pencil className="h-4 w-4 text-status-info" />
                                   </Button>
                                   <Button
                                     variant="ghost"
@@ -631,7 +631,7 @@ export default function LeaveRequestsSection() {
                                     data-testid={`button-delete-historic-${request.id}`}
                                     title="Delete"
                                   >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                    <Trash2 className="h-4 w-4 text-destructive00" />
                                   </Button>
                                 </>
                               )}
@@ -715,37 +715,37 @@ export default function LeaveRequestsSection() {
                   </div>
                 </div>
 
-                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <Label className="text-green-800 text-sm font-medium">Employee Leave Balance ({selectedLeaveRequest.leaveType.replace('_', ' ')})</Label>
-                  <p className="text-green-700 text-xs mt-1">
+                <div className="p-4 bg-status-success-muted rounded-lg border border-status-success/30">
+                  <Label className="text-status-success text-sm font-medium">Employee Leave Balance ({selectedLeaveRequest.leaveType.replace('_', ' ')})</Label>
+                  <p className="text-status-success text-xs mt-1">
                     This request accounts for {formatLeaveDays(requestedDays)} of the {formatLeaveDays(relevantBalance?.pending ?? 0)} pending day(s).
                   </p>
                   <div className="grid grid-cols-4 gap-2 mt-2 text-sm">
-                    <div className="text-center p-2 bg-white rounded">
+                    <div className="text-center p-2 bg-card rounded">
                       <p className="text-muted-foreground text-xs">Total</p>
                       <p className="font-semibold">{formatLeaveDays(relevantBalance?.total || 0)}</p>
                     </div>
-                    <div className="text-center p-2 bg-white rounded">
+                    <div className="text-center p-2 bg-card rounded">
                       <p className="text-muted-foreground text-xs">Taken</p>
-                      <p className="font-semibold text-amber-600">{formatLeaveDays(relevantBalance?.taken || 0)}</p>
+                      <p className="font-semibold text-status-warning">{formatLeaveDays(relevantBalance?.taken || 0)}</p>
                     </div>
-                    <div className="text-center p-2 bg-white rounded">
+                    <div className="text-center p-2 bg-card rounded">
                       <p className="text-muted-foreground text-xs">Pending</p>
-                      <p className="font-semibold text-blue-600">{formatLeaveDays(relevantBalance?.pending || 0)}</p>
+                      <p className="font-semibold text-status-info">{formatLeaveDays(relevantBalance?.pending || 0)}</p>
                     </div>
-                    <div className="text-center p-2 bg-white rounded">
+                    <div className="text-center p-2 bg-card rounded">
                       <p className="text-muted-foreground text-xs">Available</p>
-                      <p className={`font-semibold ${availableDays > 0 ? 'text-green-600' : 'text-red-600'}`}>{formatLeaveDays(availableDays)}</p>
+                      <p className={`font-semibold ${availableDays > 0 ? 'text-status-success' : 'text-destructive'}`}>{formatLeaveDays(availableDays)}</p>
                     </div>
                   </div>
                   {availableDays <= 0 && (
-                    <p className="text-red-600 text-xs mt-2 font-medium">Warning: Employee has no available leave for this type!</p>
+                    <p className="text-destructive text-xs mt-2 font-medium">Warning: Employee has no available leave for this type!</p>
                   )}
                 </div>
 
                 <div>
                   <Label className="text-muted-foreground text-sm">Reason</Label>
-                  <div className="mt-1 p-3 bg-slate-50 rounded-lg border">
+                  <div className="mt-1 p-3 bg-muted/50 rounded-lg border">
                     <p>{selectedLeaveRequest.reason || 'No reason provided'}</p>
                   </div>
                 </div>
@@ -753,8 +753,8 @@ export default function LeaveRequestsSection() {
                 {selectedLeaveRequest.comments && (
                   <div>
                     <Label className="text-muted-foreground text-sm">Additional Comments from Employee</Label>
-                    <div className="mt-1 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <p className="text-blue-800">{selectedLeaveRequest.comments}</p>
+                    <div className="mt-1 p-3 bg-status-info-muted rounded-lg border border-status-info/30">
+                      <p className="text-status-info">{selectedLeaveRequest.comments}</p>
                     </div>
                   </div>
                 )}
@@ -765,16 +765,16 @@ export default function LeaveRequestsSection() {
                     <Label className="text-muted-foreground text-sm">Approval History</Label>
 
                     {selectedLeaveRequest.managerDecision && (
-                      <div className={`p-3 rounded-lg border ${selectedLeaveRequest.managerDecision === 'rejected' ? 'bg-red-50 border-red-300' : 'bg-purple-50 border-purple-200'}`}>
+                      <div className={`p-3 rounded-lg border ${selectedLeaveRequest.managerDecision === 'rejected' ? 'bg-destructive/10 border-destructive/30' : 'bg-status-success-muted border-status-success/30'}`}>
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className={`text-xs ${selectedLeaveRequest.managerDecision === 'rejected' ? 'bg-red-100 text-red-700 border-red-300' : 'bg-purple-100 text-purple-700 border-purple-300'}`}>Manager Recommendation</Badge>
+                          <Badge variant="outline" className={`text-xs ${selectedLeaveRequest.managerDecision === 'rejected' ? 'bg-destructive/10 text-destructive border-destructive/30' : 'bg-status-success-muted text-status-success border-status-success/30'}`}>Manager Recommendation</Badge>
                           <span className="text-xs text-muted-foreground">
                             {selectedLeaveRequest.managerDecision === 'approved' ? '✓ Recommended' : '✗ Not Recommended'}
                             {selectedLeaveRequest.managerDecisionAt && ` on ${format(new Date(selectedLeaveRequest.managerDecisionAt), 'd MMM yyyy')}`}
                           </span>
                         </div>
                         {selectedLeaveRequest.managerNotes && (
-                          <p className={`text-sm ${selectedLeaveRequest.managerDecision === 'rejected' ? 'text-red-800' : 'text-purple-800'}`}>{selectedLeaveRequest.managerNotes}</p>
+                          <p className={`text-sm ${selectedLeaveRequest.managerDecision === 'rejected' ? 'text-destructive' : 'text-status-success'}`}>{selectedLeaveRequest.managerNotes}</p>
                         )}
                         {selectedLeaveRequest.managerApproverId && (() => {
                           const approver = resolveApprover(selectedLeaveRequest.managerApproverId);
@@ -788,15 +788,15 @@ export default function LeaveRequestsSection() {
                     )}
 
                     {selectedLeaveRequest.hrNotes && (
-                      <div className="p-3 bg-cyan-50 rounded-lg border border-cyan-200">
+                      <div className="p-3 bg-status-info-muted rounded-lg border border-status-info/30">
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-xs bg-cyan-100 text-cyan-700 border-cyan-300">HR Review</Badge>
+                          <Badge variant="outline" className="text-xs bg-status-info-muted text-status-info border-status-info/30">HR Review</Badge>
                           <span className="text-xs text-muted-foreground">
                             {selectedLeaveRequest.hrDecision === 'approved' ? '✓ Approved' : '✗ Rejected'}
                             {selectedLeaveRequest.hrDecisionAt && ` on ${format(new Date(selectedLeaveRequest.hrDecisionAt), 'd MMM yyyy')}`}
                           </span>
                         </div>
-                        <p className="text-sm text-cyan-800">{selectedLeaveRequest.hrNotes}</p>
+                        <p className="text-sm text-status-info">{selectedLeaveRequest.hrNotes}</p>
                         {selectedLeaveRequest.hrApproverId && (() => {
                           const approver = resolveApprover(selectedLeaveRequest.hrApproverId);
                           return approver ? (
@@ -839,10 +839,10 @@ export default function LeaveRequestsSection() {
                           <button 
                             key={index} 
                             onClick={openDocument}
-                            className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border w-full text-left hover:bg-slate-100 transition-colors"
+                            className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg border w-full text-left hover:bg-muted transition-colors"
                           >
-                            <FileText className="h-4 w-4 text-blue-500" />
-                            <span className="text-blue-600 hover:underline">
+                            <FileText className="h-4 w-4 text-status-info" />
+                            <span className="text-status-info hover:underline">
                               {isPdf ? `PDF Document ${index + 1}` : isImage ? `Image ${index + 1}` : `Document ${index + 1}`}
                               <span className="text-xs text-muted-foreground ml-2">(Click to view)</span>
                             </span>
@@ -855,9 +855,9 @@ export default function LeaveRequestsSection() {
 
                 {/* Admin Cancel for completed requests (approved/rejected) */}
                 {['approved', 'rejected'].includes(selectedLeaveRequest.status) && (
-                  <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
-                    <p className="text-sm text-red-700 mb-2 font-medium">Admin Cancel</p>
-                    <p className="text-xs text-red-600 mb-3">
+                  <div className="mt-4 p-4 bg-destructive/10 rounded-lg border border-destructive/30">
+                    <p className="text-sm text-destructive mb-2 font-medium">Admin Cancel</p>
+                    <p className="text-xs text-destructive/80 mb-3">
                       {selectedLeaveRequest.status === 'approved' 
                         ? "Cancelling this approved leave will credit the leave days back to the employee's balance."
                         : "Cancel this rejected request if needed."}
@@ -891,18 +891,18 @@ export default function LeaveRequestsSection() {
                   
                   return (
                     <>
-                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4">
-                        <p className="text-sm text-blue-800">
+                      <div className="bg-status-info-muted p-3 rounded-lg border border-status-info/30 mb-4">
+                        <p className="text-sm text-status-info">
                           <strong>Current Stage:</strong> {actionInfo.stage}
                         </p>
                       </div>
                       {actionInfo.role === 'hr' && selectedLeaveRequest.managerDecision === 'not_recommended' && (
-                        <div className="bg-red-50 border border-red-300 rounded-lg p-3 mb-4">
-                          <p className="text-sm font-semibold text-red-800">Manager did not recommend this leave</p>
+                        <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 mb-4">
+                          <p className="text-sm font-semibold text-destructive">Manager did not recommend this leave</p>
                           {selectedLeaveRequest.managerNotes && (
-                            <p className="text-sm text-red-700 mt-1">{selectedLeaveRequest.managerNotes}</p>
+                            <p className="text-sm text-destructive/80 mt-1">{selectedLeaveRequest.managerNotes}</p>
                           )}
-                          <p className="text-xs text-red-600 mt-1">You may override this recommendation.</p>
+                          <p className="text-xs text-destructive/70 mt-1">You may override this recommendation.</p>
                         </div>
                       )}
                       <div>
@@ -953,7 +953,7 @@ export default function LeaveRequestsSection() {
                               });
                             }
                           }}
-                          className="text-red-600 border-red-200 hover:bg-red-50"
+                          className="text-destructive border-destructive/30 hover:bg-destructive/10"
                         >
                           <X className="mr-2 h-4 w-4" /> {actionInfo.role === 'manager' ? 'Not Recommend' : 'Reject'}
                         </Button>
@@ -973,16 +973,16 @@ export default function LeaveRequestsSection() {
                               });
                             }
                           }}
-                          className="bg-green-600 hover:bg-green-700"
+                          className="bg-status-success hover:bg-status-success/80 text-white"
                         >
                           <Check className="mr-2 h-4 w-4" /> {actionInfo.role === 'manager' ? 'Recommend' : 'Approve'}
                         </Button>
                       </div>
                       
                       {selectedLeaveRequest.status !== 'cancelled' && selectedLeaveRequest.status !== 'rejected' && (
-                        <div className="mt-4 pt-4 border-t border-red-200 bg-red-50 -m-4 p-4 rounded-b-lg">
-                          <p className="text-sm text-red-700 mb-2 font-medium">Admin Cancel</p>
-                          <p className="text-xs text-red-600 mb-3">
+                        <div className="mt-4 pt-4 border-t border-destructive/30 bg-destructive/10 -m-4 p-4 rounded-b-lg">
+                          <p className="text-sm text-destructive mb-2 font-medium">Admin Cancel</p>
+                          <p className="text-xs text-destructive/80 mb-3">
                             {selectedLeaveRequest.status === 'approved' 
                               ? "Cancelling this approved leave will credit the leave days back to the employee's balance."
                               : "Cancel this leave request completely."}
@@ -1023,17 +1023,17 @@ export default function LeaveRequestsSection() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-amber-600" />
+              <BookOpen className="h-5 w-5 text-status-warning" />
               {editingHistoric ? 'Edit Historic Leave Entry' : 'Add Historic Leave Entry'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <div className="p-3 bg-status-warning-muted border border-status-warning/30 rounded-lg text-sm text-status-warning">
               This entry will be marked as pre-approved and the leave days will be immediately deducted from the employee's balance.
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="h-employee">Employee <span className="text-red-500">*</span></Label>
+              <Label htmlFor="h-employee">Employee <span className="text-destructive">*</span></Label>
               <SearchableSelect
                 value={historicForm.userId}
                 onValueChange={v => setHistoricForm(f => ({ ...f, userId: v }))}
@@ -1047,7 +1047,7 @@ export default function LeaveRequestsSection() {
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="h-leavetype">Leave Type <span className="text-red-500">*</span></Label>
+              <Label htmlFor="h-leavetype">Leave Type <span className="text-destructive">*</span></Label>
               <Select value={historicForm.leaveType} onValueChange={v => setHistoricForm(f => ({ ...f, leaveType: v }))}>
                 <SelectTrigger id="h-leavetype" data-testid="select-historic-leavetype">
                   <SelectValue placeholder="Select type..." />
@@ -1067,7 +1067,7 @@ export default function LeaveRequestsSection() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Start Date <span className="text-red-500">*</span></Label>
+                <Label>Start Date <span className="text-destructive">*</span></Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -1090,7 +1090,7 @@ export default function LeaveRequestsSection() {
                 </Popover>
               </div>
               <div className="space-y-1">
-                <Label>End Date <span className="text-red-500">*</span></Label>
+                <Label>End Date <span className="text-destructive">*</span></Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -1120,7 +1120,7 @@ export default function LeaveRequestsSection() {
               const empReligion = selEmp?.religion || null;
               const days = countWorkingDays(historicForm.startDate, historicForm.endDate, empReligion);
               return (
-                <div className="text-sm text-muted-foreground bg-slate-50 px-3 py-2 rounded border">
+                <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded border">
                   Duration: <strong>{days} working day{days !== 1 ? 's' : ''}</strong>
                   <span className="ml-1 text-xs">(weekends &amp; public holidays excluded)</span>
                 </div>

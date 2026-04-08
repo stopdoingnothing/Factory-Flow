@@ -58,7 +58,7 @@ export default function PublicHolidaysSection() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-slate-900 dark:text-slate-100">Public Holidays</h1>
+          <h1 className="text-3xl font-heading font-bold text-foreground">Public Holidays</h1>
           <p className="text-muted-foreground">Manage public holidays that affect leave calculations</p>
         </div>
         <Button onClick={() => { setCurrentHoliday({}); setIsEditingHoliday(false); setIsHolidayDialogOpen(true); }} data-testid="add-holiday">
@@ -97,18 +97,18 @@ export default function PublicHolidaysSection() {
                     <TableCell>
                       {holiday.religionGroup ? (() => {
                         const cls: Record<string, string> = {
-                          muslim: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                          jewish: 'bg-blue-100 text-blue-800 border-blue-200',
-                          christian: 'bg-purple-100 text-purple-800 border-purple-200',
-                          hindu: 'bg-orange-100 text-orange-800 border-orange-200',
+                          muslim: 'bg-status-success-muted text-status-success border-status-success/30',
+                          jewish: 'bg-status-info-muted text-status-info border-status-info/30',
+                          christian: 'bg-status-neutral-muted text-status-neutral border-status-neutral/30',
+                          hindu: 'bg-status-warning-muted text-status-warning border-status-warning/30',
                         };
                         return (
-                          <Badge className={cls[holiday.religionGroup!] || 'bg-slate-100 text-slate-700'}>
+                          <Badge className={cls[holiday.religionGroup!] || 'bg-muted text-muted-foreground'}>
                             {holiday.religionGroup!.charAt(0).toUpperCase() + holiday.religionGroup!.slice(1)} only
                           </Badge>
                         );
                       })() : (
-                        <Badge variant="outline" className="text-slate-500">Everyone</Badge>
+                        <Badge variant="outline" className="text-muted-foreground">Everyone</Badge>
                       )}
                     </TableCell>
                     <TableCell>

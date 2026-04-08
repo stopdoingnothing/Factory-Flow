@@ -138,7 +138,7 @@ export default function DashboardSection({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-slate-900">Dashboard</h1>
+        <h1 className="text-3xl font-heading font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground">Overview of your workforce management</p>
       </div>
 
@@ -147,8 +147,8 @@ export default function DashboardSection({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Users className="h-6 w-6 text-blue-600" />
+              <div className="p-3 bg-status-info-muted rounded-lg">
+                <Users className="h-6 w-6 text-status-info" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{activeEmployees.length}</p>
@@ -161,16 +161,16 @@ export default function DashboardSection({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-amber-100 rounded-lg">
-                <FileText className="h-6 w-6 text-amber-600" />
+              <div className="p-3 bg-status-warning-muted rounded-lg">
+                <FileText className="h-6 w-6 text-status-warning" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{pendingCounts.total}</p>
                 <p className="text-sm text-muted-foreground">Pending Leave</p>
                 {pendingCounts.total > 0 && (
                   <div className="flex gap-1 mt-1 text-xs text-muted-foreground">
-                    {pendingCounts.manager > 0 && <span className="bg-orange-100 px-1 rounded">M:{pendingCounts.manager}</span>}
-                    {pendingCounts.hr > 0 && <span className="bg-blue-100 px-1 rounded">HR:{pendingCounts.hr}</span>}
+                    {pendingCounts.manager > 0 && <span className="bg-status-warning-muted px-1 rounded">M:{pendingCounts.manager}</span>}
+                    {pendingCounts.hr > 0 && <span className="bg-status-info-muted px-1 rounded">HR:{pendingCounts.hr}</span>}
                   </div>
                 )}
               </div>
@@ -180,8 +180,8 @@ export default function DashboardSection({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <div className="p-3 bg-status-success-muted rounded-lg">
+                <CheckCircle2 className="h-6 w-6 text-status-success" />
               </div>
               <div>
                 <p className="text-2xl font-bold">
@@ -198,8 +198,8 @@ export default function DashboardSection({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-red-100 rounded-lg">
-                <AlertTriangle className="h-6 w-6 text-red-600" />
+              <div className="p-3 bg-destructive/10 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
               </div>
               <div>
                 <p className="text-2xl font-bold">
@@ -219,7 +219,7 @@ export default function DashboardSection({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-green-500" />
+            <TrendingUp className="h-5 w-5 text-status-success" />
             7-Day Attendance Trend
           </CardTitle>
           <CardDescription>Unique employees clocked in each day</CardDescription>
@@ -238,11 +238,11 @@ export default function DashboardSection({
                         <span className="text-xs font-semibold text-muted-foreground">{count > 0 ? count : ''}</span>
                         <div className="w-full flex items-end" style={{ height: '80px' }}>
                           <div
-                            className={`w-full rounded-t transition-all ${isToday ? 'bg-green-500' : isWeekend ? 'bg-slate-100' : 'bg-green-200'}`}
+                            className={`w-full rounded-t transition-all ${isToday ? 'bg-status-success' : isWeekend ? 'bg-muted' : 'bg-status-success-muted'}`}
                             style={{ height: `${heightPct}%` }}
                           />
                         </div>
-                        <span className={`text-xs ${isToday ? 'font-bold text-green-700' : 'text-muted-foreground'}`}>{label}</span>
+                        <span className={`text-xs ${isToday ? 'font-bold text-status-success' : 'text-muted-foreground'}`}>{label}</span>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side={side} className="max-w-[200px] p-3">
@@ -260,7 +260,7 @@ export default function DashboardSection({
                         </>
                       )}
                       {!isWeekend && missingUsers.length === 0 && count > 0 && (
-                        <p className="text-xs text-green-600">All workers present</p>
+                        <p className="text-xs text-status-success">All workers present</p>
                       )}
                     </TooltipContent>
                   </Tooltip>
@@ -278,7 +278,7 @@ export default function DashboardSection({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-amber-500" />
+            <FileText className="h-5 w-5 text-status-warning" />
             Pending Leave Requests
           </CardTitle>
           <CardDescription>Leave requests awaiting approval at different stages</CardDescription>
@@ -293,9 +293,9 @@ export default function DashboardSection({
                 const actionInfo = canTakeAction(request);
                 const statusInfo = formatLeaveStatus(request.status);
                 return (
-                  <div key={request.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
+                  <div key={request.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full overflow-hidden bg-slate-200">
+                      <div className="h-8 w-8 rounded-full overflow-hidden bg-muted">
                         <img src={employee?.photoUrl || 'https://github.com/shadcn.png'} alt="" className="h-full w-full object-cover" />
                       </div>
                       <div>
@@ -318,7 +318,7 @@ export default function DashboardSection({
                         <>
                           <Button
                             size="sm"
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-status-success hover:bg-status-success/80 text-white"
                             onClick={() => {
                               if (actionInfo.role === 'manager') {
                                 managerDecisionMutation.mutate({ id: request.id, decision: 'approved' });
@@ -364,7 +364,7 @@ export default function DashboardSection({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <AlertTriangle className="h-5 w-5 text-status-warning" />
             Low Leave Balance Alerts
           </CardTitle>
           <CardDescription>Personnel with 2 or fewer leave days remaining</CardDescription>
@@ -376,16 +376,16 @@ export default function DashboardSection({
               const lowBalances = empBalances.filter((b: LeaveBalance) => ((b.total ?? 0) - (b.taken ?? 0) - (b.pending ?? 0)) <= 2 && (b.total ?? 0) > 0);
               if (lowBalances.length === 0) return null;
               return (
-                <div key={emp.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <div key={emp.id} className="flex items-center justify-between p-3 bg-status-warning-muted rounded-lg border border-status-warning/30">
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full overflow-hidden bg-slate-200">
+                    <div className="h-8 w-8 rounded-full overflow-hidden bg-muted">
                       <img src={emp.photoUrl || 'https://github.com/shadcn.png'} alt="" className="h-full w-full object-cover" />
                     </div>
                     <span className="font-medium">{emp.firstName} {emp.surname}</span>
                   </div>
                   <div className="flex gap-2">
                     {lowBalances.map((b: LeaveBalance) => (
-                      <Badge key={b.id} variant="outline" className="border-amber-400 text-amber-700">
+                      <Badge key={b.id} variant="outline" className="border-status-warning text-status-warning">
                         {b.leaveType}: {(b.total ?? 0) - (b.taken ?? 0) - (b.pending ?? 0)} left
                       </Badge>
                     ))}

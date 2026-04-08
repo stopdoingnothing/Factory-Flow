@@ -105,7 +105,7 @@ export default function DepartmentsSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-slate-900">Departments</h1>
+        <h1 className="text-3xl font-heading font-bold text-foreground">Departments</h1>
         <p className="text-muted-foreground">Manage departments for employee organization</p>
       </div>
       <Card>
@@ -145,7 +145,7 @@ export default function DepartmentsSection() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => handleOpenEditDept(dept)} data-testid={`button-edit-dept-${dept.id}`}>
-                          <Pencil className="h-4 w-4 text-slate-500" />
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
                         </Button>
                         <Button 
                           variant="ghost" 
@@ -155,7 +155,7 @@ export default function DepartmentsSection() {
                           title={employeeCount > 0 ? "Cannot delete department with personnel" : "Delete department"}
                           data-testid={`button-delete-dept-${dept.id}`}
                         >
-                          <Trash2 className={`h-4 w-4 ${employeeCount > 0 ? 'text-slate-300' : 'text-red-500'}`} />
+                          <Trash2 className={`h-4 w-4 ${employeeCount > 0 ? 'text-muted-foreground/40' : 'text-destructive'}`} />
                         </Button>
                       </TableCell>
                     </TableRow>

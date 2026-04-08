@@ -74,25 +74,25 @@ export default function AdminLogin() {
          style={{ backgroundImage: `url(${factoryBg})` }}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
 
-      <Card className="w-full max-w-md z-10 shadow-2xl border-0 bg-white/95 backdrop-blur-xl animate-in zoom-in-95 duration-500">
+      <Card className="w-full max-w-md z-10 shadow-2xl border-0 bg-card/95 backdrop-blur-xl animate-in zoom-in-95 duration-500">
         <CardHeader className="text-center pb-2">
           <img src={companyLogo} alt={companyName} className="h-14 mx-auto mb-4" />
-          <CardTitle className="text-2xl font-heading tracking-wide text-gray-900">{companyName.toUpperCase()} ADMIN</CardTitle>
-          <CardDescription className="text-gray-600">System Configuration & Management</CardDescription>
+          <CardTitle className="text-2xl font-heading tracking-wide">{companyName.toUpperCase()} ADMIN</CardTitle>
+          <CardDescription>System Configuration & Management</CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-                <Input 
+                <Mail className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                <Input
                   id="email"
-                  type="email" 
-                  placeholder="admin@factory.com" 
+                  type="email"
+                  placeholder="admin@factory.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 text-gray-900 bg-white"
+                  className="pl-10"
                   required
                 />
               </div>
@@ -101,20 +101,20 @@ export default function AdminLogin() {
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-                <Input 
+                <Lock className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                <Input
                   id="password"
-                  type="password" 
-                  placeholder="••••••••" 
+                  type="password"
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 text-gray-900 bg-white"
+                  className="pl-10"
                   required
                 />
               </div>
             </div>
             
-            {error && <p className="text-red-500 text-sm font-medium text-center animate-pulse">{error}</p>}
+            {error && <p className="text-destructive text-sm font-medium text-center animate-pulse">{error}</p>}
             
             <Button type="submit" className="w-full h-12 btn-industrial text-lg mt-4 bg-primary hover:bg-primary/90" disabled={loading}>
               {loading ? 'Authenticating...' : 'Access Dashboard'}
@@ -125,7 +125,7 @@ export default function AdminLogin() {
           <div className="mt-4 text-center">
             <Button 
               variant="link" 
-              className="text-blue-600"
+              className="text-primary"
               onClick={() => {
                 setShowForgotPassword(true);
                 setResetSent(false);
@@ -137,7 +137,7 @@ export default function AdminLogin() {
             </Button>
           </div>
           <div className="mt-2 text-center">
-             <Button variant="link" className="text-slate-500" onClick={() => setLocation('/')}>
+             <Button variant="link" className="text-muted-foreground" onClick={() => setLocation('/')}>
                Back to Employee Login
              </Button>
           </div>
@@ -155,9 +155,9 @@ export default function AdminLogin() {
           
           {resetSent ? (
             <div className="text-center py-6">
-              <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-              <p className="text-lg font-medium text-gray-900">Check your email</p>
-              <p className="text-sm text-gray-600 mt-2">
+              <CheckCircle className="h-12 w-12 text-status-success mx-auto mb-4" />
+              <p className="text-lg font-medium text-foreground">Check your email</p>
+              <p className="text-sm text-muted-foreground mt-2">
                 If an account exists with that email, a password reset link has been sent.
               </p>
               <Button 
@@ -172,7 +172,7 @@ export default function AdminLogin() {
               <div className="space-y-2">
                 <Label htmlFor="reset-email">Email Address</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="reset-email"
                     type="email"

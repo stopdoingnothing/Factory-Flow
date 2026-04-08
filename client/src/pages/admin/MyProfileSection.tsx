@@ -59,7 +59,7 @@ export default function MyProfileSection() {
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
             <Avatar className="h-24 w-24">
-              <AvatarFallback className="text-2xl bg-blue-600 text-white">
+              <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
                 {getInitials()}
               </AvatarFallback>
             </Avatar>
@@ -68,7 +68,7 @@ export default function MyProfileSection() {
                 {(displayUser as any).firstName} {(displayUser as any).surname}
               </h2>
               {(displayUser as any).nickname && (
-                <p className="text-gray-500">"{(displayUser as any).nickname}"</p>
+                <p className="text-muted-foreground">"{(displayUser as any).nickname}"</p>
               )}
               <div className="mt-2 flex flex-wrap justify-center md:justify-start gap-2">
                 {((displayUser as any).roles?.length
@@ -79,18 +79,18 @@ export default function MyProfileSection() {
                 ))}
               </div>
               {(displayUser as any).department && (
-                <p className="mt-2 text-sm text-gray-500 flex items-center justify-center md:justify-start gap-1">
+                <p className="mt-2 text-sm text-muted-foreground flex items-center justify-center md:justify-start gap-1">
                   <Building2 className="h-3.5 w-3.5" />
                   {(displayUser as any).department}
                 </p>
               )}
               {managerName ? (
-                <p className="mt-1 text-sm text-gray-500 flex items-center justify-center md:justify-start gap-1">
+                <p className="mt-1 text-sm text-muted-foreground flex items-center justify-center md:justify-start gap-1">
                   <Users className="h-3.5 w-3.5" />
                   Reports to {managerName}
                 </p>
               ) : (
-                <p className="mt-1 text-sm text-amber-600 flex items-center justify-center md:justify-start gap-1">
+                <p className="mt-1 text-sm text-status-warning flex items-center justify-center md:justify-start gap-1">
                   <Users className="h-3.5 w-3.5" />
                   No line manager assigned
                 </p>
@@ -110,25 +110,25 @@ export default function MyProfileSection() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
-              <Mail className="h-4 w-4 text-gray-500" />
+              <Mail className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm text-gray-500">Email</p>
+                <p className="text-sm text-muted-foreground">Email</p>
                 <p>{(displayUser as any).email || 'Not provided'}</p>
               </div>
             </div>
             <Separator />
             <div className="flex items-center gap-3">
-              <Phone className="h-4 w-4 text-gray-500" />
+              <Phone className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm text-gray-500">Mobile</p>
+                <p className="text-sm text-muted-foreground">Mobile</p>
                 <p>{(displayUser as any).mobile || 'Not provided'}</p>
               </div>
             </div>
             <Separator />
             <div className="flex items-center gap-3">
-              <MapPin className="h-4 w-4 text-gray-500" />
+              <MapPin className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm text-gray-500">Address</p>
+                <p className="text-sm text-muted-foreground">Address</p>
                 <p>{(displayUser as any).homeAddress || 'Not provided'}</p>
               </div>
             </div>
@@ -154,12 +154,12 @@ export default function MyProfileSection() {
                       <div className="flex justify-between items-center">
                         <span className="font-medium capitalize">{balance.leaveType.replace('_', ' ')}</span>
                         <div className="text-right">
-                          <span className="text-green-600 font-bold">{formatLeaveDays(available)}</span>
-                          <span className="text-gray-500 text-sm"> / {formatLeaveDays(balance.total)} days</span>
+                          <span className="text-status-success font-bold">{formatLeaveDays(available)}</span>
+                          <span className="text-muted-foreground text-sm"> / {formatLeaveDays(balance.total)} days</span>
                         </div>
                       </div>
                       {!!carryOver && carryOver > 0 && (
-                        <p className="text-xs text-amber-600">
+                        <p className="text-xs text-status-warning">
                           +{formatLeaveDays(carryOver)} carried over
                           {carryOverExpiry && ` (expires ${new Date(carryOverExpiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})`}
                         </p>
@@ -186,7 +186,7 @@ export default function MyProfileSection() {
                 );
               })()
             ) : (
-              <p className="text-gray-500">No leave balances found.</p>
+              <p className="text-muted-foreground">No leave balances found.</p>
             )}
           </CardContent>
         </Card>
@@ -203,18 +203,18 @@ export default function MyProfileSection() {
           {recentAttendance && recentAttendance.length > 0 ? (
             <div className="space-y-3">
               {recentAttendance.map((record: AttendanceRecord) => (
-                <div key={record.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div key={record.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
                   <Badge variant={record.type === 'in' ? 'default' : 'secondary'}>
                     Clock {record.type === 'in' ? 'In' : 'Out'}
                   </Badge>
-                  <span className="text-gray-600">
+                  <span className="text-foreground">
                     {format(new Date(record.timestamp), "d MMM yyyy 'at' h:mm a")}
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-gray-500">No recent attendance records.</p>
+            <p className="text-muted-foreground">No recent attendance records.</p>
           )}
         </CardContent>
       </Card>

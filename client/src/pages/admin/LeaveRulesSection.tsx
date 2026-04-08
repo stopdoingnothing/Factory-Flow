@@ -71,25 +71,25 @@ const SA_BCEA_RULES = [
 
 const colorMap: Record<string, { bg: string; border: string; heading: string; text: string; badge: string }> = {
   blue: {
-    bg: 'bg-blue-50',
-    border: 'border-blue-200',
-    heading: 'text-blue-900',
-    text: 'text-blue-700',
-    badge: 'bg-blue-100 text-blue-800 border-blue-200',
+    bg: 'bg-status-info-muted',
+    border: 'border-status-info/30',
+    heading: 'text-status-info',
+    text: 'text-status-info',
+    badge: 'bg-status-info-muted text-status-info border-status-info/30',
   },
   amber: {
-    bg: 'bg-amber-50',
-    border: 'border-amber-200',
-    heading: 'text-amber-900',
-    text: 'text-amber-700',
-    badge: 'bg-amber-100 text-amber-800 border-amber-200',
+    bg: 'bg-status-warning-muted',
+    border: 'border-status-warning/30',
+    heading: 'text-status-warning',
+    text: 'text-status-warning',
+    badge: 'bg-status-warning-muted text-status-warning border-status-warning/30',
   },
   green: {
-    bg: 'bg-green-50',
-    border: 'border-green-200',
-    heading: 'text-green-900',
-    text: 'text-green-700',
-    badge: 'bg-green-100 text-green-800 border-green-200',
+    bg: 'bg-status-success-muted',
+    border: 'border-status-success/30',
+    heading: 'text-status-success',
+    text: 'text-status-success',
+    badge: 'bg-status-success-muted text-status-success border-status-success/30',
   },
 };
 
@@ -302,7 +302,7 @@ export default function LeaveRulesSection() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-slate-900">Leave Rules</h1>
+          <h1 className="text-3xl font-heading font-bold text-foreground">Leave Rules</h1>
           <p className="text-muted-foreground">SA BCEA-compliant leave calculations and accrual rules</p>
         </div>
         <div className="flex gap-2">
@@ -326,10 +326,10 @@ export default function LeaveRulesSection() {
       </div>
 
       {/* SA BCEA Law Reference */}
-      <Card className="border-slate-200">
+      <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-slate-600" />
+            <BookOpen className="h-5 w-5 text-muted-foreground" />
             <CardTitle className="text-base">South African BCEA Leave Entitlements</CardTitle>
           </div>
           <CardDescription>
@@ -366,12 +366,12 @@ export default function LeaveRulesSection() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
                       <div className="space-y-2">
                         <p className={`text-xs font-semibold uppercase tracking-wide ${c.text}`}>Calculation Formula</p>
-                        <p className={`text-sm font-mono ${c.heading} bg-white rounded px-2 py-1 border ${c.border}`}>{rule.formula}</p>
+                        <p className={`text-sm font-mono ${c.heading} bg-card rounded px-2 py-1 border ${c.border}`}>{rule.formula}</p>
                         <p className={`text-xs ${c.text} leading-relaxed`}>{rule.notes}</p>
                       </div>
                       <div className="space-y-2">
                         <p className={`text-xs font-semibold uppercase tracking-wide ${c.text}`}>Examples by Tenure</p>
-                        <div className="bg-white rounded border overflow-hidden">
+                        <div className="bg-card rounded border overflow-hidden">
                           <table className="w-full text-xs">
                             <thead>
                               <tr className={`${c.bg}`}>
@@ -469,7 +469,7 @@ export default function LeaveRulesSection() {
                         onClick={() => handleDeleteRule(rule.id)}
                         data-testid={`button-delete-rule-${rule.id}`}
                       >
-                        <Trash2 className="h-4 w-4 text-red-500" />
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -485,7 +485,7 @@ export default function LeaveRulesSection() {
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <CheckCircle2 className="h-5 w-5 text-status-success" />
               SA BCEA Recalculation Complete
             </DialogTitle>
             <DialogDescription>
@@ -497,27 +497,27 @@ export default function LeaveRulesSection() {
           {recalcResult && (
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
-                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-2xl font-bold text-green-700">{recalcResult.updated}</p>
-                  <p className="text-xs text-green-600">Employees Updated</p>
+                <div className="text-center p-3 bg-status-success-muted rounded-lg border border-status-success/30">
+                  <p className="text-2xl font-bold text-status-success">{recalcResult.updated}</p>
+                  <p className="text-xs text-status-success">Employees Updated</p>
                 </div>
-                <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-2xl font-bold text-blue-700">{recalcResult.details.length}</p>
-                  <p className="text-xs text-blue-600">Records Processed</p>
+                <div className="text-center p-3 bg-status-info-muted rounded-lg border border-status-info/30">
+                  <p className="text-2xl font-bold text-status-info">{recalcResult.details.length}</p>
+                  <p className="text-xs text-status-info">Records Processed</p>
                 </div>
-                <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
-                  <p className="text-2xl font-bold text-red-700">{recalcResult.errors.length}</p>
-                  <p className="text-xs text-red-600">Errors</p>
+                <div className="text-center p-3 bg-destructive/10 rounded-lg border border-destructive/30">
+                  <p className="text-2xl font-bold text-destructive">{recalcResult.errors.length}</p>
+                  <p className="text-xs text-destructive">Errors</p>
                 </div>
               </div>
 
               {recalcResult.errors.length > 0 && (
-                <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                  <p className="text-sm font-semibold text-red-800 flex items-center gap-1.5 mb-2">
+                <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/30">
+                  <p className="text-sm font-semibold text-destructive flex items-center gap-1.5 mb-2">
                     <AlertTriangle className="h-4 w-4" /> Errors
                   </p>
                   {recalcResult.errors.map((e, i) => (
-                    <p key={i} className="text-xs text-red-700">{e}</p>
+                    <p key={i} className="text-xs text-destructive">{e}</p>
                   ))}
                 </div>
               )}
@@ -542,17 +542,17 @@ export default function LeaveRulesSection() {
                           {d.monthsWorked} month{d.monthsWorked !== 1 ? 's' : ''}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
+                          <Badge variant="outline" className="bg-status-info-muted text-status-info border-status-info/30">
                             {d.annualLeave} days
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">
+                          <Badge variant="outline" className="bg-status-warning-muted text-status-warning border-status-warning/30">
                             {d.sickLeave} days
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200">
+                          <Badge variant="outline" className="bg-status-success-muted text-status-success border-status-success/30">
                             {d.familyResponsibility} days
                           </Badge>
                         </TableCell>
@@ -581,7 +581,7 @@ export default function LeaveRulesSection() {
           </DialogHeader>
           <div className="space-y-4 py-2 max-h-[65vh] overflow-y-auto pr-1">
             <div className="space-y-1">
-              <Label htmlFor="ruleName">Name <span className="text-red-500">*</span></Label>
+              <Label htmlFor="ruleName">Name <span className="text-destructive">*</span></Label>
               <Input
                 id="ruleName"
                 value={currentRule.name || ''}
@@ -593,7 +593,7 @@ export default function LeaveRulesSection() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label htmlFor="leaveType">Leave Type <span className="text-red-500">*</span></Label>
+                <Label htmlFor="leaveType">Leave Type <span className="text-destructive">*</span></Label>
                 <Select
                   value={currentRule.leaveType || ''}
                   onValueChange={(value) => setCurrentRule({ ...currentRule, leaveType: value })}
@@ -649,8 +649,8 @@ export default function LeaveRulesSection() {
             </div>
 
             {currentRule.accrualType === 'days_worked' && (
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm font-medium text-blue-900 mb-3">Earn X days for every Y days worked</p>
+              <div className="p-3 bg-status-info-muted rounded-lg border border-status-info/30">
+                <p className="text-sm font-medium text-status-info mb-3">Earn X days for every Y days worked</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Label htmlFor="daysEarned" className="text-sm">Days Earned</Label>
@@ -678,9 +678,9 @@ export default function LeaveRulesSection() {
             )}
 
             {currentRule.accrualType === 'tiered' && (
-              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                <p className="text-sm font-medium text-amber-900 mb-1">Tiered Accrual</p>
-                <p className="text-xs text-amber-700">
+              <div className="p-3 bg-status-warning-muted rounded-lg border border-status-warning/30">
+                <p className="text-sm font-medium text-status-warning mb-1">Tiered Accrual</p>
+                <p className="text-xs text-status-warning">
                   Different accrual rates based on employment tenure. Save this rule first, then click "Phases" to configure each tier.
                 </p>
               </div>
@@ -786,7 +786,7 @@ export default function LeaveRulesSection() {
                         data-testid={`input-phase-name-${index}`}
                       />
                       <Button variant="ghost" size="icon" onClick={() => handleRemovePhase(index)} data-testid={`button-remove-phase-${index}`}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                     <div className="grid grid-cols-2 gap-3">

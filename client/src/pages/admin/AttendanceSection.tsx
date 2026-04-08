@@ -205,7 +205,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
     return (
       <div className="space-y-4">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-slate-900">Attendance</h1>
+          <h1 className="text-3xl font-heading font-bold text-foreground">Attendance</h1>
           <p className="text-muted-foreground">View and manage employee attendance records</p>
         </div>
         
@@ -233,15 +233,15 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
           ).length;
           
           return (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-              <div className="bg-green-500 text-white rounded-full p-2">
+            <div className="bg-status-success-muted border border-status-success/30 rounded-lg p-4 flex items-center gap-3">
+              <div className="bg-status-success text-white rounded-full p-2">
                 <Clock className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-lg font-semibold text-green-800">
+                <p className="text-lg font-semibold text-status-success">
                   {currentlyClockedIn} of {eligibleEmployees.length} employees clocked in
                 </p>
-                <p className="text-sm text-green-600">Currently on site today</p>
+                <p className="text-sm text-status-success">Currently on site today</p>
               </div>
             </div>
           );
@@ -254,7 +254,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
             className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
               attendanceTab === 'records' 
                 ? 'bg-primary text-white' 
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                : 'bg-muted text-muted-foreground hover:bg-muted/70'
             }`}
             data-testid="attendance-tab-records"
           >
@@ -266,7 +266,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
             className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
               attendanceTab === 'manual-entry' 
                 ? 'bg-primary text-white' 
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                : 'bg-muted text-muted-foreground hover:bg-muted/70'
             }`}
             data-testid="attendance-tab-manual"
           >
@@ -278,7 +278,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
             className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
               attendanceTab === 'trends' 
                 ? 'bg-primary text-white' 
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                : 'bg-muted text-muted-foreground hover:bg-muted/70'
             }`}
             data-testid="attendance-tab-trends"
           >
@@ -290,7 +290,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
             className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
               attendanceTab === 'awol' 
                 ? 'bg-primary text-white' 
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                : 'bg-muted text-muted-foreground hover:bg-muted/70'
             }`}
             data-testid="attendance-tab-awol"
           >
@@ -542,7 +542,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                     </Button>
                     <Button
                       variant="default"
-                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                      className="bg-status-warning hover:bg-status-warning/80 text-white"
                       onClick={() => setAttendanceTab('manual-entry')}
                       data-testid="button-add-missed-entry"
                     >
@@ -783,7 +783,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                                   <img 
                                     src={record.clockInRecord.photoUrl} 
                                     alt="Clock In" 
-                                    className="w-8 h-8 rounded-full border-2 border-white object-cover cursor-pointer hover:z-10 transition-all"
+                                    className="w-8 h-8 rounded-full border-2 border-background object-cover cursor-pointer hover:z-10 transition-all"
                                     onClick={() => window.open(record.clockInRecord!.photoUrl!, '_blank')}
                                   />
                                 )}
@@ -791,7 +791,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                                   <img 
                                     src={record.clockOutRecord.photoUrl} 
                                     alt="Clock Out" 
-                                    className="w-8 h-8 rounded-full border-2 border-white object-cover cursor-pointer hover:z-10 transition-all"
+                                    className="w-8 h-8 rounded-full border-2 border-background object-cover cursor-pointer hover:z-10 transition-all"
                                     onClick={() => window.open(record.clockOutRecord!.photoUrl!, '_blank')}
                                   />
                                 )}
@@ -806,11 +806,11 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                                     </Badge>
                                   ))
                                 ) : notYetClockedIn ? (
-                                  <Badge variant="outline" className="border-amber-400 text-amber-600">
+                                  <Badge variant="outline" className="border-status-warning text-status-warning">
                                     Not Clocked In
                                   </Badge>
                                 ) : (
-                                  <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+                                  <Badge variant="default" className="bg-status-success hover:bg-status-success/80 text-white">
                                     On Time
                                   </Badge>
                                 )}
@@ -835,7 +835,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                                     onClick={() => openEditAttendance(record.clockOutRecord!)}
                                     data-testid={`button-edit-out-${record.odId}`}
                                   >
-                                    <Pencil className="h-4 w-4 text-blue-500" />
+                                    <Pencil className="h-4 w-4 text-status-info" />
                                   </Button>
                                 )}
                                 {(record.clockInRecord || record.clockOutRecord) && (
@@ -850,7 +850,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                                     }}
                                     data-testid={`button-delete-${record.odId}`}
                                   >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                    <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
                                 )}
                               </div>
@@ -1005,9 +1005,9 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                   // For simplicity, we'll just show the other counts
                   
                   const data = [
-                    { label: 'Late Arrivals', value: stats.late, color: 'bg-amber-500' },
-                    { label: 'Early Departures', value: stats.early, color: 'bg-orange-500' },
-                    { label: 'Missing Clock Outs', value: stats.noClockOut, color: 'bg-red-500' },
+                    { label: 'Late Arrivals', value: stats.late, color: 'bg-status-warning' },
+                    { label: 'Early Departures', value: stats.early, color: 'bg-status-warning/70' },
+                    { label: 'Missing Clock Outs', value: stats.noClockOut, color: 'bg-destructive' },
                   ];
                   
                   return (
@@ -1018,7 +1018,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                             <span>{item.label}</span>
                             <span className="font-semibold">{item.value}</span>
                           </div>
-                          <div className="w-full bg-slate-100 rounded-full h-2">
+                          <div className="w-full bg-muted rounded-full h-2">
                             <div 
                               className={`${item.color} h-2 rounded-full`} 
                               style={{ width: `${Math.min(100, (item.value / Math.max(1, attendanceRecords.length)) * 100)}%` }}
@@ -1073,8 +1073,8 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                       {rows.map(({ ds, actual, total, pct }) => (
                         <div key={ds} className="flex items-center gap-2">
                           <span className="text-xs w-16 text-muted-foreground">{format(new Date(ds + 'T00:00:00'), 'dd MMM')}</span>
-                          <div className="flex-1 bg-slate-100 rounded-full h-2">
-                            <div className={`h-2 rounded-full ${pct >= 90 ? 'bg-green-500' : pct >= 70 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
+                          <div className="flex-1 bg-muted rounded-full h-2">
+                            <div className={`h-2 rounded-full ${pct >= 90 ? 'bg-status-success' : pct >= 70 ? 'bg-status-warning' : 'bg-destructive'}`} style={{ width: `${pct}%` }} />
                           </div>
                           <span className="text-xs w-20 text-right text-muted-foreground">{actual}/{total} · {pct}%</span>
                         </div>
@@ -1090,7 +1090,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-blue-500" />
+                <TrendingUp className="h-5 w-5 text-status-info" />
                 Department Attendance Summary
               </CardTitle>
               <CardDescription>Attendance rate by department for the selected period</CardDescription>
@@ -1152,7 +1152,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                             {pct === null ? (
                               <span className="text-muted-foreground text-xs">—</span>
                             ) : (
-                              <span className={`font-semibold ${pct >= 90 ? 'text-green-600' : pct >= 70 ? 'text-amber-600' : 'text-red-600'}`}>
+                              <span className={`font-semibold ${pct >= 90 ? 'text-status-success' : pct >= 70 ? 'text-status-warning' : 'text-destructive'}`}>
                                 {pct}%
                               </span>
                             )}
@@ -1176,7 +1176,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                 <div className="flex flex-row items-center justify-between w-full">
                   <div>
                     <CardTitle className="flex items-center gap-2">
-                      <UserX className="h-5 w-5 text-red-600" />
+                      <UserX className="h-5 w-5 text-destructive" />
                       Absent Without Leave
                     </CardTitle>
                     <CardDescription>Working days where employees did not clock in or out, and had no approved leave</CardDescription>
@@ -1295,16 +1295,16 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                 return (
                   <div className="space-y-4">
                     <div className="grid grid-cols-3 gap-4 mb-4">
-                      <div className="p-4 bg-slate-50 rounded-lg border text-center">
+                      <div className="p-4 bg-muted/50 rounded-lg border text-center">
                         <p className="text-2xl font-bold">{workingDays.length}</p>
                         <p className="text-xs text-muted-foreground">Working Days</p>
                       </div>
-                      <div className="p-4 bg-red-50 rounded-lg border border-red-200 text-center">
-                        <p className="text-2xl font-bold text-red-600">{awolEntries.length}</p>
+                      <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/30 text-center">
+                        <p className="text-2xl font-bold text-destructive">{awolEntries.length}</p>
                         <p className="text-xs text-muted-foreground">Total AWOL Instances</p>
                       </div>
-                      <div className="p-4 bg-amber-50 rounded-lg border border-amber-200 text-center">
-                        <p className="text-2xl font-bold text-amber-600">{awolByUser.size}</p>
+                      <div className="p-4 bg-status-warning-muted rounded-lg border border-status-warning/30 text-center">
+                        <p className="text-2xl font-bold text-status-warning">{awolByUser.size}</p>
                         <p className="text-xs text-muted-foreground">Employees with AWOL</p>
                       </div>
                     </div>
@@ -1330,10 +1330,10 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                             const d = new Date(entry.date);
                             const dayName = format(d, 'EEEE');
                             return (
-                              <TableRow key={`${entry.user.id}-${entry.date}-${idx}`} className="bg-red-50/30">
+                              <TableRow key={`${entry.user.id}-${entry.date}-${idx}`} className="bg-destructive/5">
                                 <TableCell>
                                   <div className="flex items-center gap-2">
-                                    <div className="h-7 w-7 rounded-full overflow-hidden bg-slate-100">
+                                    <div className="h-7 w-7 rounded-full overflow-hidden bg-muted">
                                       <img src={entry.user.photoUrl || 'https://github.com/shadcn.png'} alt="" className="h-full w-full object-cover" />
                                     </div>
                                     <span className="font-medium">{entry.user.firstName} {entry.user.surname}</span>
@@ -1341,7 +1341,7 @@ import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from '.
                                 </TableCell>
                                 <TableCell>{entry.user.department || '-'}</TableCell>
                                 <TableCell>
-                                  <Badge variant="outline" className="border-red-300 text-red-700">
+                                  <Badge variant="outline" className="border-destructive/50 text-destructive">
                                     {format(d, 'dd/MM/yyyy')}
                                   </Badge>
                                 </TableCell>

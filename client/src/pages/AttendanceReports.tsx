@@ -540,7 +540,7 @@ export default function AttendanceReports() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-slate-900" data-testid="text-report-title">
+          <h1 className="text-3xl font-heading font-bold text-foreground" data-testid="text-report-title">
             Attendance Reports
           </h1>
           <p className="text-muted-foreground">
@@ -620,42 +620,42 @@ export default function AttendanceReports() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <Card>
               <CardContent className="pt-4 pb-4 text-center">
-                <Users className="h-5 w-5 mx-auto mb-1 text-blue-500" />
+                <Users className="h-5 w-5 mx-auto mb-1 text-status-info" />
                 <p className="text-2xl font-bold" data-testid="stat-employees">{overallStats.total}</p>
                 <p className="text-xs text-muted-foreground">Employees</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-4 text-center">
-                <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-green-500" />
+                <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-status-success" />
                 <p className="text-2xl font-bold" data-testid="stat-attendance">{overallStats.avgAttendance.toFixed(1)}%</p>
                 <p className="text-xs text-muted-foreground">Avg Attendance</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-4 text-center">
-                <Clock className="h-5 w-5 mx-auto mb-1 text-orange-500" />
+                <Clock className="h-5 w-5 mx-auto mb-1 text-status-warning" />
                 <p className="text-2xl font-bold" data-testid="stat-late">{overallStats.totalLate}</p>
                 <p className="text-xs text-muted-foreground">Late Arrivals</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-4 text-center">
-                <AlertTriangle className="h-5 w-5 mx-auto mb-1 text-amber-500" />
+                <AlertTriangle className="h-5 w-5 mx-auto mb-1 text-status-warning" />
                 <p className="text-2xl font-bold" data-testid="stat-early">{overallStats.totalEarly}</p>
                 <p className="text-xs text-muted-foreground">Early Departures</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-4 text-center">
-                <TrendingUp className="h-5 w-5 mx-auto mb-1 text-purple-500" />
+                <TrendingUp className="h-5 w-5 mx-auto mb-1 text-status-info" />
                 <p className="text-2xl font-bold" data-testid="stat-hours">{overallStats.totalHours.toFixed(0)}</p>
                 <p className="text-xs text-muted-foreground">Total Hours</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-4 text-center">
-                <XCircle className="h-5 w-5 mx-auto mb-1 text-red-500" />
+                <XCircle className="h-5 w-5 mx-auto mb-1 text-destructive" />
                 <p className="text-2xl font-bold" data-testid="stat-anomalies">{overallStats.employeesWithAnomalies}</p>
                 <p className="text-xs text-muted-foreground">With Anomalies</p>
               </CardContent>
@@ -667,7 +667,7 @@ export default function AttendanceReports() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-blue-500" />
+                <BarChart3 className="h-5 w-5 text-status-info" />
                 Department Absenteeism Summary
               </CardTitle>
               <CardDescription>Sorted by lowest attendance rate first</CardDescription>
@@ -693,7 +693,7 @@ export default function AttendanceReports() {
                         <TableCell className="font-medium">{d.dept}</TableCell>
                         <TableCell className="text-center">{d.employees}</TableCell>
                         <TableCell className="text-center">
-                          <span className={`font-semibold ${rate >= 90 ? 'text-green-600' : rate >= 70 ? 'text-amber-600' : 'text-red-600'}`}>
+                          <span className={`font-semibold ${rate >= 90 ? 'text-status-success' : rate >= 70 ? 'text-status-warning' : 'text-destructive'}`}>
                             {rate.toFixed(0)}%
                           </span>
                         </TableCell>
@@ -704,7 +704,7 @@ export default function AttendanceReports() {
                           {d.withAnomalies > 0 ? (
                             <Badge variant="destructive" className="text-xs">{d.withAnomalies}</Badge>
                           ) : (
-                            <span className="text-green-600 text-xs">None</span>
+                            <span className="text-status-success text-xs">None</span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -852,7 +852,7 @@ export default function AttendanceReports() {
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <div className="text-center hidden sm:block">
-                            <span className={`font-semibold ${summary.attendanceRate >= 90 ? 'text-green-600' : summary.attendanceRate >= 70 ? 'text-amber-600' : 'text-red-600'}`}>
+                            <span className={`font-semibold ${summary.attendanceRate >= 90 ? 'text-status-success' : summary.attendanceRate >= 70 ? 'text-status-warning' : 'text-destructive'}`}>
                               {summary.attendanceRate.toFixed(0)}%
                             </span>
                             <p className="text-xs text-muted-foreground">Attendance</p>
@@ -862,13 +862,13 @@ export default function AttendanceReports() {
                             <p className="text-xs text-muted-foreground">Days</p>
                           </div>
                           <div className="text-center hidden md:block">
-                            <span className={`font-semibold ${summary.lateArrivals > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                            <span className={`font-semibold ${summary.lateArrivals > 0 ? 'text-status-warning' : 'text-status-success'}`}>
                               {summary.lateArrivals}
                             </span>
                             <p className="text-xs text-muted-foreground">Late</p>
                           </div>
                           <div className="text-center hidden md:block">
-                            <span className={`font-semibold ${summary.earlyDepartures > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                            <span className={`font-semibold ${summary.earlyDepartures > 0 ? 'text-status-warning' : 'text-status-success'}`}>
                               {summary.earlyDepartures}
                             </span>
                             <p className="text-xs text-muted-foreground">Early</p>
@@ -892,21 +892,21 @@ export default function AttendanceReports() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div className="text-center p-3 bg-muted rounded-lg">
                             <p className="text-sm text-muted-foreground">Avg Clock In</p>
-                            <p className={`text-lg font-semibold ${summary.avgClockInTime > clockInCutoff ? 'text-orange-600' : 'text-green-600'}`}>
+                            <p className={`text-lg font-semibold ${summary.avgClockInTime > clockInCutoff ? 'text-status-warning' : 'text-status-success'}`}>
                               {summary.avgClockInTime}
                             </p>
                             <p className="text-xs text-muted-foreground">Cutoff: {clockInCutoff}</p>
                           </div>
                           <div className="text-center p-3 bg-muted rounded-lg">
                             <p className="text-sm text-muted-foreground">Avg Clock Out</p>
-                            <p className={`text-lg font-semibold ${summary.avgClockOutTime < clockOutCutoff && summary.avgClockOutTime !== '--:--' ? 'text-amber-600' : 'text-green-600'}`}>
+                            <p className={`text-lg font-semibold ${summary.avgClockOutTime < clockOutCutoff && summary.avgClockOutTime !== '--:--' ? 'text-status-warning' : 'text-status-success'}`}>
                               {summary.avgClockOutTime}
                             </p>
                             <p className="text-xs text-muted-foreground">Cutoff: {clockOutCutoff}</p>
                           </div>
                           <div className="text-center p-3 bg-muted rounded-lg">
                             <p className="text-sm text-muted-foreground">Missed Days</p>
-                            <p className={`text-lg font-semibold ${summary.missedDays > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            <p className={`text-lg font-semibold ${summary.missedDays > 0 ? 'text-destructive' : 'text-status-success'}`}>
                               {summary.missedDays}
                             </p>
                           </div>
@@ -921,7 +921,7 @@ export default function AttendanceReports() {
                         {summary.anomalies.length > 0 && (
                           <div className="space-y-2">
                             <h4 className="text-sm font-semibold flex items-center gap-2">
-                              <AlertTriangle className="h-4 w-4 text-amber-500" />
+                              <AlertTriangle className="h-4 w-4 text-status-warning" />
                               Anomalies Detected
                             </h4>
                             {summary.anomalies.map((anomaly, i) => (
@@ -984,40 +984,40 @@ export default function AttendanceReports() {
                                       <>
                                         <TableCell>
                                           {record.clockIn ? (
-                                            <span className={record.isLate ? 'text-orange-600 font-medium' : ''}>
+                                            <span className={record.isLate ? 'text-status-warning font-medium' : ''}>
                                               {record.clockIn}
                                             </span>
                                           ) : (
-                                            <span className="text-red-500">--:--</span>
+                                            <span className="text-destructive">--:--</span>
                                           )}
                                         </TableCell>
                                         <TableCell>
                                           {record.clockOut ? (
-                                            <span className={record.isEarlyDeparture ? 'text-amber-600 font-medium' : ''}>
+                                            <span className={record.isEarlyDeparture ? 'text-status-warning font-medium' : ''}>
                                               {record.clockOut}
                                             </span>
                                           ) : record.clockIn ? (
                                             <span className="text-muted-foreground">--:--</span>
                                           ) : (
-                                            <span className="text-red-500">--:--</span>
+                                            <span className="text-destructive">--:--</span>
                                           )}
                                         </TableCell>
                                         <TableCell className="text-sm">{record.hoursWorked > 0 ? record.hoursWorked.toFixed(1) : '-'}</TableCell>
                                         <TableCell>
                                           {record.isFirstDay && record.clockIn ? (
-                                            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-200">Registered</Badge>
+                                            <Badge variant="secondary" className="text-xs bg-status-info-muted text-status-info border-status-info/30">Registered</Badge>
                                           ) : !record.clockIn ? (
                                             <Badge variant="destructive" className="text-xs">Absent</Badge>
                                           ) : record.isLate && record.isEarlyDeparture ? (
                                             <Badge variant="destructive" className="text-xs">Late + Early</Badge>
                                           ) : record.isLate ? (
-                                            <Badge className="bg-orange-500 text-xs">Late</Badge>
+                                            <Badge className="bg-status-warning text-white text-xs">Late</Badge>
                                           ) : record.isEarlyDeparture ? (
-                                            <Badge className="bg-amber-500 text-xs">Early</Badge>
+                                            <Badge className="bg-status-warning text-white text-xs">Early</Badge>
                                           ) : !record.clockOut && record.clockIn ? (
                                             <Badge variant="secondary" className="text-xs">No Clock-out</Badge>
                                           ) : (
-                                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">On Time</Badge>
+                                            <Badge variant="secondary" className="bg-status-success-muted text-status-success text-xs">On Time</Badge>
                                           )}
                                         </TableCell>
                                         <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
@@ -1046,7 +1046,7 @@ export default function AttendanceReports() {
         <Card className="mt-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-blue-500" />
+              <BarChart3 className="h-5 w-5 text-status-info" />
               Department Attendance Summary
             </CardTitle>
             <CardDescription>Aggregate attendance rates and infringements by department for the selected period</CardDescription>
@@ -1089,23 +1089,23 @@ export default function AttendanceReports() {
                         <TableCell className="text-center">{row.totalWorking}</TableCell>
                         <TableCell className="text-center">{row.totalWorked}</TableCell>
                         <TableCell className="text-center">
-                          <span className={`font-semibold ${row.avgRate >= 90 ? 'text-green-600' : row.avgRate >= 75 ? 'text-amber-600' : 'text-red-600'}`}>
+                          <span className={`font-semibold ${row.avgRate >= 90 ? 'text-status-success' : row.avgRate >= 75 ? 'text-status-warning' : 'text-destructive'}`}>
                             {row.avgRate.toFixed(1)}%
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={row.totalLate > 0 ? 'text-orange-600 font-medium' : ''}>{row.totalLate}</span>
+                          <span className={row.totalLate > 0 ? 'text-status-warning font-medium' : ''}>{row.totalLate}</span>
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={row.totalEarly > 0 ? 'text-amber-600 font-medium' : ''}>{row.totalEarly}</span>
+                          <span className={row.totalEarly > 0 ? 'text-status-warning font-medium' : ''}>{row.totalEarly}</span>
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={row.totalMissed > 0 ? 'text-red-600 font-medium' : ''}>{row.totalMissed}</span>
+                          <span className={row.totalMissed > 0 ? 'text-destructive font-medium' : ''}>{row.totalMissed}</span>
                         </TableCell>
                       </TableRow>
                     ))}
                     {/* Totals row */}
-                    <TableRow className="border-t-2 bg-slate-50 font-semibold">
+                    <TableRow className="border-t-2 bg-muted/50 font-semibold">
                       <TableCell>TOTAL</TableCell>
                       <TableCell className="text-center">{deptRows.reduce((a, r) => a + r.count, 0)}</TableCell>
                       <TableCell className="text-center">{deptRows.reduce((a, r) => a + r.totalWorking, 0)}</TableCell>

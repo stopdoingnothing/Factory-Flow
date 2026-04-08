@@ -312,7 +312,7 @@ export default function SettingsSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-slate-900">Settings</h1>
+        <h1 className="text-3xl font-heading font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground">Configure system settings and manage user groups</p>
       </div>
       
@@ -323,7 +323,7 @@ export default function SettingsSection() {
           className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
             settingsTab === 'general' 
               ? 'bg-primary text-white' 
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              : 'bg-muted text-muted-foreground hover:bg-muted/70'
           }`}
           data-testid="settings-tab-general"
         >
@@ -335,7 +335,7 @@ export default function SettingsSection() {
           className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
             settingsTab === 'user-groups' 
               ? 'bg-primary text-white' 
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              : 'bg-muted text-muted-foreground hover:bg-muted/70'
           }`}
           data-testid="settings-tab-user-groups"
         >
@@ -347,7 +347,7 @@ export default function SettingsSection() {
           className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
             settingsTab === 'branding' 
               ? 'bg-primary text-white' 
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              : 'bg-muted text-muted-foreground hover:bg-muted/70'
           }`}
           data-testid="settings-tab-branding"
         >
@@ -359,7 +359,7 @@ export default function SettingsSection() {
           className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
             settingsTab === 'api' 
               ? 'bg-primary text-white' 
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              : 'bg-muted text-muted-foreground hover:bg-muted/70'
           }`}
           data-testid="settings-tab-api"
         >
@@ -535,16 +535,16 @@ export default function SettingsSection() {
                 />
               </div>
 
-              <div className="p-3 bg-slate-100 rounded-lg">
+              <div className="p-3 bg-muted rounded-lg">
                 <p className="text-sm font-medium mb-2">Available placeholders:</p>
                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                  <span><code className="bg-white px-1 rounded">{'{firstName}'}</code> - First name</span>
-                  <span><code className="bg-white px-1 rounded">{'{surname}'}</code> - Surname</span>
-                  <span><code className="bg-white px-1 rounded">{'{id}'}</code> - Employee ID</span>
-                  <span><code className="bg-white px-1 rounded">{'{department}'}</code> - Department</span>
-                  <span><code className="bg-white px-1 rounded">{'{time}'}</code> - Actual clock time</span>
-                  <span><code className="bg-white px-1 rounded">{'{cutoff}'}</code> - Cut-off time</span>
-                  <span><code className="bg-white px-1 rounded">{'{date}'}</code> - Date</span>
+                  <span><code className="bg-card px-1 rounded">{'{firstName}'}</code> - First name</span>
+                  <span><code className="bg-card px-1 rounded">{'{surname}'}</code> - Surname</span>
+                  <span><code className="bg-card px-1 rounded">{'{id}'}</code> - Employee ID</span>
+                  <span><code className="bg-card px-1 rounded">{'{department}'}</code> - Department</span>
+                  <span><code className="bg-card px-1 rounded">{'{time}'}</code> - Actual clock time</span>
+                  <span><code className="bg-card px-1 rounded">{'{cutoff}'}</code> - Cut-off time</span>
+                  <span><code className="bg-card px-1 rounded">{'{date}'}</code> - Date</span>
                 </div>
               </div>
             </div>
@@ -655,10 +655,10 @@ export default function SettingsSection() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Upload a CSV file with columns: <code className="bg-slate-100 px-1 rounded">employeeId, leaveType, total, taken, pending</code>
+                Upload a CSV file with columns: <code className="bg-muted px-1 rounded">employeeId, leaveType, total, taken, pending</code>
               </p>
               <p className="text-sm text-muted-foreground">
-                Example: <code className="bg-slate-100 px-1 rounded">EMP001,Annual Leave,15,5,0</code>
+                Example: <code className="bg-muted px-1 rounded">EMP001,Annual Leave,15,5,0</code>
               </p>
             </div>
             <Input
@@ -756,7 +756,7 @@ export default function SettingsSection() {
               <CardDescription>Manage admin user groups for access control</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button onClick={handleOpenCreateAdmin} className="btn-industrial bg-amber-500 hover:bg-amber-600 text-black" data-testid="button-add-admin">
+              <Button onClick={handleOpenCreateAdmin} className="btn-industrial bg-status-warning hover:bg-status-warning/80 text-white" data-testid="button-add-admin">
                 <UserCog className="mr-2 h-4 w-4" /> Add Admin User
               </Button>
               <Button onClick={handleOpenCreateGroup} className="btn-industrial bg-primary text-white" data-testid="button-add-group">
@@ -791,7 +791,7 @@ export default function SettingsSection() {
                         </TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenEditGroup(group)} data-testid={`button-edit-group-${group.id}`}>
-                            <Pencil className="h-4 w-4 text-slate-500" />
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
                           </Button>
                           <Button 
                             variant="ghost" 
@@ -801,7 +801,7 @@ export default function SettingsSection() {
                             title={adminCount > 0 ? "Cannot delete group with assigned admins" : "Delete group"}
                             data-testid={`button-delete-group-${group.id}`}
                           >
-                            <Trash2 className={`h-4 w-4 ${adminCount > 0 ? 'text-slate-300' : 'text-red-500'}`} />
+                            <Trash2 className={`h-4 w-4 ${adminCount > 0 ? 'text-muted-foreground/40' : 'text-destructive'}`} />
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -850,10 +850,10 @@ export default function SettingsSection() {
                           title="Resend credentials email"
                           data-testid={`button-resend-credentials-${admin.id}`}
                         >
-                          <Mail className="h-4 w-4 text-blue-500" />
+                          <Mail className="h-4 w-4 text-status-info" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(admin.id)}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
+                          <Trash2 className="h-4 w-4 text-destructive00" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -1078,7 +1078,7 @@ export default function SettingsSection() {
             <div className="space-y-2">
               <Label>API Endpoint</Label>
               <div className="flex items-center gap-2">
-                <code className="flex-1 bg-slate-100 rounded px-3 py-2 text-sm font-mono break-all">
+                <code className="flex-1 bg-muted rounded px-3 py-2 text-sm font-mono break-all">
                   GET {window.location.origin}/api/external/employees
                 </code>
                 <Button
@@ -1102,7 +1102,7 @@ export default function SettingsSection() {
                 <p className="text-sm text-muted-foreground">Loading...</p>
               ) : (
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 bg-slate-100 rounded px-3 py-2 text-sm font-mono break-all">
+                  <code className="flex-1 bg-muted rounded px-3 py-2 text-sm font-mono break-all">
                     {apiKeyVisible ? apiKey : '•'.repeat(Math.min(apiKey.length, 48))}
                   </code>
                   <Button
@@ -1169,7 +1169,7 @@ export default function SettingsSection() {
             {/* Response shape */}
             <div className="space-y-2">
               <Label>Response Format</Label>
-              <div className="bg-slate-100 rounded-lg p-4 text-xs font-mono space-y-1">
+              <div className="bg-muted rounded-lg p-4 text-xs font-mono space-y-1">
                 <p>{'{'}</p>
                 <p className="pl-4">"count": 42,</p>
                 <p className="pl-4">"generatedAt": "2026-01-01T08:00:00.000Z",</p>

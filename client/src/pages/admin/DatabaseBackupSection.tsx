@@ -124,8 +124,8 @@ export default function DatabaseBackupSection() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-slate-800">Database Backup</h2>
-        <p className="text-slate-500 mt-1">Download a complete snapshot of all data, or restore from a previous backup.</p>
+        <h2 className="text-2xl font-bold text-foreground">Database Backup</h2>
+        <p className="text-muted-foreground mt-1">Download a complete snapshot of all data, or restore from a previous backup.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -135,24 +135,24 @@ export default function DatabaseBackupSection() {
             <CardTitle className="flex items-center gap-2 text-base">
               <Download className="h-4 w-4" /> Download Backup
             </CardTitle>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Export the entire database as a single JSON file — suitable for reinstalling on a new server or migrating to a new environment.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">What's included</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">What's included</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                 {INCLUDED_TABLES.map(({ icon: Icon, label }) => (
-                  <div key={label} className="flex items-center gap-2 text-sm text-slate-600">
-                    <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <div key={label} className="flex items-center gap-2 text-sm text-foreground">
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     {label}
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 flex items-start gap-2 text-sm text-amber-700">
+            <div className="rounded-md bg-status-warning-muted border border-status-warning/30 px-3 py-2 flex items-start gap-2 text-sm text-status-warning">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               Photos and face recognition data are included. Files may be large if many employees have photos.
             </div>
@@ -170,7 +170,7 @@ export default function DatabaseBackupSection() {
             <CardTitle className="flex items-center gap-2 text-base">
               <Upload className="h-4 w-4" /> Restore from Backup
             </CardTitle>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Upload a backup file to restore data. Existing records are kept — only records that don't already exist will be added.
             </p>
           </CardHeader>
@@ -178,28 +178,28 @@ export default function DatabaseBackupSection() {
             {!backupInfo ? (
               <>
                 <div
-                  className="border-2 border-dashed border-slate-200 rounded-lg p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                  className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-muted-foreground hover:bg-muted/50 transition-colors"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Database className="h-8 w-8 text-slate-300" />
+                  <Database className="h-8 w-8 text-muted-foreground/40" />
                   <div className="text-center">
-                    <p className="text-sm font-medium text-slate-600">Click to select a backup file</p>
-                    <p className="text-xs text-slate-400">Only .json backup files from this system are accepted</p>
+                    <p className="text-sm font-medium text-foreground">Click to select a backup file</p>
+                    <p className="text-xs text-muted-foreground">Only .json backup files from this system are accepted</p>
                   </div>
                 </div>
                 <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFileSelect} />
-                <div className="flex items-start gap-2 text-sm text-slate-500">
-                  <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
                   Existing records are never overwritten — only missing records from the backup will be added.
                 </div>
               </>
             ) : (
               <>
-                <div className="rounded-md border border-green-200 bg-green-50 p-3 space-y-2">
-                  <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
+                <div className="rounded-md border border-status-success/30 bg-status-success-muted p-3 space-y-2">
+                  <div className="flex items-center gap-2 text-status-success font-medium text-sm">
                     <CheckCircle2 className="h-4 w-4" /> Valid backup file
                   </div>
-                  <div className="text-xs text-slate-500 space-y-1">
+                  <div className="text-xs text-muted-foreground space-y-1">
                     <div>Version: <span className="font-mono">{backupInfo.version}</span></div>
                     <div>Exported: {new Date(backupInfo.exportedAt).toLocaleString()}</div>
                   </div>
@@ -208,7 +208,7 @@ export default function DatabaseBackupSection() {
                       .filter(([, v]) => v > 0)
                       .map(([key, count]) => (
                         <div key={key} className="flex justify-between text-xs">
-                          <span className="text-slate-500 capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+                          <span className="text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
                           <Badge variant="secondary" className="text-xs h-4">{formatCount(count)}</Badge>
                         </div>
                       ))}

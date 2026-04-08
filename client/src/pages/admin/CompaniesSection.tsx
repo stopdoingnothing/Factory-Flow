@@ -101,7 +101,7 @@ export default function CompaniesSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-slate-900">Companies</h1>
+        <h1 className="text-3xl font-heading font-bold text-foreground">Companies</h1>
         <p className="text-muted-foreground">Manage payroll companies that employees are assigned to</p>
       </div>
 
@@ -138,7 +138,7 @@ export default function CompaniesSection() {
                     <TableRow key={company.id} data-testid={`row-company-${company.id}`}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <Building className="h-4 w-4 text-slate-400" />
+                          <Building className="h-4 w-4 text-muted-foreground" />
                           {company.name}
                         </div>
                       </TableCell>
@@ -149,7 +149,7 @@ export default function CompaniesSection() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(company)} data-testid={`button-edit-company-${company.id}`}>
-                          <Pencil className="h-4 w-4 text-slate-500" />
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -159,7 +159,7 @@ export default function CompaniesSection() {
                           title={count > 0 ? "Cannot delete a company that has employees assigned" : "Delete company"}
                           data-testid={`button-delete-company-${company.id}`}
                         >
-                          <Trash2 className={`h-4 w-4 ${count > 0 ? 'text-slate-300' : 'text-red-500'}`} />
+                          <Trash2 className={`h-4 w-4 ${count > 0 ? 'text-muted-foreground/40' : 'text-destructive'}`} />
                         </Button>
                       </TableCell>
                     </TableRow>

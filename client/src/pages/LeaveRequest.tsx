@@ -261,9 +261,9 @@ export function LeaveRequest() {
             <CardContent>
               {/* Manager/position notification */}
               {(user?.reportsToPositionId || user?.managerId) ? (
-                <Alert className="mb-6 border-blue-200 bg-blue-50">
-                  <UserCheck className="h-4 w-4 text-blue-600" />
-                  <AlertDescription className="text-blue-800">
+                <Alert className="mb-6 border-status-info/30 bg-status-info-muted">
+                  <UserCheck className="h-4 w-4 text-status-info" />
+                  <AlertDescription className="text-status-info">
                     {manager ? (
                       <>Your leave request will be reviewed by <strong>{manager.firstName} {manager.surname}</strong>. They will be notified when you submit this request.</>
                     ) : (
@@ -272,9 +272,9 @@ export function LeaveRequest() {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <Alert className="mb-6 border-amber-200 bg-amber-50">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-amber-800">
+                <Alert className="mb-6 border-status-warning/30 bg-status-warning-muted">
+                  <AlertTriangle className="h-4 w-4 text-status-warning" />
+                  <AlertDescription className="text-status-warning">
                     No reporting position assigned. Your leave request will go directly to HR for review.
                   </AlertDescription>
                 </Alert>
@@ -338,7 +338,7 @@ export function LeaveRequest() {
                           Unpaid Leave
                         </p>
                         <div>
-                          <div className="text-2xl font-bold font-heading leading-none text-slate-400">∞</div>
+                          <div className="text-2xl font-bold font-heading leading-none text-muted-foreground">∞</div>
                           <p className="text-xs text-muted-foreground mt-0.5">no limit · HR approval</p>
                         </div>
                       </CardContent>
@@ -372,9 +372,9 @@ export function LeaveRequest() {
                       )}
                       {/* Unpaid Leave notice */}
                       {unpaidIsSelected && (
-                        <Alert className="border-amber-200 bg-amber-50">
-                          <AlertTriangle className="h-4 w-4 text-amber-600" />
-                          <AlertDescription className="text-amber-800">
+                        <Alert className="border-status-warning/30 bg-status-warning-muted">
+                          <AlertTriangle className="h-4 w-4 text-status-warning" />
+                          <AlertDescription className="text-status-warning">
                             Unpaid leave requires <strong>HR approval</strong>. Your manager will first be asked to recommend or decline, then HR makes the final decision. Please provide <strong>7 days' notice</strong> where possible.
                           </AlertDescription>
                         </Alert>
@@ -475,8 +475,8 @@ export function LeaveRequest() {
                         weekend: (date: Date) => date.getDay() === 0 || date.getDay() === 6,
                       }}
                       modifiersClassNames={{
-                        publicHoliday: 'bg-orange-100 text-orange-700 font-medium',
-                        weekend: 'bg-slate-100 text-slate-500',
+                        publicHoliday: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 font-medium',
+                        weekend: 'bg-muted text-muted-foreground',
                       }}
                     />
                   </div>
@@ -542,8 +542,8 @@ export function LeaveRequest() {
 
                   {/* No leave type selected warning */}
                   {dateRange.from && dateRange.to && !leaveType && (
-                    <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                    <div className="flex items-center gap-2 rounded-md border border-status-warning/30 bg-status-warning-muted px-4 py-2.5 text-sm text-status-warning">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-status-warning" />
                       Please select a leave type to check your balance.
                     </div>
                   )}
@@ -611,20 +611,20 @@ export function LeaveRequest() {
 
                   {/* Projection panel — shown when leave starts > 30 days away */}
                   {showProjection && dateRange.from && (
-                    <div className="rounded-md border border-blue-200 overflow-hidden text-sm">
-                      <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-blue-200">
-                        <TrendingUp className="h-4 w-4 text-blue-600 shrink-0" />
-                        <span className="font-medium text-blue-800">
+                    <div className="rounded-md border border-status-info/30 overflow-hidden text-sm">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-status-info-muted border-b border-status-info/30">
+                        <TrendingUp className="h-4 w-4 text-status-info shrink-0" />
+                        <span className="font-medium text-status-info">
                           Projected balance at {format(dateRange.to ?? dateRange.from, 'dd MMM yyyy')}
                         </span>
-                        <span className="ml-auto text-xs font-mono text-blue-600">
+                        <span className="ml-auto text-xs font-mono text-status-info">
                           {projectionLoading
-                            ? <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+                            ? <Loader2 className="h-3 w-3 animate-spin text-status-info" />
                             : projectionError
-                              ? <span className="text-red-500">{(projectionErrorObj as Error)?.message || 'projection error'}</span>
+                              ? <span className="text-destructive">{(projectionErrorObj as Error)?.message || 'projection error'}</span>
                               : projection
                                 ? `${projection.projectedAvailable.toFixed(2)} days projected`
-                                : <span className="text-amber-500">no data</span>
+                                : <span className="text-status-warning">no data</span>
                           }
                         </span>
                       </div>
@@ -640,7 +640,7 @@ export function LeaveRequest() {
                         workDays = Math.max(workDays, 0);
                         const isCovered = projection.projectedAvailable >= workDays;
                         return (
-                          <div className="px-4 py-3 space-y-1.5 bg-white">
+                          <div className="px-4 py-3 space-y-1.5 bg-card">
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Current available</span>
                               <span className="font-medium">{projection.currentAvailable.toFixed(2)} days</span>
@@ -648,7 +648,7 @@ export function LeaveRequest() {
                             {!projection.cycleResetOccurs && projection.projectedAccrual > 0 && (
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Accrual over {projection.monthsProjected} month{projection.monthsProjected !== 1 ? 's' : ''}</span>
-                                <span className="font-medium text-green-700">+{projection.projectedAccrual.toFixed(2)} days</span>
+                                <span className="font-medium text-status-success">+{projection.projectedAccrual.toFixed(2)} days</span>
                               </div>
                             )}
                             {projection.cycleResetOccurs && projection.breakdown.map(entry => (
@@ -656,9 +656,9 @@ export function LeaveRequest() {
                                 <div key={entry.month} className="space-y-1">
                                   <div className="flex justify-between">
                                     <span className="text-muted-foreground">{entry.month} accrual</span>
-                                    <span className="font-medium text-green-700">+{entry.accrual.toFixed(2)} days</span>
+                                    <span className="font-medium text-status-success">+{entry.accrual.toFixed(2)} days</span>
                                   </div>
-                                  <div className="flex justify-between text-blue-700">
+                                  <div className="flex justify-between text-status-info">
                                     <span>Annual cycle reset → {(entry.carryOverCreated ?? 0).toFixed(2)} days carried over</span>
                                     {entry.carryOverExpiry && (
                                       <span className="text-xs text-muted-foreground">(expires {entry.carryOverExpiry})</span>
@@ -668,13 +668,13 @@ export function LeaveRequest() {
                               ) : (
                                 <div key={entry.month} className="flex justify-between">
                                   <span className="text-muted-foreground">{entry.month} accrual (new cycle)</span>
-                                  <span className="font-medium text-green-700">+{entry.accrual.toFixed(2)} days</span>
+                                  <span className="font-medium text-status-success">+{entry.accrual.toFixed(2)} days</span>
                                 </div>
                               )
                             ))}
                             <div className={cn(
                               "flex justify-between font-semibold pt-1 border-t",
-                              isCovered ? "text-green-700 border-green-200" : "text-destructive border-destructive/20"
+                              isCovered ? "text-status-success border-status-success/30" : "text-destructive border-destructive/20"
                             )}>
                               <span>Projected available</span>
                               <span>{projection.projectedAvailable.toFixed(2)} days {isCovered ? '✓' : '✗'}</span>
@@ -682,7 +682,7 @@ export function LeaveRequest() {
                             {workDays > 0 && (
                               <p className={cn(
                                 "text-xs pt-0.5",
-                                isCovered ? "text-green-600" : "text-muted-foreground"
+                                isCovered ? "text-status-success" : "text-muted-foreground"
                               )}>
                                 {isCovered
                                   ? `This request (${workDays} days) will be covered.`
@@ -755,14 +755,14 @@ export function LeaveRequest() {
                   {/* File List */}
                   {files.length > 0 && (
                     <div className="space-y-2 mt-4">
-                      <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
+                      <div className="flex items-center gap-2 text-sm text-status-success font-medium">
                         <CheckCircle2 className="h-4 w-4" />
                         <span>{files.length} document{files.length > 1 ? 's' : ''} uploaded</span>
                       </div>
                       {files.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg text-sm" data-testid={`uploaded-file-${index}`}>
+                        <div key={index} className="flex items-center justify-between p-3 bg-status-success-muted border border-status-success/30 rounded-lg text-sm" data-testid={`uploaded-file-${index}`}>
                           <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-green-600" />
+                            <FileText className="h-4 w-4 text-status-success" />
                             <span className="truncate max-w-[250px] font-medium">{file.name}</span>
                           </div>
                           <Button 
