@@ -26,6 +26,7 @@ services:
       DATABASE_URL: postgres://factoryflow:${POSTGRES_PASSWORD:-changeme}@db:5432/factoryflow
       SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-in-production}
       POSTMARK_API_KEY: ${POSTMARK_API_KEY:-}
+      APP_URL: ${APP_URL:-http://localhost:5000}
       AGENT_GATEWAY_URL: ${AGENT_GATEWAY_URL:-http://host.docker.internal:8787}
       AGENT_GATEWAY_API_KEY: ${AGENT_GATEWAY_API_KEY:-dev-key}
       GITHUB_FEEDBACK_TOKEN: ${GITHUB_FEEDBACK_TOKEN:-}

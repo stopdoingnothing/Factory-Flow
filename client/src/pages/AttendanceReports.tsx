@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { formatDateForDisplay, parseDateFromDisplay, isValidDateFormat } from './admin/utils';
+import { isTrackableEmployee } from '@/lib/userFilters';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -220,7 +221,7 @@ export default function AttendanceReports() {
   };
 
   const activeUsers = useMemo(() => {
-    return users.filter(u => !u.terminationDate && !u.exclude && u.attendanceRequired !== false);
+    return users.filter(isTrackableEmployee);
   }, [users]);
 
   const summaries = useMemo(() => {

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Documentation - Version 1</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            size: A4;
+            margin: 2.5cm 2cm;
+            @bottom-center {
+                content: counter(page);
+                font-family: 'Source Sans Pro', sans-serif;
+                font-size: 10px;
+                color: #666;
+            }
+            @top-right {
+                content: "AECE Checkpoint";
+                font-family: 'Source Sans Pro', sans-serif;
+                font-size: 9px;
+                color: #999;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.7;
+            color: #2c3e50;
+            font-size: 11pt;
+            background: #fafbfc;
+        }
+
+        .title-page {
+            page-break-after: always;
+            padding: 4cm 0 0 0;
+            text-align: center;
+            background: linear-gradient(135deg, #1a365d 0%, #2d5a8c 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .title-page h1 {
+            font-family: 'Merriweather', serif;
+            font-size: 48pt;
+            font-weight: 700;
+            margin-bottom: 0.5em;
+            letter-spacing: -0.5px;
+        }
+
+        .title-page .subtitle {
+            font-size: 14pt;
+            font-weight: 400;
+            opacity: 0.95;
+            margin-bottom: 1.5em;
+            letter-spacing: 1px;
+        }
+
+        .title-page .meta {
+            opacity: 0.8;
+            font-size: 11pt;
+            line-height: 1.8;
+        }
+
+        .toc {
+            page-break-after: always;
+            padding: 2cm 0;
+            background: #f8f9fa;
+        }
+
+        .toc h2 {
+            font-family: 'Merriweather', serif;
+            font-size: 28pt;
+            color: #1a365d;
+            margin-bottom: 1.5em;
+            border-bottom: 3px solid #d97706;
+            padding-bottom: 0.5em;
+        }
+
+        .toc-content {
+            column-count: 2;
+            column-gap: 2em;
+        }
+
+        .toc ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .toc li {
+            margin: 0.7em 0;
+            padding-left: 0;
+        }
+
+        .toc li a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            border-bottom: 1px dotted #d97706;
+        }
+
+        .toc-level-2 {
+            margin-left: 1.5em;
+            font-size: 10pt;
+            color: #555;
+        }
+
+        .content {
+            background: white;
+            padding: 0;
+        }
+
+        h1 {
+            font-family: 'Merriweather', serif;
+            font-size: 32pt;
+            color: #1a365d;
+            margin: 2em 0 1em 0;
+            page-break-after: avoid;
+            border-bottom: 2px solid #d97706;
+            padding-bottom: 0.4em;
+            letter-spacing: -0.5px;
+        }
+
+        h2 {
+            font-family: 'Merriweather', serif;
+            font-size: 22pt;
+            color: #1a365d;
+            margin: 1.8em 0 0.8em 0;
+            page-break-after: avoid;
+            border-left: 4px solid #d97706;
+            padding-left: 0.8em;
+            letter-spacing: -0.3px;
+        }
+
+        h3 {
+            font-family: 'Source Sans Pro', sans-serif;
+            font-size: 14pt;
+            color: #2c3e50;
+            margin: 1.3em 0 0.6em 0;
+            page-break-after: avoid;
+            font-weight: 600;
+        }
+
+        h4 {
+            font-size: 12pt;
+            color: #34495e;
+            margin: 1em 0 0.5em 0;
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0.8em 0;
+            text-align: justify;
+        }
+
+        a {
+            color: #2980b9;
+            text-decoration: none;
+            border-bottom: 1px solid #e8e8e8;
+        }
+
+        ul, ol {
+            margin: 1em 0 1em 2em;
+            padding: 0;
+        }
+
+        li {
+            margin: 0.5em 0;
+            line-height: 1.7;
+        }
+
+        li p {
+            margin: 0.3em 0;
+        }
+
+        code {
+            font-family: 'Courier New', monospace;
+            font-size: 10pt;
+            background-color: #f5f5f5;
+            padding: 0.2em 0.5em;
+            border-radius: 3px;
+            color: #e83e8c;
+        }
+
+        pre {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 1.2em;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1.2em 0;
+            page-break-inside: avoid;
+            font-size: 9.5pt;
+            line-height: 1.5;
+            border-left: 4px solid #d97706;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        blockquote {
+            border-left: 4px solid #d97706;
+            padding: 1em 1.2em;
+            margin: 1.2em 0;
+            background-color: #fffbf0;
+            page-break-inside: avoid;
+            font-style: italic;
+            color: #555;
+        }
+
+        blockquote p {
+            margin: 0.5em 0;
+            text-align: left;
+        }
+
+        blockquote strong {
+            font-weight: 600;
+            color: #1a365d;
+            font-style: normal;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5em 0;
+            page-break-inside: avoid;
+            font-size: 10pt;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        thead {
+            background: linear-gradient(135deg, #1a365d 0%, #2d5a8c 100%);
+            color: white;
+        }
+
+        th {
+            padding: 0.8em 0.9em;
+            text-align: left;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            border: none;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tbody tr:nth-child(odd) {
+            background-color: #f9fbfd;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #ffffff;
+        }
+
+        tbody tr:hover {
+            background-color: #f0f5ff;
+        }
+
+        td {
+            padding: 0.8em 0.9em;
+            border: none;
+        }
+
+        strong {
+            font-weight: 700;
+            color: #1a365d;
+        }
+
+        em {
+            font-style: italic;
+            color: #34495e;
+        }
+
+        .note, .warning, .admin-only {
+            margin: 1.2em 0;
+            padding: 1em 1.2em;
+            page-break-inside: avoid;
+            border-left: 4px solid;
+            border-radius: 2px;
+        }
+
+        .note {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+        .note strong {
+            color: #1976d2;
+        }
+
+        .warning {
+            background-color: #fff3e0;
+            border-color: #ff9800;
+        }
+
+        .warning strong {
+            color: #e65100;
+        }
+
+        .admin-only {
+            background-color: #f3e5f5;
+            border-color: #9c27b0;
+        }
+
+        .admin-only strong {
+            color: #7b1fa2;
+        }
+
+        hr {
+            border: none;
+            border-top: 2px solid #d97706;
+            margin: 2em 0;
+            opacity: 0.5;
+        }
+
+        .section-break {
+            page-break-before: always;
+            padding-top: 1em;
+        }
+
+        .page-break {
+            page-break-after: always;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            a {
+                color: #2980b9;
+                text-decoration: underline;
+                border: none;
+            }
+
+            h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid;
+                orphans: 2;
+                widows: 2;
+            }
+
+            p, li {
+                orphans: 2;
+                widows: 2;
+            }
+
+            table {
+                page-break-inside: avoid;
+            }
+
+            tr {
+                page-break-inside: avoid;
+            }
+        }
+
+        .toc, .note, .warning, .admin-only, table {
+            page-break-inside: avoid;
+        }
+    </style>
+</head>
+<body>
+    <div class="title-page">
+        <h1>Training Documentation</h1>
+        <div class="subtitle">AECE Checkpoint Training Documentation</div>
+        <div class="meta">
+            Version 1<br>
+            Complete Reference<br>
+            <br>
+            Generated April 2026
+        </div>
+    </div>
+
+    <div class="toc">
+        <h2>Contents</h2>
+        <div class="toc-content">
+            <ul>
+<li><strong>Checkpoint Training Documentation</strong></li>
+  <li>Which Guide Do I Need?</li>
+    <li>🆕 New HR Hire? → HR User Guide</li>
+    <li>⚙️ System Administrator? → Admin Reference Manual</li>
+    <li>⚡ Quick Lookup During Your Shift? → HR Quick Reference</li>
+  <li>How to Use These Guides</li>
+  <li>File Manifest</li>
+  <li>Document Format &amp; Features</li>
+  <li>Questions Not Answered Here?</li>
+</ul>
+
+        </div>
+    </div>
+
+    <div class="content">
+        <h1>Checkpoint Training Documentation</h1>
+<p>Three guides to help you use the AECE Checkpoint leave management system.</p>
+<hr />
+<h2>Which Guide Do I Need?</h2>
+<h3>🆕 <strong>New HR Hire?</strong> → <a href="hr-user-guide.md">HR User Guide</a></h3>
+<p>Start here on your first day. This is your complete onboarding manual covering every routine task:<br />
+- How to log in and navigate the dashboard<br />
+- Step-by-step instructions for approving leave, managing employees, and handling grievances<br />
+- How to adjust leave balances, register faces, and export reports<br />
+- Common scenarios and edge cases you'll encounter<br />
+- Glossary and escalation contacts</p>
+<p><strong>~45 pages | Read over your first week | Return to sections as needed</strong></p>
+<hr />
+<h3>⚙️ <strong>System Administrator?</strong> → <a href="admin-reference-manual.md">Admin Reference Manual</a></h3>
+<p>Your complete technical reference for every setting, capability, and configuration:<br />
+- Initial setup checklist and system architecture<br />
+- Field-by-field documentation of every setting (General, Branding, Permissions, etc.)<br />
+- Leave calculation formulas and balance engine deep dive<br />
+- Database backup/restore procedures<br />
+- Email notification matrix and API reference<br />
+- Troubleshooting guide for common issues</p>
+<p><strong>~75 pages | Use as a reference alongside your daily work | Search for specific topics</strong></p>
+<hr />
+<h3>⚡ <strong>Quick Lookup During Your Shift?</strong> → <a href="hr-quick-reference.md">HR Quick Reference</a></h3>
+<p>One-page scannable cheat sheet for trained HR users. Keep this open in a tab or printed by your desk:<br />
+- Morning checklist (5 items, 1 minute)<br />
+- Common tasks lookup table<br />
+- Leave status guide (what each status means)<br />
+- 10 key rules that catch people out<br />
+- Email notifications quick reference<br />
+- Escalation contacts</p>
+<p><strong>~2 pages | Scan in under 2 minutes | Print if you prefer</strong></p>
+<hr />
+<h2>How to Use These Guides</h2>
+<ol>
+<li>
+<p><strong>New to the system?</strong> Start with the <strong>HR User Guide</strong>. Read sections in order or jump to what you need.</p>
+</li>
+<li>
+<p><strong>Implementing a system change?</strong> Use the <strong>Admin Reference Manual</strong>. Search for the feature, then follow the step-by-step instructions.</p>
+</li>
+<li>
+<p><strong>In a hurry?</strong> Use the <strong>HR Quick Reference</strong>. Tables, checklists, and key rules only — no prose.</p>
+</li>
+<li>
+<p><strong>Still stuck?</strong> Check the escalation contacts at the bottom of the Quick Reference, or revisit the full guide for that topic.</p>
+</li>
+</ol>
+<hr />
+<h2>File Manifest</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Audience</th>
+<th>Purpose</th>
+<th>Length</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hr-user-guide.md</code></td>
+<td>New HR hires, trained HR staff</td>
+<td>Complete onboarding &amp; daily reference</td>
+<td>~45 pages</td>
+</tr>
+<tr>
+<td><code>admin-reference-manual.md</code></td>
+<td>System administrators, advanced users</td>
+<td>Technical reference for all settings &amp; capabilities</td>
+<td>~75 pages</td>
+</tr>
+<tr>
+<td><code>hr-quick-reference.md</code></td>
+<td>Trained HR staff</td>
+<td>Printable / desktop quick reference</td>
+<td>~2 pages</td>
+</tr>
+<tr>
+<td><code>README.md</code></td>
+<td>Everyone</td>
+<td>Navigation guide (this file)</td>
+<td>1 page</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Document Format &amp; Features</h2>
+<p>All documents use:<br />
+- <strong>Table of Contents with anchor links</strong> (click to jump to sections)<br />
+- <strong>Numbered procedures</strong> for every task (easy to follow)<br />
+- <strong>Callout blocks</strong> for tips (<code>&gt; **Note:**</code>), warnings (<code>&gt; **Warning:**</code>), and admin-only sections<br />
+- <strong>Reference tables</strong> for quick lookup<br />
+- <strong>Glossary</strong> in the HR User Guide for technical terms</p>
+<hr />
+<h2>Questions Not Answered Here?</h2>
+<ul>
+<li><strong>System is broken?</strong> → Check the Admin Reference Manual troubleshooting section (section 18)</li>
+<li><strong>Policy question?</strong> → Check HR User Guide section 11 (Common Scenarios) or escalate to your manager</li>
+<li><strong>Feature request?</strong> → Contact your admin or system owner for product roadmap questions</li>
+</ul>
+<hr />
+<p><strong>Last Updated:</strong> 2026-04-09</p>
+    </div>
+
+    <p style="text-align: center; font-size: 9pt; color: #999; margin: 3em 0 1em 0; page-break-before: always;">
+        <strong>AECE Checkpoint Training Documentation – Version 1</strong><br>
+        This document is confidential and intended for AECE Checkpoint users only.<br>
+        Last updated: April 2026
+    </p>
+</body>
+</html>

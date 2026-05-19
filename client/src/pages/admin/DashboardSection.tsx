@@ -1,5 +1,6 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { isTrackableEmployee } from '@/lib/userFilters';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -94,7 +95,7 @@ export default function DashboardSection({
   });
 
   const activeEmployees = React.useMemo(() =>
-    users.filter((u: any) => !u.terminationDate && !u.excludeFromLeave && (!u.startDate || u.startDate <= todayStr)),
+    users.filter((u: any) => isTrackableEmployee(u) && (!u.startDate || u.startDate <= todayStr)),
   [users, todayStr]);
 
   // All employees required to clock in (any role), excluding those explicitly excluded from attendance
@@ -288,8 +289,11 @@ export default function DashboardSection({
             <p className="text-muted-foreground text-center py-4">No pending leave requests</p>
           ) : (
             <div className="space-y-2">
-              {leaveRequests.filter((r: LeaveRequest) => ['pending_manager', 'pending_hr', 'pending'].includes(r.status)).slice(0, 5).map((request: LeaveRequest) => {
+              {leaveRequests.filter((r: any) => ['pending_manager', 'pending_hr', 'pending'].includes(r.status)).slice(0, 5).map((request: any) => {
                 const employee = users.find(u => u.id === request.userId);
+                const employeeName = request.employeeFirstName && request.employeeSurname
+                  ? `${request.employeeFirstName} ${request.employeeSurname}`
+                  : request.userId;
                 const actionInfo = canTakeAction(request);
                 const statusInfo = formatLeaveStatus(request.status);
                 return (
@@ -299,7 +303,7 @@ export default function DashboardSection({
                         <img src={employee?.photoUrl || 'https://github.com/shadcn.png'} alt="" className="h-full w-full object-cover" />
                       </div>
                       <div>
-                        <p className="font-medium">{employee ? `${employee.firstName} ${employee.surname}` : request.userId}</p>
+                        <p className="font-medium">{employeeName}</p>
                         <p className="text-xs text-muted-foreground">
                           {request.leaveType} • {format(new Date(request.startDate), 'd MMM')} - {format(new Date(request.endDate), 'd MMM')}
                         </p>

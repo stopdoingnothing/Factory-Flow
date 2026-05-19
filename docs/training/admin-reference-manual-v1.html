@@ -1,0 +1,2253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Reference Manual - Version 1</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            size: A4;
+            margin: 2.5cm 2cm;
+            @bottom-center {
+                content: counter(page);
+                font-family: 'Source Sans Pro', sans-serif;
+                font-size: 10px;
+                color: #666;
+            }
+            @top-right {
+                content: "AECE Checkpoint";
+                font-family: 'Source Sans Pro', sans-serif;
+                font-size: 9px;
+                color: #999;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.7;
+            color: #2c3e50;
+            font-size: 11pt;
+            background: #fafbfc;
+        }
+
+        .title-page {
+            page-break-after: always;
+            padding: 4cm 0 0 0;
+            text-align: center;
+            background: linear-gradient(135deg, #1a365d 0%, #2d5a8c 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .title-page h1 {
+            font-family: 'Merriweather', serif;
+            font-size: 48pt;
+            font-weight: 700;
+            margin-bottom: 0.5em;
+            letter-spacing: -0.5px;
+        }
+
+        .title-page .subtitle {
+            font-size: 14pt;
+            font-weight: 400;
+            opacity: 0.95;
+            margin-bottom: 1.5em;
+            letter-spacing: 1px;
+        }
+
+        .title-page .meta {
+            opacity: 0.8;
+            font-size: 11pt;
+            line-height: 1.8;
+        }
+
+        .toc {
+            page-break-after: always;
+            padding: 2cm 0;
+            background: #f8f9fa;
+        }
+
+        .toc h2 {
+            font-family: 'Merriweather', serif;
+            font-size: 28pt;
+            color: #1a365d;
+            margin-bottom: 1.5em;
+            border-bottom: 3px solid #d97706;
+            padding-bottom: 0.5em;
+        }
+
+        .toc-content {
+            column-count: 2;
+            column-gap: 2em;
+        }
+
+        .toc ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .toc li {
+            margin: 0.7em 0;
+            padding-left: 0;
+        }
+
+        .toc li a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            border-bottom: 1px dotted #d97706;
+        }
+
+        .toc-level-2 {
+            margin-left: 1.5em;
+            font-size: 10pt;
+            color: #555;
+        }
+
+        .content {
+            background: white;
+            padding: 0;
+        }
+
+        h1 {
+            font-family: 'Merriweather', serif;
+            font-size: 32pt;
+            color: #1a365d;
+            margin: 2em 0 1em 0;
+            page-break-after: avoid;
+            border-bottom: 2px solid #d97706;
+            padding-bottom: 0.4em;
+            letter-spacing: -0.5px;
+        }
+
+        h2 {
+            font-family: 'Merriweather', serif;
+            font-size: 22pt;
+            color: #1a365d;
+            margin: 1.8em 0 0.8em 0;
+            page-break-after: avoid;
+            border-left: 4px solid #d97706;
+            padding-left: 0.8em;
+            letter-spacing: -0.3px;
+        }
+
+        h3 {
+            font-family: 'Source Sans Pro', sans-serif;
+            font-size: 14pt;
+            color: #2c3e50;
+            margin: 1.3em 0 0.6em 0;
+            page-break-after: avoid;
+            font-weight: 600;
+        }
+
+        h4 {
+            font-size: 12pt;
+            color: #34495e;
+            margin: 1em 0 0.5em 0;
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0.8em 0;
+            text-align: justify;
+        }
+
+        a {
+            color: #2980b9;
+            text-decoration: none;
+            border-bottom: 1px solid #e8e8e8;
+        }
+
+        ul, ol {
+            margin: 1em 0 1em 2em;
+            padding: 0;
+        }
+
+        li {
+            margin: 0.5em 0;
+            line-height: 1.7;
+        }
+
+        li p {
+            margin: 0.3em 0;
+        }
+
+        code {
+            font-family: 'Courier New', monospace;
+            font-size: 10pt;
+            background-color: #f5f5f5;
+            padding: 0.2em 0.5em;
+            border-radius: 3px;
+            color: #e83e8c;
+        }
+
+        pre {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 1.2em;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1.2em 0;
+            page-break-inside: avoid;
+            font-size: 9.5pt;
+            line-height: 1.5;
+            border-left: 4px solid #d97706;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        blockquote {
+            border-left: 4px solid #d97706;
+            padding: 1em 1.2em;
+            margin: 1.2em 0;
+            background-color: #fffbf0;
+            page-break-inside: avoid;
+            font-style: italic;
+            color: #555;
+        }
+
+        blockquote p {
+            margin: 0.5em 0;
+            text-align: left;
+        }
+
+        blockquote strong {
+            font-weight: 600;
+            color: #1a365d;
+            font-style: normal;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5em 0;
+            page-break-inside: avoid;
+            font-size: 10pt;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        thead {
+            background: linear-gradient(135deg, #1a365d 0%, #2d5a8c 100%);
+            color: white;
+        }
+
+        th {
+            padding: 0.8em 0.9em;
+            text-align: left;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            border: none;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tbody tr:nth-child(odd) {
+            background-color: #f9fbfd;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #ffffff;
+        }
+
+        tbody tr:hover {
+            background-color: #f0f5ff;
+        }
+
+        td {
+            padding: 0.8em 0.9em;
+            border: none;
+        }
+
+        strong {
+            font-weight: 700;
+            color: #1a365d;
+        }
+
+        em {
+            font-style: italic;
+            color: #34495e;
+        }
+
+        .note, .warning, .admin-only {
+            margin: 1.2em 0;
+            padding: 1em 1.2em;
+            page-break-inside: avoid;
+            border-left: 4px solid;
+            border-radius: 2px;
+        }
+
+        .note {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+        .note strong {
+            color: #1976d2;
+        }
+
+        .warning {
+            background-color: #fff3e0;
+            border-color: #ff9800;
+        }
+
+        .warning strong {
+            color: #e65100;
+        }
+
+        .admin-only {
+            background-color: #f3e5f5;
+            border-color: #9c27b0;
+        }
+
+        .admin-only strong {
+            color: #7b1fa2;
+        }
+
+        hr {
+            border: none;
+            border-top: 2px solid #d97706;
+            margin: 2em 0;
+            opacity: 0.5;
+        }
+
+        .section-break {
+            page-break-before: always;
+            padding-top: 1em;
+        }
+
+        .page-break {
+            page-break-after: always;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            a {
+                color: #2980b9;
+                text-decoration: underline;
+                border: none;
+            }
+
+            h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid;
+                orphans: 2;
+                widows: 2;
+            }
+
+            p, li {
+                orphans: 2;
+                widows: 2;
+            }
+
+            table {
+                page-break-inside: avoid;
+            }
+
+            tr {
+                page-break-inside: avoid;
+            }
+        }
+
+        .toc, .note, .warning, .admin-only, table {
+            page-break-inside: avoid;
+        }
+    </style>
+</head>
+<body>
+    <div class="title-page">
+        <h1>Admin Reference Manual</h1>
+        <div class="subtitle">AECE Checkpoint Training Documentation</div>
+        <div class="meta">
+            Version 1<br>
+            Complete Reference<br>
+            <br>
+            Generated April 2026
+        </div>
+    </div>
+
+    <div class="toc">
+        <h2>Contents</h2>
+        <div class="toc-content">
+            <ul>
+<li><strong>System Reference Manual: AECE Checkpoint Administration</strong></li>
+  <li>Table of Contents</li>
+  <li>Section 1: System Architecture Overview</li>
+    <li>1.1 What AECE Checkpoint is</li>
+    <li>1.2 Role hierarchy and capabilities matrix</li>
+    <li>1.3 Admin vs HR capabilities: what admin can do that HR cannot</li>
+    <li>1.4 Mode selection screen</li>
+  <li>Section 2: Initial Setup Checklist</li>
+    <li>2.1 First-time setup sequence</li>
+    <li>2.2 Bootstrap restore from backup</li>
+    <li>2.3 Verifying email delivery</li>
+  <li>Section 3: System Settings: General</li>
+    <li>3.1 admin_email</li>
+    <li>3.2 sender_email</li>
+    <li>3.3 timezone</li>
+    <li>3.4 annual_leave_cycle_start</li>
+    <li>3.5 leave_carry_over_grace_months</li>
+    <li>3.6 hr_approval_stage_enabled</li>
+  <li>Section 4: System Settings: Attendance</li>
+    <li>4.1 clock_in_cutoff</li>
+    <li>4.2 clock_out_cutoff</li>
+    <li>4.3 late_arrival_message_template</li>
+    <li>4.4 early_departure_message_template</li>
+  <li>Section 5: System Settings: Branding</li>
+    <li>5.1 company_name</li>
+    <li>5.2 company_logo</li>
+    <li>5.3 primary_color, accent_color</li>
+    <li>5.4 Terminology Overrides</li>
+  <li>Section 6: System Settings: Role Permissions</li>
+    <li>6.1 What role permissions control</li>
+    <li>6.2 Navigation Permissions (12 keys)</li>
+    <li>6.3 Personnel Page Capabilities (7 keys)</li>
+    <li>6.4 How to change permissions</li>
+    <li>6.5 Multi-role user behavior</li>
+    <li>6.6 Warning: minimum viable permissions</li>
+  <li>Section 7: System Settings: API Key</li>
+    <li>7.1 Purpose of the external API key</li>
+    <li>7.2 Viewing the current API key</li>
+    <li>7.3 Regenerating the API key</li>
+    <li>7.4 API endpoint documentation</li>
+    <li>7.5 Security considerations</li>
+  <li>Section 8: Organisational Structure Configuration</li>
+    <li>8.1 Departments</li>
+    <li>8.2 Employee Types</li>
+    <li>8.3 Companies / Payroll Entities</li>
+    <li>8.4 Org Chart Positions</li>
+    <li>8.5 User Groups</li>
+  <li>Section 9: Employee Administration</li>
+    <li>9.1 Adding an admin user</li>
+    <li>9.2 Role assignment</li>
+    <li>9.3 Bulk leave balance CSV import</li>
+    <li>9.4 Contract history</li>
+  <li>Section 10: Leave Rules Configuration</li>
+    <li>10.1 BCEA statutory leave types reference</li>
+    <li>10.2 Accrual rate tiers for annual leave</li>
+    <li>10.3 Custom leave rule field reference</li>
+    <li>10.4 Phased leave rules</li>
+    <li>10.5 Public holidays configuration</li>
+    <li>10.6 Unpaid leave notice period configuration</li>
+  <li>Section 11: Leave Workflow Configuration</li>
+    <li>11.1 Two-stage vs three-stage approval</li>
+    <li>11.2 Leave escalation reminders</li>
+    <li>11.3 Cancellation rules</li>
+    <li>11.4 Annual leave cycle rollover parameters</li>
+  <li>Section 12: Attendance Configuration &amp; Operations</li>
+    <li>12.1 Kiosk mode</li>
+    <li>12.2 Clock cutoff settings</li>
+    <li>12.3 Auto clock-out reset</li>
+    <li>12.4 Infringement types and triggers</li>
+    <li>12.5 AWOL detection</li>
+  <li>Section 13: Email Notifications: Complete Reference</li>
+    <li>Email Notification Matrix</li>
+  <li>Section 14: Database Backup &amp; Restore</li>
+    <li>14.1 Automated Docker backup</li>
+    <li>14.2 Manual JSON export</li>
+    <li>14.3 Authenticated JSON restore</li>
+    <li>14.4 Bootstrap restore (empty database)</li>
+    <li>14.5 Backup strategy recommendations</li>
+  <li>Section 15: Leave Balance Engine: Deep Dive</li>
+    <li>15.1 Annual leave accrual formula</li>
+    <li>15.2 Annual leave cycle rollover</li>
+    <li>15.3 Sick leave: graduated accrual (first 6 months)</li>
+    <li>15.4 Sick leave: fixed pool (after 6 months)</li>
+    <li>15.5 Family Responsibility Leave</li>
+    <li>15.6 Balance display formula</li>
+    <li>15.7 Future accrual projection</li>
+    <li>15.8 Manual adjustment audit trail</li>
+  <li>Section 16: Audit Logs</li>
+    <li>16.1 What's captured</li>
+    <li>16.2 Accessing audit logs</li>
+    <li>16.3 Filtering and searching</li>
+    <li>16.4 Retention policy</li>
+  <li>Section 17: API Reference</li>
+    <li>17.1 Authentication</li>
+    <li>17.2 Key endpoint categories</li>
+    <li>17.3 Full documentation location</li>
+    <li>17.4 Integration patterns</li>
+  <li>Section 18: Troubleshooting &amp; Maintenance</li>
+    <li>18.1 Admin login fails</li>
+    <li>18.2 Face recognition not matching</li>
+    <li>18.3 Emails not sending</li>
+    <li>18.4 Leave balances appear incorrect</li>
+    <li>18.5 Monthly accrual did not run</li>
+    <li>18.6 Container or service issues</li>
+    <li>18.7 Data migration considerations</li>
+  <li>Conclusion</li>
+</ul>
+
+        </div>
+    </div>
+
+    <div class="content">
+        <h1>System Reference Manual: AECE Checkpoint Administration</h1>
+<p>This is the authoritative technical reference for system administrators and advanced users managing AECE Checkpoint. It covers every configurable setting, system capability, and administrative function.</p>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#section-1-system-architecture-overview">System Architecture Overview</a></li>
+<li><a href="#section-2-initial-setup-checklist">Initial Setup Checklist</a></li>
+<li><a href="#section-3-system-settings-general">System Settings: General</a></li>
+<li><a href="#section-4-system-settings-attendance">System Settings: Attendance</a></li>
+<li><a href="#section-5-system-settings-branding">System Settings: Branding</a></li>
+<li><a href="#section-6-system-settings-role-permissions">System Settings: Role Permissions</a></li>
+<li><a href="#section-7-system-settings-api-key">System Settings: API Key</a></li>
+<li><a href="#section-8-organisational-structure-configuration">Organisational Structure Configuration</a></li>
+<li><a href="#section-9-employee-administration">Employee Administration</a></li>
+<li><a href="#section-10-leave-rules-configuration">Leave Rules Configuration</a></li>
+<li><a href="#section-11-leave-workflow-configuration">Leave Workflow Configuration</a></li>
+<li><a href="#section-12-attendance-configuration--operations">Attendance Configuration &amp; Operations</a></li>
+<li><a href="#section-13-email-notifications-complete-reference">Email Notifications: Complete Reference</a></li>
+<li><a href="#section-14-database-and-restore">Database Backup &amp; Restore</a></li>
+<li><a href="#section-15-leave-balance-engine-deep-dive">Leave Balance Engine: Deep Dive</a></li>
+<li><a href="#section-16-audit-logs">Audit Logs</a></li>
+<li><a href="#section-17-api-reference">API Reference</a></li>
+<li><a href="#section-18-troubleshooting--maintenance">Troubleshooting &amp; Maintenance</a></li>
+</ol>
+<hr />
+<h2>Section 1: System Architecture Overview</h2>
+<h3>1.1 What AECE Checkpoint is</h3>
+<p>AECE Checkpoint is a self-hosted workforce management system consisting of:</p>
+<ul>
+<li><strong>Frontend:</strong> React-based single-page application (SPA) with responsive design</li>
+<li><strong>Backend:</strong> Express.js REST API handling all business logic</li>
+<li><strong>Database:</strong> PostgreSQL relational database</li>
+<li><strong>Email:</strong> Postmark SMTP service for transactional notifications</li>
+<li><strong>Deployment:</strong> Docker containerized application with docker-compose orchestration</li>
+<li><strong>Scale:</strong> Designed for 20–500 employee organizations</li>
+</ul>
+<h3>1.2 Role hierarchy and capabilities matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Description</th>
+<th>Capabilities</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Employee</strong></td>
+<td>Base role; all users have this</td>
+<td>Submit leave requests, view own balance, clock in/out, view org chart, submit grievances</td>
+</tr>
+<tr>
+<td><strong>Manager</strong></td>
+<td>Added capability for supervisor-level users</td>
+<td>View direct reports' leave requests, make manager-stage recommendations, view direct reports' attendance</td>
+</tr>
+<tr>
+<td><strong>HR</strong></td>
+<td>Added capability for HR personnel</td>
+<td>Approve leave requests at HR stage, manage all employees, configure leave rules, view audit logs, manage settings</td>
+</tr>
+<tr>
+<td><strong>Admin</strong></td>
+<td>Super-user with all capabilities</td>
+<td>HR capabilities + system settings (branding, permissions, API key), manage departments/companies/positions, backup/restore, database operations</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Additive model:</strong> A user can hold multiple roles. Roles are not hierarchical; there is no implicit inheritance. For example:<br />
+- User = <code>[employee, manager]</code> — can do both employee and manager tasks<br />
+- User = <code>[employee, hr, admin]</code> — can do all tasks<br />
+- Admin implicitly satisfies any role check</p>
+<h3>1.3 Admin vs HR capabilities: what admin can do that HR cannot</h3>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>HR</th>
+<th>Admin</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Approve/reject leave at HR stage</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Manage employee profiles (create/edit/delete)</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Configure leave rules and custom types</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Manage public holidays</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>View audit logs</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Change system settings (timezone, clock cutoffs, emails)</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Branding configuration (company name, logo, colors)</td>
+<td>✗</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Role permissions configuration</td>
+<td>✗</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Create admin users</td>
+<td>✗</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Manage departments, companies, org positions</td>
+<td>✗</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Database backup/restore/export</td>
+<td>✗</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>API key management</td>
+<td>✗</td>
+<td>✓</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Admin-only:</strong> Features marked above are restricted to the admin role.</p>
+</blockquote>
+<h3>1.4 Mode selection screen</h3>
+<p>When a user first visits the system URL without a session, they see a "Mode Selection" screen with two options:</p>
+<ul>
+<li><strong>Employee Portal</strong> — Full login with email + password (or face recognition). Leads to the portal dashboard.</li>
+<li><strong>Attendance Kiosk</strong> — Face recognition or tile-select attendance clocking. No login required; uses device camera or touchscreen.</li>
+</ul>
+<hr />
+<h2>Section 2: Initial Setup Checklist</h2>
+<h3>2.1 First-time setup sequence</h3>
+<p>Follow this order when setting up a fresh AECE Checkpoint instance:</p>
+<ol>
+<li><strong>Timezone</strong> — Set to your company's timezone (default: Africa/Johannesburg). Affects all timestamps and auto clock-out times.</li>
+<li><strong>Admin Email</strong> — Configure the email address(es) that receive system notifications. This is critical for observability.</li>
+<li><strong>Sender Email</strong> — Set the "from" address for outbound emails (must be Postmark-verified).</li>
+<li><strong>Clock-In/Out Cutoffs</strong> — Set the times after which clock-in is flagged as late and before which clock-out is flagged as early.</li>
+<li><strong>Departments</strong> — Create all departments your organization uses (e.g., Engineering, Sales, HR).</li>
+<li><strong>Employee Types</strong> — Define employment categories (Permanent, Contractor, Part-Time, etc.).</li>
+<li><strong>Companies/Payroll Entities</strong> — If you have multiple payroll entities, create them here.</li>
+<li><strong>Org Positions</strong> — Build the organizational hierarchy (Director &gt; Manager &gt; Supervisor &gt; Employee).</li>
+<li><strong>Leave Rules</strong> — If you have custom leave types beyond BCEA defaults, configure them.</li>
+<li><strong>Public Holidays</strong> — Load your holiday calendar for the year.</li>
+<li><strong>Branding</strong> — Upload company logo, set colors, customize terminology.</li>
+<li><strong>Role Permissions</strong> — Adjust which UI sections each role can see (optional; defaults are sane).</li>
+<li><strong>Create Employees</strong> — Bulk import or manually create employee records.</li>
+</ol>
+<h3>2.2 Bootstrap restore from backup</h3>
+<p>If you have a backup JSON file from another instance and want to restore it to a fresh AECE Checkpoint:</p>
+<ol>
+<li>Ensure the target database is <strong>empty</strong> (no users, no records)</li>
+<li>Visit the home URL (you'll see a "Mode Selection" screen because there's no authenticated session)</li>
+<li>Look for a button <strong>"Restore from Backup"</strong> or click the settings icon</li>
+<li>Select your backup JSON file</li>
+<li>Review the validation summary (number of records, tables affected)</li>
+<li>Click <strong>Confirm Restore</strong></li>
+</ol>
+<p>The system will import all data from the backup. This is useful for:<br />
+- Migrating from a test instance to production<br />
+- Disaster recovery</p>
+<blockquote>
+<p><strong>Note:</strong> This button is only visible when the database is empty. Once you have users or records, you must use the authenticated import function (see Section 14.3).</p>
+</blockquote>
+<h3>2.3 Verifying email delivery</h3>
+<p>To confirm that Postmark is configured and emails are sending:</p>
+<ol>
+<li>Navigate to <strong>Settings</strong> → <strong>General tab</strong></li>
+<li>Look for a button <strong>"Send Test Email"</strong> (or similar)</li>
+<li>Enter a test recipient email address</li>
+<li>Click <strong>Send</strong></li>
+<li>Check the recipient's inbox for a test email from <code>noreply@aece.co.za</code></li>
+</ol>
+<p>If the email doesn't arrive:<br />
+- Check that <code>admin_email</code> and <code>sender_email</code> are set correctly<br />
+- Verify the Postmark API key is configured (ask your admin/DevOps team)<br />
+- Check the Postmark dashboard for bounce or block records</p>
+<hr />
+<h2>Section 3: System Settings: General</h2>
+<p>All settings are configured via <strong>Settings</strong> → <strong>General Tab</strong>.</p>
+<h3>3.1 <code>admin_email</code></h3>
+<p><strong>Purpose:</strong> Email address(es) that receive all system notifications: leave request submissions, AWOL alerts, late arrival flags, escalation reminders, etc.</p>
+<p><strong>Format:</strong> Email address(es), one per line. Example:</p>
+<pre><code>hr@company.com
+hrmanager@company.com
+</code></pre>
+<p><strong>Default:</strong> Not set (empty)</p>
+<p><strong>Effect if changed:</strong> Updates to the current setting apply immediately. Existing pending notifications will not be re-sent to the new address.</p>
+<p><strong>Warning:</strong> If this is not set, HR/managers may miss critical notifications. Always configure this.</p>
+<hr />
+<h3>3.2 <code>sender_email</code></h3>
+<p><strong>Purpose:</strong> The "from" address on all outbound emails. Must be verified with Postmark.</p>
+<p><strong>Format:</strong> A single email address, e.g., <code>noreply@aece.co.za</code></p>
+<p><strong>Default:</strong> <code>noreply@aece.co.za</code></p>
+<p><strong>Effect if changed:</strong> All future emails use the new sender address. Existing emails cannot be changed.</p>
+<p><strong>Important:</strong> The email address must be:<br />
+- Valid and well-formed<br />
+- Verified in your Postmark account (contact Postmark support if needed)<br />
+- Consistent with your domain (to avoid spam flagging)</p>
+<hr />
+<h3>3.3 <code>timezone</code></h3>
+<p><strong>Purpose:</strong> The system's timezone, used for timestamp calculations, auto clock-out times, and leave cycle calculations.</p>
+<p><strong>Format:</strong> IANA timezone identifier, e.g., <code>Africa/Johannesburg</code>, <code>UTC</code>, <code>America/New_York</code></p>
+<p><strong>Default:</strong> <code>Africa/Johannesburg</code></p>
+<p><strong>Effect if changed:</strong> All future timestamps are calculated in the new timezone. Existing timestamps are NOT retroactively recalculated.</p>
+<p><strong>Warning:</strong> Changing timezone mid-year can cause confusion. Do not change lightly.</p>
+<hr />
+<h3>3.4 <code>annual_leave_cycle_start</code></h3>
+<p><strong>Purpose:</strong> The month the system uses as the start of the 12-month annual leave and FRL cycle.</p>
+<p><strong>Format:</strong> Month number, 1–12, e.g., <code>1</code> for January, <code>4</code> for April</p>
+<p><strong>Default:</strong> <code>1</code> (January)</p>
+<p><strong>Effect if changed:</strong> The next cycle reset will use the new month. Existing balances are not retroactively reset.</p>
+<p><strong>Example:</strong> If you set this to <code>4</code>, the annual leave year runs April 1 – March 31 instead of Jan 1 – Dec 31.</p>
+<hr />
+<h3>3.5 <code>leave_carry_over_grace_months</code></h3>
+<p><strong>Purpose:</strong> The number of months after the annual leave cycle ends before carry-over days are forfeited.</p>
+<p><strong>Format:</strong> Number of months, e.g., <code>6</code> means 6 months from cycle end</p>
+<p><strong>Default:</strong> <code>6</code></p>
+<p><strong>Effect if changed:</strong> New carry-over expirations will use the new grace period. Existing carry-over expirations are not recalculated.</p>
+<p><strong>Example:</strong> Cycle ends Dec 31. Grace period is 6 months. Carry-over expires June 30. On July 1, carry-over days are flagged for HR to forfeit.</p>
+<hr />
+<h3>3.6 <code>hr_approval_stage_enabled</code></h3>
+<p><strong>Purpose:</strong> Toggle between two-stage and three-stage leave approval workflow.</p>
+<p><strong>Format:</strong> Boolean (<code>true</code> or <code>false</code>)</p>
+<p><strong>Default:</strong> <code>true</code> (three-stage is standard)</p>
+<p><strong>Options:</strong><br />
+- <code>true</code> — Three-stage workflow: Employee → Manager (recommends) → HR (decides)<br />
+- <code>false</code> — Two-stage workflow: Employee → Manager (approves directly)</p>
+<p><strong>Effect if changed:</strong> Immediately affects new requests. Existing pending requests keep their current workflow.</p>
+<hr />
+<h2>Section 4: System Settings: Attendance</h2>
+<p>All settings are configured via <strong>Settings</strong> → <strong>Attendance Tab</strong>.</p>
+<h3>4.1 <code>clock_in_cutoff</code></h3>
+<p><strong>Purpose:</strong> Time after which a clock-in is flagged as late arrival.</p>
+<p><strong>Format:</strong> HH:MM in 24-hour format, e.g., <code>08:30</code>, <code>09:00</code></p>
+<p><strong>Default:</strong> <code>08:30</code> (8:30 AM)</p>
+<p><strong>Effect if changed:</strong> Clock-ins at or before this time are on-time; after this time are flagged as late. The change applies to all future clock-ins.</p>
+<p><strong>Example:</strong> If set to <code>09:00</code>, an employee clocking in at 09:01 is flagged as late.</p>
+<hr />
+<h3>4.2 <code>clock_out_cutoff</code></h3>
+<p><strong>Purpose:</strong> Time before which a clock-out is flagged as early departure.</p>
+<p><strong>Format:</strong> HH:MM in 24-hour format, e.g., <code>16:30</code>, <code>17:00</code></p>
+<p><strong>Default:</strong> <code>16:30</code> (4:30 PM)</p>
+<p><strong>Effect if changed:</strong> Clock-outs at or after this time are on-time; before this time are flagged as early. The change applies to all future clock-outs.</p>
+<p><strong>Example:</strong> If set to <code>17:00</code>, an employee clocking out at 16:59 is flagged as early departure.</p>
+<hr />
+<h3>4.3 <code>late_arrival_message_template</code></h3>
+<p><strong>Purpose:</strong> Email body template for late arrival notifications sent to managers and admin.</p>
+<p><strong>Format:</strong> Plain text with optional placeholders: <code>{name}</code>, <code>{id}</code>, <code>{time}</code>, <code>{cutoff}</code>, <code>{date}</code></p>
+<p><strong>Default:</strong> </p>
+<pre><code>{name} ({id}) clocked in at {time} on {date}, which is after the cutoff of {cutoff}.
+</code></pre>
+<p><strong>Example customization:</strong></p>
+<pre><code>Employee {name} (ID: {id}) arrived at {time} on {date}. Cutoff is {cutoff}. Please follow up if this is a pattern.
+</code></pre>
+<hr />
+<h3>4.4 <code>early_departure_message_template</code></h3>
+<p><strong>Purpose:</strong> Email body template for early departure notifications.</p>
+<p><strong>Format:</strong> Plain text with placeholders: <code>{name}</code>, <code>{id}</code>, <code>{time}</code>, <code>{cutoff}</code>, <code>{date}</code></p>
+<p><strong>Default:</strong> </p>
+<pre><code>{name} ({id}) clocked out at {time} on {date}, which is before the cutoff of {cutoff}.
+</code></pre>
+<hr />
+<h2>Section 5: System Settings: Branding</h2>
+<p>All settings are configured via <strong>Settings</strong> → <strong>Branding Tab</strong>.</p>
+<h3>5.1 <code>company_name</code></h3>
+<p><strong>Purpose:</strong> Displayed in page titles, email footers, PDF headers, and the portal header.</p>
+<p><strong>Format:</strong> Plain text, up to 50 characters</p>
+<p><strong>Default:</strong> <code>AECE Checkpoint</code></p>
+<p><strong>Effect:</strong> All displays are updated immediately.</p>
+<hr />
+<h3>5.2 <code>company_logo</code></h3>
+<p><strong>Purpose:</strong> Image displayed in the top-left of the portal header and in PDF exports.</p>
+<p><strong>Format:</strong> Image file (PNG, JPG), converted to base64 for storage</p>
+<p><strong>Default:</strong> AECE default logo</p>
+<p><strong>Effect:</strong> Updated immediately in the header and next PDF export.</p>
+<hr />
+<h3>5.3 <code>primary_color</code>, <code>accent_color</code></h3>
+<p><strong>Purpose:</strong> Hex color codes for buttons, badges, highlights, and UI accents.</p>
+<p><strong>Format:</strong> Hex color code, e.g., <code>#0056B3</code>, <code>#28A745</code></p>
+<p><strong>Default:</strong> Blue (<code>#0056B3</code>) and green (<code>#28A745</code>)</p>
+<p><strong>Effect:</strong> All UI elements using these colors update immediately upon save.</p>
+<hr />
+<h3>5.4 Terminology Overrides</h3>
+<p>Allow customization of common terms throughout the UI.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Purpose</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>term_employee</code></td>
+<td>What to call "Employee"</td>
+<td>"Employee"</td>
+</tr>
+<tr>
+<td><code>term_department</code></td>
+<td>What to call "Department"</td>
+<td>"Department"</td>
+</tr>
+<tr>
+<td><code>term_clock_in</code></td>
+<td>What to call "Clock In"</td>
+<td>"Clock In"</td>
+</tr>
+<tr>
+<td><code>term_clock_out</code></td>
+<td>What to call "Clock Out"</td>
+<td>"Clock Out"</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong> If you set <code>term_employee</code> to "Staff Member", all UI labels change from "Employee" to "Staff Member".</p>
+<hr />
+<h2>Section 6: System Settings: Role Permissions</h2>
+<blockquote>
+<p><strong>Admin-only:</strong> This setting is only visible to users with the admin role.</p>
+</blockquote>
+<p>Configure which UI sections and capabilities each role can see and use.</p>
+<h3>6.1 What role permissions control</h3>
+<p>Permissions are feature flags that toggle UI visibility and action buttons. Two categories:</p>
+<ul>
+<li><strong>Navigation permissions</strong> — Whether a role sees a menu item</li>
+<li><strong>Capability permissions</strong> — Whether a role can perform an action (e.g., delete an employee)</li>
+</ul>
+<h3>6.2 Navigation Permissions (12 keys)</h3>
+<table>
+<thead>
+<tr>
+<th>Permission Key</th>
+<th>Label</th>
+<th>Default Roles</th>
+<th>What it controls</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apply_for_leave</code></td>
+<td>Apply for Leave</td>
+<td>employee, manager, hr</td>
+<td>Whether role sees "Leave Request" nav item</td>
+</tr>
+<tr>
+<td><code>my_attendance</code></td>
+<td>My Attendance</td>
+<td>employee, manager, hr</td>
+<td>Whether role sees "My Attendance" nav item</td>
+</tr>
+<tr>
+<td><code>my_profile</code></td>
+<td>My Profile</td>
+<td>employee, manager, hr</td>
+<td>Whether role sees "My Profile" nav item</td>
+</tr>
+<tr>
+<td><code>grievances</code></td>
+<td>Grievances</td>
+<td>employee</td>
+<td>Whether role sees "Grievances" nav item</td>
+</tr>
+<tr>
+<td><code>admin_insights</code></td>
+<td>Admin Insights</td>
+<td>hr, admin</td>
+<td>Whether role sees "Dashboard" nav item (admin view)</td>
+</tr>
+<tr>
+<td><code>personnel</code></td>
+<td>Personnel</td>
+<td>hr, admin</td>
+<td>Whether role sees "Personnel" nav item</td>
+</tr>
+<tr>
+<td><code>my_team</code></td>
+<td>My Team</td>
+<td>manager, hr, admin</td>
+<td>Whether role sees "My Team" nav item</td>
+</tr>
+<tr>
+<td><code>org_chart</code></td>
+<td>Org Chart</td>
+<td>employee, manager, hr, admin</td>
+<td>Whether role sees "Org Chart" nav item</td>
+</tr>
+<tr>
+<td><code>leave_requests</code></td>
+<td>Leave Requests</td>
+<td>hr, admin</td>
+<td>Whether role sees "Leave Requests" nav item</td>
+</tr>
+<tr>
+<td><code>attendance</code></td>
+<td>Attendance</td>
+<td>hr, admin</td>
+<td>Whether role sees "Attendance" nav item</td>
+</tr>
+<tr>
+<td><code>attendance_reports</code></td>
+<td>Attendance Reports</td>
+<td>hr, admin</td>
+<td>Whether role sees "Attendance Reports" nav item</td>
+</tr>
+<tr>
+<td><code>leave_calendar</code></td>
+<td>Leave Calendar</td>
+<td>manager, hr, admin</td>
+<td>Whether role sees "Leave Calendar" nav item</td>
+</tr>
+</tbody>
+</table>
+<h3>6.3 Personnel Page Capabilities (7 keys)</h3>
+<table>
+<thead>
+<tr>
+<th>Permission Key</th>
+<th>Default Roles</th>
+<th>What it controls</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_person</code></td>
+<td>hr, admin</td>
+<td>Whether role can create new employees</td>
+</tr>
+<tr>
+<td><code>export_pdf</code></td>
+<td>hr, admin</td>
+<td>Whether role can export employee data as PDF</td>
+</tr>
+<tr>
+<td><code>missing_information_report</code></td>
+<td>hr, admin</td>
+<td>Whether role can generate a report of incomplete profiles</td>
+</tr>
+<tr>
+<td><code>edit_employee</code></td>
+<td>hr, admin</td>
+<td>Whether role can edit employee details</td>
+</tr>
+<tr>
+<td><code>terminate_reactivate_employee</code></td>
+<td>hr, admin</td>
+<td>Whether role can terminate or reactivate employees</td>
+</tr>
+<tr>
+<td><code>delete_employee</code></td>
+<td>admin</td>
+<td>Whether role can delete employee records</td>
+</tr>
+<tr>
+<td><code>assign_roles</code></td>
+<td>admin</td>
+<td>Whether role can change a user's roles</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Note:</strong> <code>add_admin</code> is hardcoded to admin only and is not configurable via this UI.</p>
+<h3>6.4 How to change permissions</h3>
+<ol>
+<li>Navigate to <strong>Settings</strong> → <strong>Role Permissions Tab</strong></li>
+<li>For each role (Employee, Manager, HR), see a list of toggles</li>
+<li>Toggle each feature on/off as desired</li>
+<li>Click <strong>Save Permissions</strong></li>
+<li>Changes take effect immediately without a page reload</li>
+</ol>
+<h3>6.5 Multi-role user behavior</h3>
+<p>A user can have multiple roles. When checking if a user can perform an action:<br />
+- <code>canSee(permission)</code> returns <code>true</code> if ANY of the user's roles has the permission<br />
+- <code>canDo(action)</code> returns <code>true</code> if ANY of the user's roles has the action capability</p>
+<p><strong>Example:</strong> A user with roles <code>[manager, hr]</code> can see the "Leave Requests" nav item if either the manager OR hr role has <code>leave_requests</code> permission (by default, only hr does, so the user sees it).</p>
+<h3>6.6 Warning: minimum viable permissions</h3>
+<p>If you remove all permissions from a role, users with only that role will see:<br />
+- A mostly empty Dashboard (no nav items visible)<br />
+- A warning banner: "Your account has no permissions. Contact an administrator."</p>
+<p>This is a valid state for testing or temporarily disabling a role.</p>
+<hr />
+<h2>Section 7: System Settings: API Key</h2>
+<blockquote>
+<p><strong>Admin-only:</strong> This setting is only visible to users with the admin role.</p>
+</blockquote>
+<h3>7.1 Purpose of the external API key</h3>
+<p>The API key authenticates third-party integrations (e.g., payroll systems, reporting tools) to call AECE Checkpoint endpoints. It's a static bearer token used in the <code>X-Api-Key</code> HTTP header.</p>
+<p><strong>Authenticated endpoints available with API key:</strong><br />
+- All GET endpoints (read-only access to employees, leave balances, attendance, reports)<br />
+- Most POST/PATCH endpoints (full API surface)<br />
+- Exceptions: login, password reset (session-only)</p>
+<p><strong>Use cases:</strong><br />
+- Payroll system querying leave balances for deduction calculations<br />
+- BI tool pulling attendance and leave reports<br />
+- Legacy HR system syncing employee data</p>
+<h3>7.2 Viewing the current API key</h3>
+<ol>
+<li>Navigate to <strong>Settings</strong> → <strong>API Tab</strong></li>
+<li>The API key is displayed in a text field, <strong>masked by default</strong> (shows <code>••••••••</code> for security)</li>
+<li>Click the <strong>eye icon</strong> to reveal the full key</li>
+<li>Copy the key to clipboard (button provided)</li>
+</ol>
+<h3>7.3 Regenerating the API key</h3>
+<ol>
+<li>Navigate to <strong>Settings</strong> → <strong>API Tab</strong></li>
+<li>Click <strong>Regenerate API Key</strong></li>
+<li>Confirm the action (a warning appears: "The old key will be invalidated immediately")</li>
+<li>A new key is generated and displayed</li>
+<li><strong>All requests using the old key will immediately fail</strong></li>
+<li>Update any integrations with the new key before revoking the old one</li>
+</ol>
+<blockquote>
+<p><strong>Warning:</strong> Regeneration is immediate. Give integrations time to update before revoking.</p>
+</blockquote>
+<h3>7.4 API endpoint documentation</h3>
+<ol>
+<li>Navigate to <strong>Settings</strong> → <strong>API Tab</strong></li>
+<li>Look for a section <strong>"Endpoint Documentation"</strong> or <strong>"Available Endpoints"</strong></li>
+<li>A list displays all available endpoints with:<br />
+   - HTTP method (GET, POST, PATCH, DELETE)<br />
+   - URL path (e.g., <code>/api/employees</code>, <code>/api/leave-requests</code>)<br />
+   - Request/response examples (often in a collapsible section)<br />
+   - Required authentication method (API key or session)</li>
+</ol>
+<h3>7.5 Security considerations</h3>
+<ul>
+<li><strong>Treat API keys as credentials</strong> — Do not share in Slack, email, or version control</li>
+<li><strong>Rotate periodically</strong> — Regenerate the key every 6–12 months</li>
+<li><strong>Limit scope</strong> — If possible, use a separate account with minimal permissions for API integrations</li>
+<li><strong>Monitor usage</strong> — Check audit logs for API key usage patterns</li>
+</ul>
+<hr />
+<h2>Section 8: Organisational Structure Configuration</h2>
+<blockquote>
+<p><strong>Admin-only:</strong> Most of these settings are only visible to users with the admin role.</p>
+</blockquote>
+<h3>8.1 Departments</h3>
+<p><strong>Purpose:</strong> Grouping employees by team/functional area for reporting, leave calendar filtering, and org structure.</p>
+<p><strong>Create a department:</strong><br />
+1. Navigate to <strong>Settings</strong> → <strong>Departments Tab</strong> (or admin &gt; Departments)<br />
+2. Click <strong>+ New Department</strong><br />
+3. Enter name (e.g., "Engineering", "Sales", "HR") and optional description<br />
+4. Click <strong>Save</strong></p>
+<p><strong>Edit a department:</strong><br />
+1. Find the department in the list<br />
+2. Click <strong>Edit</strong><br />
+3. Change name or description<br />
+4. Click <strong>Save</strong></p>
+<p><strong>Delete a department:</strong><br />
+1. Click the department<br />
+2. Click <strong>Delete</strong><br />
+3. <strong>Deletion is blocked if any employees are assigned to this department</strong>. Reassign employees first.</p>
+<hr />
+<h3>8.2 Employee Types</h3>
+<p><strong>Purpose:</strong> Categorizing employees by contract type (Permanent, Contractor, Part-Time, etc.). Affects which leave rules apply to them.</p>
+<p><strong>Create an employee type:</strong><br />
+1. Navigate to <strong>Admin</strong> → <strong>Employee Types</strong> (or Settings → Employee Types)<br />
+2. Click <strong>+ New Type</strong><br />
+3. Enter:<br />
+   - <strong>Name</strong> (e.g., "Permanent", "Contractor")<br />
+   - <strong>Leave Label</strong> — What to call leave for this type (e.g., "Leave" for permanent, "Unavailable" for contractors)<br />
+   - <strong>Has Leave Entitlement?</strong> — "yes" or "no" (contractors may not have entitlements)<br />
+   - <strong>Is Permanent?</strong> — "yes" or "no" (Contractors have end dates; Permanent don't)<br />
+   - <strong>Is Default?</strong> — "yes" or "no" (the default type for new employees)<br />
+4. Click <strong>Save</strong></p>
+<p><strong>Example employee types:</strong><br />
+- <strong>Permanent:</strong> Has Leave Entitlement = yes, Is Permanent = yes, Is Default = yes<br />
+- <strong>Contractor:</strong> Has Leave Entitlement = no, Is Permanent = no, Is Default = no<br />
+- <strong>Part-Time:</strong> Has Leave Entitlement = yes, Is Permanent = yes, Is Default = no</p>
+<hr />
+<h3>8.3 Companies / Payroll Entities</h3>
+<p><strong>Purpose:</strong> Tracking which payroll company an employee belongs to (for multi-entity organizations).</p>
+<p><strong>Create a company:</strong><br />
+1. Navigate to <strong>Admin</strong> → <strong>Companies</strong><br />
+2. Click <strong>+ New Company</strong><br />
+3. Enter name (e.g., "AECE SA (Pty) Ltd") and optional registration number<br />
+4. Click <strong>Save</strong></p>
+<p><strong>Assign an employee to a company:</strong><br />
+1. Navigate to <strong>Personnel</strong><br />
+2. Click the employee<br />
+3. In the edit form, select <strong>Company</strong><br />
+4. Click <strong>Save</strong></p>
+<hr />
+<h3>8.4 Org Chart Positions</h3>
+<p><strong>Purpose:</strong> Defining the organizational hierarchy (reporting structure, titles) independent of employees.</p>
+<p><strong>Create a position:</strong><br />
+1. Navigate to <strong>Admin</strong> → <strong>Org Positions</strong><br />
+2. Click <strong>+ New Position</strong><br />
+3. Enter:<br />
+   - <strong>Title</strong> (e.g., "CEO", "Engineering Manager", "Developer")<br />
+   - <strong>Department</strong> (e.g., "Engineering")<br />
+   - <strong>Parent Position</strong> (who does this position report to? e.g., CEO's parent is none; Manager's parent is CEO)<br />
+   - <strong>Sort Order</strong> (controls left-to-right order in org chart)<br />
+   - <strong>Is Outsourced</strong> — "yes" or "no" (visual indicator for outsourced roles)<br />
+   - <strong>Tier</strong> (controls vertical spacing; higher = lower on org chart)<br />
+4. Click <strong>Save</strong></p>
+<p><strong>Hierarchy example:</strong></p>
+<pre><code>CEO (no parent)
+├─ CFO (parent: CEO)
+│  ├─ Accountant (parent: CFO)
+│  └─ Payroll Officer (parent: CFO)
+└─ Engineering Manager (parent: CEO)
+   ├─ Senior Developer (parent: Engineering Manager)
+   └─ Developer (parent: Engineering Manager)
+</code></pre>
+<hr />
+<h3>8.5 User Groups</h3>
+<p><strong>Purpose:</strong> Grouping admin-level users for organizational context (e.g., "HR Team", "Finance Team").</p>
+<p><strong>Create a user group:</strong><br />
+1. Navigate to <strong>Settings</strong> → <strong>User Groups Tab</strong><br />
+2. Click <strong>+ New Group</strong><br />
+3. Enter name (e.g., "HR Team") and optional description<br />
+4. Click <strong>Save</strong></p>
+<p><strong>Assign a user to a group:</strong><br />
+1. Navigate to <strong>Personnel</strong><br />
+2. Click the user<br />
+3. In the edit form, select <strong>User Group</strong><br />
+4. Click <strong>Save</strong></p>
+<hr />
+<h2>Section 9: Employee Administration</h2>
+<blockquote>
+<p><strong>Admin-only:</strong> Most of these functions are restricted to users with the admin role.</p>
+</blockquote>
+<h3>9.1 Adding an admin user</h3>
+<p>Only the admin role can create new admin users (not available via Personnel).</p>
+<ol>
+<li>Navigate to <strong>Settings</strong> → <strong>User Management</strong> (or Admin panel)</li>
+<li>Look for a button <strong>"+ Add Admin User"</strong></li>
+<li>Fill in:<br />
+   - <strong>Name</strong> (first name and surname)<br />
+   - <strong>Email</strong> (work email, must be unique)<br />
+   - <strong>Password</strong> (system-generated; will be sent to them)<br />
+   - <strong>User Group</strong> (optional; for organizational grouping)</li>
+<li>Click <strong>Save</strong></li>
+<li>An email is sent to the new admin with credentials</li>
+</ol>
+<hr />
+<h3>9.2 Role assignment</h3>
+<p>Any admin user can change another user's roles.</p>
+<ol>
+<li>Navigate to <strong>Personnel</strong></li>
+<li>Click the user</li>
+<li>In the edit form, look for <strong>Roles</strong> (checkboxes for employee, manager, hr, admin)</li>
+<li>Check/uncheck as needed:<br />
+   - <code>[x] employee</code> — All users need this<br />
+   - <code>[ ] manager</code> — Check if they manage direct reports<br />
+   - <code>[ ] hr</code> — Check if they approve leave<br />
+   - <code>[ ] admin</code> — Check if they manage settings</li>
+<li>Click <strong>Save</strong></li>
+</ol>
+<p><strong>Examples:</strong><br />
+- New hire: <code>[x] employee</code><br />
+- Team lead: <code>[x] employee, [x] manager</code><br />
+- HR officer: <code>[x] employee, [x] hr</code><br />
+- System admin: <code>[x] employee, [x] admin</code> (admin implicitly includes HR)</p>
+<hr />
+<h3>9.3 Bulk leave balance CSV import</h3>
+<p>Import multiple leave balance records at once (e.g., go-live data migration, batch corrections).</p>
+<ol>
+<li>Navigate to <strong>Leave Balances</strong></li>
+<li>Click <strong>Bulk Import</strong></li>
+<li>Prepare a CSV file with columns:<br />
+   - <code>employeeId</code> — The employee's ID (must exist in the system)<br />
+   - <code>leaveType</code> — Type name, e.g., "Annual Leave", "Sick Leave"<br />
+   - <code>total</code> — The number of days (decimal allowed, e.g., 3.5)<br />
+   - <code>taken</code> — Days already used (decimal allowed)<br />
+   - <code>pending</code> — Days pending approval (decimal allowed)</li>
+<li>Upload the file</li>
+<li>The system validates and shows a preview:<br />
+   - Number of records to import<br />
+   - Number of updates vs. new creates<br />
+   - Any errors (e.g., employee not found)</li>
+<li>Click <strong>Confirm Import</strong></li>
+</ol>
+<p><strong>CSV example:</strong></p>
+<pre><code>employeeId,leaveType,total,taken,pending
+AECE1001,Annual Leave,15,3,2
+AECE1001,Sick Leave,30,1,0
+AECE1002,Annual Leave,15,0,0
+AECE1002,Sick Leave,30,2.5,0
+</code></pre>
+<hr />
+<h3>9.4 Contract history</h3>
+<p>Track contract extensions, type changes, and employment milestones.</p>
+<p><strong>View a user's contract history:</strong><br />
+1. Navigate to <strong>Personnel</strong><br />
+2. Click the user<br />
+3. Look for the <strong>"Contract History"</strong> tab<br />
+4. A timeline shows all recorded events (created, extended, converted, ended)</p>
+<p><strong>Add a contract event manually:</strong><br />
+1. In the same Contract History tab, click <strong>+ Add Event</strong><br />
+2. Select the action (created, extended, converted, ended)<br />
+3. For extended/converted: enter old values and new values<br />
+4. Enter a reason (e.g., "Contract extended due to project continuation")<br />
+5. Click <strong>Save</strong></p>
+<hr />
+<h2>Section 10: Leave Rules Configuration</h2>
+<h3>10.1 BCEA statutory leave types reference</h3>
+<p>These are built-in and managed by the system. Do <strong>not</strong> create custom rules for these.</p>
+<table>
+<thead>
+<tr>
+<th>Leave Type</th>
+<th>Entitlement</th>
+<th>Accrual Method</th>
+<th>Cycle</th>
+<th>BCEA Section</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Annual Leave</strong></td>
+<td>1.25 days/month (min 15 days/year)</td>
+<td>Monthly (tiered)</td>
+<td>12 months calendar year</td>
+<td>§ 20</td>
+</tr>
+<tr>
+<td><strong>Sick Leave</strong></td>
+<td>30 days (full time, 5-day week)</td>
+<td>Graduated 1/26 first 6 months, then full</td>
+<td>36 months rolling</td>
+<td>§ 22</td>
+</tr>
+<tr>
+<td><strong>Family Responsibility Leave</strong></td>
+<td>3 days</td>
+<td>Lump sum per cycle</td>
+<td>12 months calendar year</td>
+<td>§ 27</td>
+</tr>
+<tr>
+<td><strong>Maternity Leave</strong></td>
+<td>87 days (4 weeks before, post-birth non-working)</td>
+<td>Statutory, once triggered</td>
+<td>Per pregnancy</td>
+<td>§ 25(2)</td>
+</tr>
+<tr>
+<td><strong>Parental Leave</strong></td>
+<td>10 days</td>
+<td>Statutory, once triggered</td>
+<td>Per birth</td>
+<td>§ 25A(1)</td>
+</tr>
+<tr>
+<td><strong>Adoption Leave</strong></td>
+<td>50 days</td>
+<td>Statutory, once triggered</td>
+<td>Per adoption</td>
+<td>§ 25A(3)</td>
+</tr>
+<tr>
+<td><strong>Commissioning Parental Leave</strong></td>
+<td>50 days</td>
+<td>Statutory, once triggered</td>
+<td>Per arrangement</td>
+<td>§ 25A(4)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>10.2 Accrual rate tiers for annual leave</h3>
+<p>The system supports tiered annual leave rates based on tenure.</p>
+<p><strong>Default tier setup:</strong><br />
+- <strong>Tier 1</strong> — 0–23 months of service → 15 days/year (1.25 days/month)<br />
+- <strong>Tier 2</strong> — 24+ months of service → 20 days/year (1.67 days/month)</p>
+<p><strong>Modify tiers:</strong><br />
+1. Navigate to <strong>Leave Rules</strong> → <strong>Accrual Rate Tiers</strong> (or similar)<br />
+2. Edit the threshold months and corresponding annual days<br />
+3. Click <strong>Save</strong></p>
+<p><strong>Effect:</strong> New accrual calculations use the updated tiers. Existing balances do not retroactively recalculate until the next monthly accrual run.</p>
+<hr />
+<h3>10.3 Custom leave rule field reference</h3>
+<p>Create custom leave types (study leave, bereavement leave, etc.) with these settings.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Options / Format</th>
+<th>Purpose</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>leaveType</code></td>
+<td>Text (unique)</td>
+<td>Name of the leave type</td>
+<td>"Study Leave"</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>Text</td>
+<td>Human description</td>
+<td>"Approved study for professional development"</td>
+</tr>
+<tr>
+<td><code>accrualType</code></td>
+<td>none / lump_sum / monthly</td>
+<td>How days are granted</td>
+<td>"monthly" = 0.5 days/month</td>
+</tr>
+<tr>
+<td><code>daysEarned</code></td>
+<td>Decimal</td>
+<td>Days earned in accrual type period</td>
+<td>0.5 for monthly; 5 for annual</td>
+</tr>
+<tr>
+<td><code>periodDaysWorked</code></td>
+<td>Integer</td>
+<td>(For per-days-worked accrual) days worked to earn daysEarned</td>
+<td>Not applicable for monthly/lump_sum</td>
+</tr>
+<tr>
+<td><code>cycleLengthMonths</code></td>
+<td>Integer</td>
+<td>How long the cycle is (months)</td>
+<td>12 (annual); 36 (3 years)</td>
+</tr>
+<tr>
+<td><code>cycleAnchor</code></td>
+<td>calendar_year / employment_start_date</td>
+<td>When cycle resets</td>
+<td>calendar_year = all reset Jan 1</td>
+</tr>
+<tr>
+<td><code>carryOverAllowed</code></td>
+<td>true / false</td>
+<td>Can unused days carry to next cycle?</td>
+<td>true (allow carry-over)</td>
+</tr>
+<tr>
+<td><code>maxDaysPerCycle</code></td>
+<td>Integer</td>
+<td>Optional cap on maximum accrual per cycle</td>
+<td>10 (max 10 days/year)</td>
+</tr>
+<tr>
+<td><code>pausesAnnualAccrual</code></td>
+<td>true / false</td>
+<td>Does time on this leave count as inactive for annual accrual?</td>
+<td>true (unpaid leave pauses annual)</td>
+</tr>
+<tr>
+<td><code>employeeTypeApplicability</code></td>
+<td>Array</td>
+<td>Which employee types can use this</td>
+<td>["Permanent", "Part-Time"] (not Contractors)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example 1: Study Leave (lump sum, annual)</strong><br />
+- leaveType: "Study Leave"<br />
+- accrualType: "lump_sum"<br />
+- daysEarned: 5 (5 days per year)<br />
+- cycleLengthMonths: 12</p>
+<p><strong>Example 2: Bereavement Leave (approval-only)</strong><br />
+- leaveType: "Bereavement Leave"<br />
+- accrualType: "none" (HR grants as needed)<br />
+- carryOverAllowed: false</p>
+<hr />
+<h3>10.4 Phased leave rules</h3>
+<p>Define different accrual rates for different periods of an employee's tenure with the same leave type.</p>
+<p><strong>Use cases:</strong><br />
+- Probation period (first 6 months) gets lower accrual; post-probation gets higher<br />
+- Year 1 gets one rate; Year 2+ gets another</p>
+<p><strong>Create a phase:</strong><br />
+1. Open or create a leave rule<br />
+2. Click <strong>+ Add Phase</strong><br />
+3. Fill in:<br />
+   - <strong>Phase Name</strong> — e.g., "Probation"<br />
+   - <strong>Starts After Months</strong> — e.g., 0 (from start) or 6 (after 6 months)<br />
+   - <strong>Accrual in This Phase</strong> — Different rate from the main rule<br />
+4. Click <strong>Save</strong></p>
+<p><strong>Example:</strong><br />
+- Main rule: "Study Leave", 1 day/month<br />
+- Phase 1: "Probation" (0–6 months), 0 days/month<br />
+- Phase 2: (After 6 months, defaults to main rule 1 day/month)</p>
+<hr />
+<h3>10.5 Public holidays configuration</h3>
+<p><strong>Add a holiday:</strong><br />
+1. Navigate to <strong>Leave Rules</strong> → <strong>Public Holidays</strong><br />
+2. Click <strong>+ New Holiday</strong><br />
+3. Enter:<br />
+   - <strong>Name</strong> — e.g., "Christmas Day"<br />
+   - <strong>Date</strong> — e.g., "2025-12-25"<br />
+   - <strong>Recurring</strong> — true = same date every year; false = one-off<br />
+   - <strong>Type</strong> — "public" or "religious"<br />
+   - <strong>Religion</strong> — blank (for everyone) or specific (Muslim, Christian, Jewish, Hindu)<br />
+   - <strong>Description</strong> — optional notes<br />
+4. Click <strong>Save</strong></p>
+<p><strong>Effect:</strong> The date is excluded from leave day calculations. For example, if an employee is on leave on a public holiday, that day doesn't count as a leave day.</p>
+<hr />
+<h3>10.6 Unpaid leave notice period configuration</h3>
+<p>The system enforces a default 7-day advance notice period for unpaid leave. Employees who request unpaid leave with &lt;7 days' notice trigger a flag for HR discretion.</p>
+<blockquote>
+<p><strong>Note:</strong> The notice period is currently hardcoded at 7 days. In a future version, it will be configurable via Settings.</p>
+</blockquote>
+<hr />
+<h2>Section 11: Leave Workflow Configuration</h2>
+<h3>11.1 Two-stage vs three-stage approval</h3>
+<p><strong>Three-stage workflow (default):</strong> Employee → Manager (recommends) → HR (decides)<br />
+<strong>Two-stage workflow:</strong> Employee → Manager (approves directly)</p>
+<p><strong>Toggle between them:</strong><br />
+1. Navigate to <strong>Settings</strong> → <strong>General Tab</strong><br />
+2. Find the setting <code>hr_approval_stage_enabled</code><br />
+3. Set to <code>true</code> (three-stage) or <code>false</code> (two-stage)<br />
+4. Click <strong>Save</strong></p>
+<p><strong>Effect:</strong><br />
+- <strong>Three-stage:</strong> Manager makes a recommendation; HR can approve/reject (may override manager's recommendation)<br />
+- <strong>Two-stage:</strong> Manager's decision is final; request approved/rejected at manager stage<br />
+- <strong>Changing mid-cycle:</strong> Existing pending requests keep their current workflow. New requests use the new workflow.</p>
+<hr />
+<h3>11.2 Leave escalation reminders</h3>
+<p>Requests pending more than 3 days automatically trigger reminder emails.</p>
+<p><strong>How it works:</strong><br />
+- Runs every 8 hours<br />
+- Identifies requests still in pending_manager or pending_hr status that are &gt;3 days old<br />
+- Sends email to the responsible party (manager or HR) with a list of overdue requests</p>
+<p><strong>Manual trigger:</strong><br />
+1. Navigate to <strong>Leave Requests</strong><br />
+2. Look for a button <strong>"Send Escalation Reminders"</strong> (or similar)<br />
+3. Click to immediately send reminders for all overdue requests (doesn't wait for the scheduled job)</p>
+<hr />
+<h3>11.3 Cancellation rules</h3>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Employee can cancel?</th>
+<th>Admin can cancel?</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pending_manager</code></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Reserved days restored to pending balance</td>
+</tr>
+<tr>
+<td><code>pending_hr</code></td>
+<td>No (request state is locked)</td>
+<td>Yes</td>
+<td>Reserved days restored to pending balance</td>
+</tr>
+<tr>
+<td><code>approved</code></td>
+<td>No</td>
+<td>Yes</td>
+<td>Days restored; if settled, reduced from taken balance</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td>No</td>
+<td>No</td>
+<td>Already rejected; no balance change</td>
+</tr>
+<tr>
+<td><code>cancelled</code></td>
+<td>N/A</td>
+<td>—</td>
+<td>Already cancelled; no further change</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>11.4 Annual leave cycle rollover parameters</h3>
+<p>Configure when and how annual leave cycles reset.</p>
+<p><strong>Settings:</strong><br />
+- <code>annual_leave_cycle_start</code> (Section 3.4) — Month when the cycle resets (e.g., 1 for January)<br />
+- <code>leave_carry_over_grace_months</code> (Section 3.5) — How many months after cycle end before carry-over expires (e.g., 6)</p>
+<p><strong>Example:</strong><br />
+- Cycle starts January 1<br />
+- Employee earns 15 days in the 12-month cycle (Jan 1 – Dec 31)<br />
+- On Dec 31, if they have unused days, those carry forward<br />
+- Carry-over expires 6 months later (June 30)<br />
+- On July 1, carry-over is flagged for forfeit if not yet used</p>
+<hr />
+<h2>Section 12: Attendance Configuration &amp; Operations</h2>
+<h3>12.1 Kiosk mode</h3>
+<p>The attendance kiosk is a face-recognition or tile-based clock-in/out system requiring no login.</p>
+<p><strong>Face recognition kiosk:</strong><br />
+- Employee stands in front of a camera (e.g., a tablet mounted at the entrance)<br />
+- The system recognizes their face by matching against stored face descriptors<br />
+- Clock-in or clock-out is recorded automatically<br />
+- If no match, employee falls back to ID entry</p>
+<p><strong>Tile mode kiosk:</strong><br />
+- Screen displays a grid of employee photo tiles<br />
+- Employee taps their tile<br />
+- Clock-in or clock-out is recorded automatically<br />
+- Managers can approve logins for employees without passwords</p>
+<p><strong>Configuration:</strong><br />
+1. Navigate to <strong>Settings</strong> → <strong>Kiosk Tab</strong> (if available)<br />
+2. Select mode (Face or Tile)<br />
+3. Configure any additional options (timeout, camera settings, etc.)</p>
+<hr />
+<h3>12.2 Clock cutoff settings</h3>
+<p>Covered in Section 4.1 and 4.2. These determine what clock times are flagged as late/early.</p>
+<hr />
+<h3>12.3 Auto clock-out reset</h3>
+<p>The system runs an automatic clock-out reset every night (usually at midnight in your configured timezone).</p>
+<p><strong>What it does:</strong><br />
+1. Finds all employees still clocked in from the prior day<br />
+2. Creates an automatic clock-out record at 23:59 of the prior day<br />
+3. Sends emails to the employee and their manager<br />
+4. Runs AWOL detection (identifies employees with no clock-in and no approved leave)<br />
+5. Runs leave escalation reminders</p>
+<p><strong>Manual trigger:</strong><br />
+If the scheduled job fails or you need to run it manually:<br />
+1. Navigate to <strong>Attendance</strong><br />
+2. Look for a button <strong>"Run Auto Clock-Out"</strong> (or <strong>"Run Nightly Reset"</strong>)<br />
+3. Click to execute immediately</p>
+<hr />
+<h3>12.4 Infringement types and triggers</h3>
+<p>Three types of infringements are automatically flagged:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Trigger</th>
+<th>Email Recipients</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Late Arrival</strong></td>
+<td>Clock-in after <code>clock_in_cutoff</code></td>
+<td>Manager, admin_email</td>
+<td>Tracking tardiness patterns</td>
+</tr>
+<tr>
+<td><strong>Early Departure</strong></td>
+<td>Clock-out before <code>clock_out_cutoff</code></td>
+<td>Manager, admin_email</td>
+<td>Tracking early departures (legitimate or not)</td>
+</tr>
+<tr>
+<td><strong>Missed Clock-Out</strong></td>
+<td>Employee still clocked in at end of day (auto-reset applies)</td>
+<td>Employee, manager</td>
+<td>Notification that system auto-clocked them out</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>12.5 AWOL detection</h3>
+<p>Runs nightly as part of the auto-reset job.</p>
+<p><strong>Identifies:</strong> Employees with NO clock-in record AND NO approved leave for the previous day.</p>
+<p><strong>Sends:</strong> Email to the employee's manager (grouped; one email per manager listing all their AWOL reports) or admin_email if no manager assigned.</p>
+<p><strong>Action:</strong> Manager/HR should:<br />
+1. Verify the employee was actually absent<br />
+2. Check if leave was mistakenly not approved or not visible<br />
+3. Issue appropriate discipline (verbal warning, written warning, etc.) if unexcused</p>
+<hr />
+<h2>Section 13: Email Notifications: Complete Reference</h2>
+<p>Postmark sends all notifications using the configured <code>sender_email</code> address. All outbound email bodies are templated and can be partially customized (e.g., late/early arrival messages).</p>
+<h3>Email Notification Matrix</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Email Function</th>
+<th>Trigger</th>
+<th>Recipients</th>
+<th>Subject</th>
+<th>Content</th>
+<th>Customizable?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>sendLeaveRequestNotification</td>
+<td>Employee submits leave request</td>
+<td>Manager (if assigned) + admin_email</td>
+<td>"New Leave Request"</td>
+<td>Employee name, leave type, dates, balance context</td>
+<td>Partially</td>
+</tr>
+<tr>
+<td>2</td>
+<td>sendLeaveStageNotification</td>
+<td>Manager makes decision (forwards to HR) OR HR approves (notifies employee)</td>
+<td>HR emails + employee (on approval)</td>
+<td>"[Manager Forwarded]" or "[Approved]"</td>
+<td>Request details, manager recommendation, HR decision</td>
+<td>Partially</td>
+</tr>
+<tr>
+<td>3</td>
+<td>sendLateAttendanceNotification</td>
+<td>Clock-in after <code>clock_in_cutoff</code></td>
+<td>Manager + admin_email</td>
+<td>"Late Arrival Alert"</td>
+<td><code>late_arrival_message_template</code> with placeholders</td>
+<td>Yes (template)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>sendMissedClockOutNotification</td>
+<td>Auto clock-out runs at 23:59</td>
+<td>Employee</td>
+<td>"Missed Clock-Out"</td>
+<td>System clocked you out at 23:59</td>
+<td>No</td>
+</tr>
+<tr>
+<td>5</td>
+<td>sendManagerMissedClockOutAlert</td>
+<td>Auto clock-out runs</td>
+<td>Manager + admin_email</td>
+<td>"Team Member Missed Clock-Out"</td>
+<td>Employee name, date, auto clock-out time</td>
+<td>No</td>
+</tr>
+<tr>
+<td>6</td>
+<td>sendAWOLAlert</td>
+<td>AWOL detected (no clock-in, no leave)</td>
+<td>Manager (grouped per manager) or admin_email</td>
+<td>"AWOL Report"</td>
+<td>List of employees, dates, action items</td>
+<td>No</td>
+</tr>
+<tr>
+<td>7</td>
+<td>sendLeaveEscalationReminder</td>
+<td>Request pending &gt;3 days (every 8 hours)</td>
+<td>Manager (pending_manager) or admin_email (pending_hr)</td>
+<td>"[Escalation] Pending Leave Request(s)"</td>
+<td>List of overdue requests, approval links</td>
+<td>No</td>
+</tr>
+<tr>
+<td>8</td>
+<td>sendAdminWelcomeEmail</td>
+<td>New admin user created</td>
+<td>New admin's email</td>
+<td>"Welcome to AECE Checkpoint"</td>
+<td>Login credentials (legacy; now uses password reset)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>9</td>
+<td>sendAdminCredentialsEmail</td>
+<td>POST /resend-credentials called</td>
+<td>User's email</td>
+<td>"Password Reset Link"</td>
+<td>Time-limited reset link (1 hour)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>10</td>
+<td>sendPasswordResetEmail</td>
+<td>POST /auth/request-reset called</td>
+<td>User's email</td>
+<td>"Password Reset Link"</td>
+<td>Time-limited reset link (1 hour)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>11</td>
+<td>(Carry-over 60-day warning)</td>
+<td>Monthly accrual run; carry-over expiry in 60 days</td>
+<td>Employee + HR</td>
+<td>"Carry-Over Expiry Warning"</td>
+<td>Days expiring soon; remind to use</td>
+<td>No</td>
+</tr>
+<tr>
+<td>12</td>
+<td>(Carry-over 30-day warning)</td>
+<td>Monthly accrual run; carry-over expiry in 30 days</td>
+<td>Employee + HR</td>
+<td>"[URGENT] Carry-Over Expiry"</td>
+<td>Days expiring soon; urgent reminder</td>
+<td>No</td>
+</tr>
+<tr>
+<td>13</td>
+<td>(Carry-over expiry flag)</td>
+<td>Carry-over grace period elapsed</td>
+<td>HR</td>
+<td>"Carry-Over Forfeiture Flag"</td>
+<td>Expired carry-over; manual action needed</td>
+<td>No</td>
+</tr>
+<tr>
+<td>14</td>
+<td>(Sick leave 6-month transition)</td>
+<td>Employee reaches 6 months employment</td>
+<td>Employee + HR</td>
+<td>"Sick Leave Pool Granted"</td>
+<td>Full sick pool now available (30 days or scaled)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>15</td>
+<td>(Sick leave 36-month reset)</td>
+<td>36-month sick cycle resets</td>
+<td>Employee + HR</td>
+<td>"Sick Leave Cycle Reset"</td>
+<td>Old cycle ended; new pool granted; old days forfeited</td>
+<td>No</td>
+</tr>
+<tr>
+<td>16</td>
+<td>(Termination settlement)</td>
+<td>terminationDate set</td>
+<td>All HR users</td>
+<td>"Employee Termination Settlement"</td>
+<td>Final leave balances for payroll</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Section 14: Database Backup &amp; Restore</h2>
+<h3>14.1 Automated Docker backup</h3>
+<p>The system includes an automated backup container that:<br />
+- Runs <code>pg_dump</code> every 6 hours<br />
+- Compresses the dump with gzip<br />
+- Stores it in the <code>./data/backups/</code> directory (on the host machine)<br />
+- Retains 90 days of backups (older ones are deleted automatically)</p>
+<p><strong>Accessing backup files:</strong><br />
+1. SSH into the host server<br />
+2. Navigate to the backup directory (path varies; usually <code>/path/to/factory-flow/data/backups/</code>)<br />
+3. List the backups: <code>ls -lh *.sql.gz</code><br />
+4. Each file is named with a timestamp: <code>aece-backup-2025-04-09-14-30-00.sql.gz</code></p>
+<p><strong>Offsite backup recommendation:</strong><br />
+- Periodically copy backups to cloud storage (S3, Azure Blob, etc.)<br />
+- Retention: keep at least 30 days of daily backups offsite</p>
+<hr />
+<h3>14.2 Manual JSON export</h3>
+<p>Export the entire database as a single JSON file (portable, easy to restore).</p>
+<ol>
+<li>Navigate to <strong>Admin</strong> → <strong>Database Backup</strong></li>
+<li>Click <strong>Export to JSON</strong></li>
+<li>A JSON file downloads (filename: <code>aece-backup-YYYY-MM-DD.json</code>)</li>
+<li>File size: typically 1–10 MB depending on data volume</li>
+</ol>
+<p><strong>What's included:</strong> All tables and records (15 data categories):<br />
+- Users (employees, roles, passwords hashed)<br />
+- Leave balances, requests, rules<br />
+- Attendance records, settings<br />
+- Public holidays, grievances, notifications<br />
+- All audit logs<br />
+- Org structure (departments, positions, companies)</p>
+<hr />
+<h3>14.3 Authenticated JSON restore</h3>
+<p>Import a JSON backup into the current AECE Checkpoint instance.</p>
+<ol>
+<li>Navigate to <strong>Admin</strong> → <strong>Database Backup</strong></li>
+<li>Click <strong>Import from JSON</strong></li>
+<li>Select the JSON file</li>
+<li>The system validates the file structure and shows a preview:<br />
+   - Number of records per table<br />
+   - Any validation errors</li>
+<li>Click <strong>Confirm Import</strong></li>
+</ol>
+<p><strong>Behavior:</strong><br />
+- <strong>Additive restore:</strong> New records are inserted; existing records with the same primary key are <strong>not</strong> overwritten<br />
+- <strong>Use case:</strong> Restoring deleted data without wiping current changes</p>
+<p><strong>To perform a full restore</strong> (overwrite all data), contact your admin/DevOps team to:<br />
+1. Drop and recreate the database<br />
+2. Then run the JSON import</p>
+<hr />
+<h3>14.4 Bootstrap restore (empty database)</h3>
+<p>For disaster recovery or fresh instance setup.</p>
+<ol>
+<li>Ensure the database is completely empty (no users, no records)</li>
+<li>Visit the system URL (you'll see the "Mode Selection" screen)</li>
+<li>Click <strong>"Restore from Backup"</strong> or similar button</li>
+<li>Select a backup JSON file</li>
+<li>Review the preview</li>
+<li>Click <strong>Confirm Restore</strong></li>
+</ol>
+<p>After the restore, the system is fully populated. Users can log in immediately.</p>
+<hr />
+<h3>14.5 Backup strategy recommendations</h3>
+<p><strong>Daily backups:</strong><br />
+- Automated Docker backups every 6 hours are sufficient for operational recovery</p>
+<p><strong>Weekly manual JSON export:</strong><br />
+- Every Friday, export a JSON backup<br />
+- Store locally and upload to cloud storage (e.g., S3)<br />
+- Retain for 30 days</p>
+<p><strong>Monthly offsite archive:</strong><br />
+- Keep one monthly backup in cold storage for compliance/audit purposes</p>
+<p><strong>Disaster recovery testing:</strong><br />
+- Monthly: restore a backup to a test instance<br />
+- Verify data integrity<br />
+- Time the restore process so you know RPO/RTO</p>
+<p><strong>Retention policy:</strong><br />
+- On-host automated backups: 90 days<br />
+- Cloud backups: 30 days (rolling)<br />
+- Archive: 2 years (for compliance)</p>
+<hr />
+<h2>Section 15: Leave Balance Engine: Deep Dive</h2>
+<h3>15.1 Annual leave accrual formula</h3>
+<p><strong>Monthly accrual calculation:</strong></p>
+<pre><code>Monthly accrual = Tier Rate × (Active Days in Month / Total Calendar Days in Month)
+</code></pre>
+<p><strong>Tier determination:</strong><br />
+- <code>0–23 months employment</code> → Tier 1: 15 days/year (1.25 days/month)<br />
+- <code>24+ months employment</code> → Tier 2: 20 days/year (1.67 days/month)<br />
+- Custom override via <code>annualLeaveOverrideDays</code> → bypass tier logic entirely</p>
+<p><strong>Pausing leave types:</strong><br />
+If an employee is on a "pausing" leave type (e.g., unpaid leave with <code>pausesAnnualAccrual: true</code>), those days do <strong>not</strong> count as active for accrual. Example:<br />
+- Employee takes 5 days of unpaid leave (pausing) in March<br />
+- That month's active days = 22 (not 21 for the unpaid)<br />
+- Annual accrual still runs on the full month</p>
+<p><strong>Example:</strong><br />
+- Employee: 10 months tenure, Tier 1 (15 days/year = 1.25 days/month)<br />
+- March: 22 active days, 31 calendar days<br />
+- Accrual: 1.25 × (22 / 31) = 0.89 days (March accrual)</p>
+<hr />
+<h3>15.2 Annual leave cycle rollover</h3>
+<p>At the end of the annual cycle (default Dec 31):</p>
+<ol>
+<li><strong>Balance snapshot:</strong> Current balance = accrual + carry-over − taken − pending</li>
+<li><strong>Carry-over calculation:</strong> Unused days at cycle end = Balance − 0 = Balance (if positive)</li>
+<li><strong>Grace period:</strong> Carry-over expires 6 months later (default June 30)</li>
+<li><strong>Forfeiture email:</strong> 60-day warning (May 1), then 30-day urgent (July 1)</li>
+<li><strong>Expiry flag:</strong> On July 1, if carry-over is still present, a flag appears in HR's queue</li>
+<li><strong>Manual action:</strong> HR must manually reduce the balance (see Section 5.2) to forfeit the carry-over</li>
+</ol>
+<p><strong>Example:</strong><br />
+- Employee ends 2024 with 8 days unused<br />
+- These 8 days carry forward to 2025<br />
+- Carry-over expires June 30, 2025<br />
+- May 1, 2025: HR gets 60-day warning email<br />
+- July 1, 2025: System flags carry-over for forfeit<br />
+- HR manually removes the 8 days with audit reason: "Carry-over forfeiture as of 2025-06-30"</p>
+<hr />
+<h3>15.3 Sick leave: graduated accrual (first 6 months)</h3>
+<p>For the first 6 months of employment, sick leave accrues at:</p>
+<pre><code>Graduated accrual = Days worked × (1 / 26)
+</code></pre>
+<p>The system tracks cumulative days worked and credits accrual accordingly.</p>
+<p><strong>Example:</strong><br />
+- Employee starts 2025-01-01<br />
+- By 2025-06-30 (6-month mark), they've worked 130 days<br />
+- Sick leave credited: 130 ÷ 26 = 5 days<br />
+- On day 181 (6 months exactly), the system grants the full 30-day pool<br />
+- Total sick balance becomes 35 days (5 + 30)</p>
+<p><strong>Tracking:</strong><br />
+- Use the <code>sickLeaveTracking</code> table to monitor cumulative days worked<br />
+- Do <strong>not</strong> manually adjust sick leave during the graduated period unless correcting an error</p>
+<hr />
+<h3>15.4 Sick leave: fixed pool (after 6 months)</h3>
+<p>After 6 months of employment, the employee is granted the full statutory entitlement:</p>
+<p><strong>5-day/week employees:</strong></p>
+<pre><code>Sick leave entitlement = 30 days per 36-month cycle
+</code></pre>
+<p><strong>Part-time employees (scaled by work days per week):</strong></p>
+<pre><code>Sick leave entitlement = 30 × (work days per week / 5)
+</code></pre>
+<p><strong>Example:</strong><br />
+- 3-day/week part-time employee<br />
+- Entitlement: 30 × (3 / 5) = 18 days per 36-month cycle</p>
+<p><strong>36-month cycle reset:</strong><br />
+Every 3 years, the cycle resets. The employee's balance resets to the full entitlement, and any unused days from the prior cycle are forfeited.</p>
+<hr />
+<h3>15.5 Family Responsibility Leave</h3>
+<p><strong>Eligibility:</strong><br />
+- 4+ months of employment <strong>AND</strong><br />
+- 4+ days per week work schedule</p>
+<p><strong>Entitlement:</strong><br />
+- 3 days per 12-month annual cycle (lump sum, not accrued)<br />
+- No carry-over (unused days are forfeited at cycle end)<br />
+- Resets on the annual leave cycle start date (default Jan 1)</p>
+<p><strong>Example:</strong><br />
+- Employee starts 2025-03-01, works 5 days/week<br />
+- Eligible for FRL on 2025-07-01 (4 months later)<br />
+- But wait—cycle reset is Jan 1, so they're already mid-cycle<br />
+- FRL is granted immediately: 3 days available until 2025-12-31<br />
+- On 2026-01-01 (new cycle), 3 days refresh (or forfeit if unused)</p>
+<hr />
+<h3>15.6 Balance display formula</h3>
+<table>
+<thead>
+<tr>
+<th>Balance Item</th>
+<th>Formula</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Available</strong></td>
+<td>(Total + Carry-over) − (Taken + Pending)</td>
+<td>Days the employee can take now</td>
+</tr>
+<tr>
+<td><strong>Total Entitlement</strong></td>
+<td>Accrued + Granted for cycle</td>
+<td>Days earned for the current cycle</td>
+</tr>
+<tr>
+<td><strong>Carry-over</strong></td>
+<td>Days not used from prior cycle</td>
+<td>Days that rolled forward (with expiry date)</td>
+</tr>
+<tr>
+<td><strong>Taken</strong></td>
+<td>Days from settled/historic requests</td>
+<td>Days already used</td>
+</tr>
+<tr>
+<td><strong>Pending</strong></td>
+<td>Days from approved but unsettled requests</td>
+<td>Days from approved requests not yet occurred</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong><br />
+- Total: 15 (earned for cycle)<br />
+- Carry-over: 3 (with expiry 2025-06-30)<br />
+- Taken: 5 (used so far)<br />
+- Pending: 2 (from approved request next week)<br />
+- <strong>Available = (15 + 3) − (5 + 2) = 11 days</strong></p>
+<hr />
+<h3>15.7 Future accrual projection</h3>
+<p>When an employee requests leave, the system projects their balance at the time they'll take the leave.</p>
+<p><strong>Use case:</strong> Employee has 8 days available today, but requests 10 days of leave next month. Projection shows they'll accrue 1.25 days in the interim, bringing available to 9.25 days—still short, but shows they're close.</p>
+<p><strong>Projection logic:</strong><br />
+1. Current available balance<br />
+2. Add accrual for each month between now and leave start date<br />
+3. Subtract any other pending approvals<br />
+4. Result: projected balance at leave start date</p>
+<p><strong>Messages:</strong><br />
+- <strong>"[Balance note]"</strong> — Projection shows they'll have enough by leave start. Safe to approve.<br />
+- <strong>"[Balance warning]"</strong> — Projection shows they'll still be short. Discretion required.</p>
+<hr />
+<h3>15.8 Manual adjustment audit trail</h3>
+<p>Every manual balance adjustment is logged in the audit log with:<br />
+- Actor (who made the change)<br />
+- Before/after values<br />
+- Mandatory reason (provided by HR)<br />
+- Timestamp</p>
+<p><strong>Audit log format:</strong></p>
+<pre><code>Action: manual_adjustment
+Entity: leave_balance
+Changes: {
+  total: { before: 15, after: 18 },
+  reason: &quot;Correction: employee negotiated additional 3 days&quot;
+}
+</code></pre>
+<hr />
+<h2>Section 16: Audit Logs</h2>
+<h3>16.1 What's captured</h3>
+<p>Every significant action is logged to the <code>audit_logs</code> table:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Logged Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>update_user_profile</code></td>
+<td>User ID, fields changed (role, termination date, start date, email, department), before/after values</td>
+</tr>
+<tr>
+<td><code>manual_adjustment</code></td>
+<td>Balance ID, total/taken/pending before/after, reason provided</td>
+</tr>
+<tr>
+<td><code>create_historic_leave</code></td>
+<td>Leave request ID, employee, type, dates, authorizedBy, referenceNumber</td>
+</tr>
+<tr>
+<td><code>admin_cancel_leave</code></td>
+<td>Request ID, status before cancel, balance adjustment applied</td>
+</tr>
+<tr>
+<td><code>update_setting</code></td>
+<td>Setting key, old value, new value</td>
+</tr>
+<tr>
+<td><code>user_login</code></td>
+<td>User ID, timestamp</td>
+</tr>
+<tr>
+<td><code>create_user</code></td>
+<td>New user ID, initial roles</td>
+</tr>
+<tr>
+<td><code>user_terminated</code></td>
+<td>User ID, termination date, settlement amount (if applicable)</td>
+</tr>
+<tr>
+<td><code>notice_period_bypass</code></td>
+<td>Leave request ID, bypass reason, actor</td>
+</tr>
+<tr>
+<td><code>user_role_assignment</code></td>
+<td>User ID, roles before/after</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>16.2 Accessing audit logs</h3>
+<ol>
+<li>Navigate to <strong>Reports</strong> → <strong>Audit Logs</strong> (or <strong>Admin Insights</strong> → <strong>Audit Logs</strong>)</li>
+<li>You'll see a table of recent events (last 1000 records)</li>
+<li>Columns: Timestamp, Actor, Action, Entity Type, Entity ID, Changes, Description</li>
+</ol>
+<hr />
+<h3>16.3 Filtering and searching</h3>
+<ul>
+<li><strong>Date range picker</strong> — Narrow to a time period</li>
+<li><strong>Action type dropdown</strong> — Filter by action (create_user, manual_adjustment, etc.)</li>
+<li><strong>User search</strong> — Filter by actor (who performed the action)</li>
+<li><strong>Export</strong> — Download the current view as CSV</li>
+</ul>
+<hr />
+<h3>16.4 Retention policy</h3>
+<ul>
+<li><strong>Logs are permanent</strong> — Never deleted (unless you manually delete them from the database, which is not recommended)</li>
+<li><strong>Searchable</strong> — Full-text search on descriptions and changes</li>
+<li><strong>Immutable</strong> — Once logged, cannot be modified</li>
+</ul>
+<hr />
+<h2>Section 17: API Reference</h2>
+<h3>17.1 Authentication</h3>
+<p>Two methods:</p>
+<p><strong>Session-based (portal login):</strong><br />
+- User logs in via email + password<br />
+- A session cookie is issued<br />
+- All subsequent requests include the cookie<br />
+- Available to all authenticated users</p>
+<p><strong>API key (for integrations):</strong><br />
+- External systems include <code>X-Api-Key: [api_key]</code> header<br />
+- Available to all endpoints except password reset and login<br />
+- Useful for third-party integrations (payroll, BI tools, etc.)</p>
+<hr />
+<h3>17.2 Key endpoint categories</h3>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Endpoints</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Users</strong></td>
+<td>GET /api/users, POST /api/users, PUT /api/users/:id, DELETE /api/users/:id</td>
+<td>Manage employee records</td>
+</tr>
+<tr>
+<td><strong>Leave Requests</strong></td>
+<td>GET /api/leave-requests, POST /api/leave-requests, PATCH /api/leave-requests/:id</td>
+<td>Submit and approve leave</td>
+</tr>
+<tr>
+<td><strong>Leave Balances</strong></td>
+<td>GET /api/leave-balances, PATCH /api/leave-balances/:id</td>
+<td>Query and adjust balances</td>
+</tr>
+<tr>
+<td><strong>Attendance</strong></td>
+<td>GET /api/attendance, POST /api/attendance, PATCH /api/attendance/:id</td>
+<td>Clock in/out, view records</td>
+</tr>
+<tr>
+<td><strong>Leave Rules</strong></td>
+<td>GET /api/leave-rules, POST /api/leave-rules, DELETE /api/leave-rules/:id</td>
+<td>Configure custom leave types</td>
+</tr>
+<tr>
+<td><strong>Settings</strong></td>
+<td>GET /api/settings, PATCH /api/settings</td>
+<td>View and change system settings</td>
+</tr>
+<tr>
+<td><strong>Reports</strong></td>
+<td>GET /api/reports/leave, GET /api/reports/attendance</td>
+<td>Export data</td>
+</tr>
+<tr>
+<td><strong>Audit</strong></td>
+<td>GET /api/audit-logs</td>
+<td>Access audit trail</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>17.3 Full documentation location</h3>
+<p>In-app API documentation is available at:<br />
+1. Navigate to <strong>Settings</strong> → <strong>API Tab</strong><br />
+2. Look for a section <strong>"Endpoint Documentation"</strong><br />
+3. A list shows all endpoints with request/response schemas and examples</p>
+<hr />
+<h3>17.4 Integration patterns</h3>
+<p><strong>Payroll system query:</strong></p>
+<pre><code>GET /api/leave-balances?userId=AECE1001&amp;leaveType=Annual%20Leave
+Header: X-Api-Key: [api_key]
+</code></pre>
+<p>Response: Current balance for annual leave deduction calculations.</p>
+<p><strong>BI tool attendance export:</strong></p>
+<pre><code>GET /api/attendance?from=2025-04-01&amp;to=2025-04-30
+Header: X-Api-Key: [api_key]
+</code></pre>
+<p>Response: All attendance records for the period, ready for reporting.</p>
+<hr />
+<h2>Section 18: Troubleshooting &amp; Maintenance</h2>
+<h3>18.1 Admin login fails</h3>
+<p><strong>Symptoms:</strong> "Invalid email or password" error when admin tries to log in.</p>
+<p><strong>Diagnosis:</strong><br />
+1. Verify the email address is spelled correctly (case-insensitive)<br />
+2. Verify Caps Lock is not on<br />
+3. Check that the user exists in the database (navigate to Personnel, search for the user)<br />
+4. Check that the user has the <code>admin</code> role</p>
+<p><strong>Resolution:</strong><br />
+- If the password is forgotten, click <strong>"Forgot Password"</strong> on the login screen<br />
+- A password reset email will be sent (if email is configured)<br />
+- If email is not configured, ask another admin to reset the password via the Settings panel<br />
+- Or, use the database to reset the password (requires admin/DevOps team)</p>
+<hr />
+<h3>18.2 Face recognition not matching</h3>
+<p><strong>Symptoms:</strong> Employee's face is not recognized at the kiosk; they must use ID entry.</p>
+<p><strong>Causes:</strong><br />
+- Face descriptor not registered (employee is new)<br />
+- Poor capture quality (lighting, alignment)<br />
+- Employee has changed appearance (beard, glasses, hairstyle)<br />
+- Camera quality or distance issue</p>
+<p><strong>Resolution:</strong><br />
+1. Re-register the employee's face (see Section 10.2)<br />
+2. Ensure good lighting and alignment<br />
+3. Have the employee remove glasses if possible<br />
+4. Test the new face registration at the kiosk</p>
+<hr />
+<h3>18.3 Emails not sending</h3>
+<p><strong>Symptoms:</strong> Notifications aren't received; no email in admin's inbox.</p>
+<p><strong>Diagnosis:</strong><br />
+1. Check <strong>Settings</strong> → <strong>General</strong> → <code>admin_email</code> is set correctly<br />
+2. Check <strong>Settings</strong> → <strong>General</strong> → <code>sender_email</code> is set and Postmark-verified<br />
+3. Check the Postmark dashboard for bounce records (email address invalid)<br />
+4. Check the Postmark dashboard for hard bounces or blocks</p>
+<p><strong>Resolution:</strong><br />
+1. Verify email addresses are correct (no typos)<br />
+2. If a sender email is not verified in Postmark, contact Postmark support<br />
+3. If an admin email has soft-bounced, correct the address in settings<br />
+4. Re-run the email that failed (manually trigger escalation reminders, resend credentials, etc.)</p>
+<hr />
+<h3>18.4 Leave balances appear incorrect</h3>
+<p><strong>Symptoms:</strong> Employee has wrong leave balance; doesn't match BCEA calculations.</p>
+<p><strong>Diagnosis:</strong><br />
+1. Check employee's start date (affects accrual)<br />
+2. Check tier system (0–23 months = Tier 1; 24+ = Tier 2)<br />
+3. Check for any manual adjustments (audit log)<br />
+4. Check for pausing leave types (unpaid leave might have paused annual accrual)<br />
+5. Use BCEA SA Preview (Section 9.3) to compare against statutory entitlement</p>
+<p><strong>Resolution:</strong><br />
+1. If start date is wrong, correct it (see Section 4.2)<br />
+2. Run the monthly accrual manually (ask admin/DevOps)<br />
+3. If a manual adjustment was made in error, make a correcting adjustment (Section 5.2)<br />
+4. If the accrual logic itself is wrong, contact the development team</p>
+<hr />
+<h3>18.5 Monthly accrual did not run</h3>
+<p><strong>Symptoms:</strong> Employees' annual leave balances didn't increase on month end.</p>
+<p><strong>Diagnosis:</strong><br />
+1. Check server logs for accrual job errors<br />
+2. Verify the server is running and the database is accessible<br />
+3. The accrual engine is idempotent (safe to re-run)</p>
+<p><strong>Resolution:</strong><br />
+1. Check server status; restart if needed<br />
+2. Manually trigger the accrual job (ask admin/DevOps team)<br />
+3. Accrual is safe to re-run—employees won't be double-credited</p>
+<hr />
+<h3>18.6 Container or service issues</h3>
+<p><strong>Symptoms:</strong> The application is down, slow, or unreachable.</p>
+<p><strong>Common commands (for DevOps/admin):</strong></p>
+<pre><code class="language-bash"># Check container status
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps
+
+# View logs
+docker-compose logs -f api
+
+# Restart services
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml restart api
+
+# Verify database connectivity
+docker-compose exec api npm run db:check
+</code></pre>
+<hr />
+<h3>18.7 Data migration considerations</h3>
+<p>If importing a JSON backup into a new instance:</p>
+<ol>
+<li><strong>Validation summary:</strong> Review the import preview before confirming</li>
+<li><strong>Additive restore:</strong> New records are added; existing records are <strong>not</strong> overwritten</li>
+<li><strong>For a clean restore:</strong> Drop and recreate the database first, then import</li>
+<li><strong>Test in a staging environment first</strong> before importing to production</li>
+<li><strong>Verify data integrity</strong> after import (spot-check employee records, balances, audit logs)</li>
+</ol>
+<hr />
+<h2>Conclusion</h2>
+<p>This manual covers every administrative function in AECE Checkpoint. For further support, contact your system administrator or development team.</p>
+<p><strong>Key takeaways:</strong><br />
+- Configure settings in order (Section 2.1)<br />
+- Use role permissions to customize UI per role (Section 6)<br />
+- Monitor audit logs for compliance (Section 16)<br />
+- Test backups regularly (Section 14.5)<br />
+- Escalate technical issues to DevOps (Section 18)</p>
+    </div>
+
+    <p style="text-align: center; font-size: 9pt; color: #999; margin: 3em 0 1em 0; page-break-before: always;">
+        <strong>AECE Checkpoint Training Documentation – Version 1</strong><br>
+        This document is confidential and intended for AECE Checkpoint users only.<br>
+        Last updated: April 2026
+    </p>
+</body>
+</html>

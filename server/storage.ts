@@ -368,18 +368,21 @@ export class DrizzleStorage implements IStorage {
   }
 
   // Leave request operations
-  async getLeaveRequests(userId?: string): Promise<LeaveRequest[]> {
-    if (userId) {
-      return db
-        .select()
-        .from(schema.leaveRequests)
-        .where(eq(schema.leaveRequests.userId, userId))
-        .orderBy(desc(schema.leaveRequests.createdAt));
-    }
-    return db
-      .select()
+  async getLeaveRequests(userId?: string) {
+    const query = db
+      .select({
+        ...schema.leaveRequests,
+        employeeFirstName: schema.users.firstName,
+        employeeSurname: schema.users.surname,
+      })
       .from(schema.leaveRequests)
+      .leftJoin(schema.users, eq(schema.leaveRequests.userId, schema.users.id))
       .orderBy(desc(schema.leaveRequests.createdAt));
+
+    if (userId) {
+      return query.where(eq(schema.leaveRequests.userId, userId));
+    }
+    return query;
   }
 
   async getLeaveRequest(id: number): Promise<LeaveRequest | undefined> {

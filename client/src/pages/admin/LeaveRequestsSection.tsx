@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { isTrackableEmployee } from '@/lib/userFilters';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -319,14 +320,16 @@ export default function LeaveRequestsSection() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activeRequests.map((request: LeaveRequest) => {
-                  const employee = users.find(u => u.id === request.userId);
+                {activeRequests.map((request: any) => {
+                  const employeeName = request.employeeFirstName && request.employeeSurname
+                    ? `${request.employeeFirstName} ${request.employeeSurname}`
+                    : request.userId;
                   const statusInfo = formatLeaveStatus(request.status);
                   const actionInfo = canTakeAction(request);
                   return (
                     <TableRow key={request.id} data-testid={`row-leave-request-${request.id}`}>
                       <TableCell className="font-medium">
-                        {employee ? `${employee.firstName} ${employee.surname}` : request.userId}
+                        {employeeName}
                       </TableCell>
                       <TableCell className="capitalize">{request.leaveType.replace('_', ' ')}</TableCell>
                       <TableCell>
@@ -444,6 +447,9 @@ export default function LeaveRequestsSection() {
                   // Group balances by employee so we can span the name cell
                   const employeeBalances = new Map<string, LeaveBalance[]>();
                   leaveBalances.forEach((balance: LeaveBalance) => {
+                    const employee = users.find(u => u.id === balance.userId);
+                    // Skip balances for non-trackable employees (admin, excluded)
+                    if (employee && !isTrackableEmployee(employee)) return;
                     const existing = employeeBalances.get(balance.userId) || [];
                     existing.push(balance);
                     employeeBalances.set(balance.userId, existing);

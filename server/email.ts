@@ -291,7 +291,7 @@ export async function sendAdminWelcomeEmail(
   }
 
   const fullName = `${data.firstName} ${data.surname}`;
-  const loginUrl = data.loginUrl || `${process.env.APP_URL || 'http://192.168.1.78:5000'}/login`;
+  const loginUrl = data.loginUrl || `${process.env.APP_URL || 'http://localhost:5000'}/login`;
 
   try {
     const result = await emailClient.sendEmail({

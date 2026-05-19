@@ -20,15 +20,19 @@ services:
     build: .
     ports:
       - "5002:5000"
+    labels:
+      cloudflare.tunnel.id: 40f3dc64-4193-4417-9214-c5d7fe1eab39
     environment:
       DATABASE_URL: postgres://factoryflow:${UAT_POSTGRES_PASSWORD:-changeme-uat}@db:5432/factoryflow
       SESSION_SECRET: ${UAT_SESSION_SECRET:-uat-session-secret-change-me}
       POSTMARK_API_KEY: ${POSTMARK_API_KEY:-}
+      APP_URL: ${APP_URL:-http://localhost:5000}
       AGENT_GATEWAY_URL: ${AGENT_GATEWAY_URL:-http://host.docker.internal:8787}
       AGENT_GATEWAY_API_KEY: ${AGENT_GATEWAY_API_KEY:-dev-key}
       GITHUB_FEEDBACK_TOKEN: ${GITHUB_FEEDBACK_TOKEN:-}
       GITHUB_FEEDBACK_OWNER: ${GITHUB_FEEDBACK_OWNER:-}
       GITHUB_FEEDBACK_REPO: ${GITHUB_FEEDBACK_REPO:-}
+      TUNNEL_ID: ${UAT_TUNNEL_ID:-40f3dc64-4193-4417-9214-c5d7fe1eab39}
       PORT: 5000
       NODE_ENV: production
     depends_on:

@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Quick Reference - Version 1</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            size: A4;
+            margin: 2.5cm 2cm;
+            @bottom-center {
+                content: counter(page);
+                font-family: 'Source Sans Pro', sans-serif;
+                font-size: 10px;
+                color: #666;
+            }
+            @top-right {
+                content: "AECE Checkpoint";
+                font-family: 'Source Sans Pro', sans-serif;
+                font-size: 9px;
+                color: #999;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.7;
+            color: #2c3e50;
+            font-size: 11pt;
+            background: #fafbfc;
+        }
+
+        .title-page {
+            page-break-after: always;
+            padding: 4cm 0 0 0;
+            text-align: center;
+            background: linear-gradient(135deg, #1a365d 0%, #2d5a8c 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .title-page h1 {
+            font-family: 'Merriweather', serif;
+            font-size: 48pt;
+            font-weight: 700;
+            margin-bottom: 0.5em;
+            letter-spacing: -0.5px;
+        }
+
+        .title-page .subtitle {
+            font-size: 14pt;
+            font-weight: 400;
+            opacity: 0.95;
+            margin-bottom: 1.5em;
+            letter-spacing: 1px;
+        }
+
+        .title-page .meta {
+            opacity: 0.8;
+            font-size: 11pt;
+            line-height: 1.8;
+        }
+
+        .toc {
+            page-break-after: always;
+            padding: 2cm 0;
+            background: #f8f9fa;
+        }
+
+        .toc h2 {
+            font-family: 'Merriweather', serif;
+            font-size: 28pt;
+            color: #1a365d;
+            margin-bottom: 1.5em;
+            border-bottom: 3px solid #d97706;
+            padding-bottom: 0.5em;
+        }
+
+        .toc-content {
+            column-count: 2;
+            column-gap: 2em;
+        }
+
+        .toc ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .toc li {
+            margin: 0.7em 0;
+            padding-left: 0;
+        }
+
+        .toc li a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            border-bottom: 1px dotted #d97706;
+        }
+
+        .toc-level-2 {
+            margin-left: 1.5em;
+            font-size: 10pt;
+            color: #555;
+        }
+
+        .content {
+            background: white;
+            padding: 0;
+        }
+
+        h1 {
+            font-family: 'Merriweather', serif;
+            font-size: 32pt;
+            color: #1a365d;
+            margin: 2em 0 1em 0;
+            page-break-after: avoid;
+            border-bottom: 2px solid #d97706;
+            padding-bottom: 0.4em;
+            letter-spacing: -0.5px;
+        }
+
+        h2 {
+            font-family: 'Merriweather', serif;
+            font-size: 22pt;
+            color: #1a365d;
+            margin: 1.8em 0 0.8em 0;
+            page-break-after: avoid;
+            border-left: 4px solid #d97706;
+            padding-left: 0.8em;
+            letter-spacing: -0.3px;
+        }
+
+        h3 {
+            font-family: 'Source Sans Pro', sans-serif;
+            font-size: 14pt;
+            color: #2c3e50;
+            margin: 1.3em 0 0.6em 0;
+            page-break-after: avoid;
+            font-weight: 600;
+        }
+
+        h4 {
+            font-size: 12pt;
+            color: #34495e;
+            margin: 1em 0 0.5em 0;
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0.8em 0;
+            text-align: justify;
+        }
+
+        a {
+            color: #2980b9;
+            text-decoration: none;
+            border-bottom: 1px solid #e8e8e8;
+        }
+
+        ul, ol {
+            margin: 1em 0 1em 2em;
+            padding: 0;
+        }
+
+        li {
+            margin: 0.5em 0;
+            line-height: 1.7;
+        }
+
+        li p {
+            margin: 0.3em 0;
+        }
+
+        code {
+            font-family: 'Courier New', monospace;
+            font-size: 10pt;
+            background-color: #f5f5f5;
+            padding: 0.2em 0.5em;
+            border-radius: 3px;
+            color: #e83e8c;
+        }
+
+        pre {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 1.2em;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1.2em 0;
+            page-break-inside: avoid;
+            font-size: 9.5pt;
+            line-height: 1.5;
+            border-left: 4px solid #d97706;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        blockquote {
+            border-left: 4px solid #d97706;
+            padding: 1em 1.2em;
+            margin: 1.2em 0;
+            background-color: #fffbf0;
+            page-break-inside: avoid;
+            font-style: italic;
+            color: #555;
+        }
+
+        blockquote p {
+            margin: 0.5em 0;
+            text-align: left;
+        }
+
+        blockquote strong {
+            font-weight: 600;
+            color: #1a365d;
+            font-style: normal;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5em 0;
+            page-break-inside: avoid;
+            font-size: 10pt;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        thead {
+            background: linear-gradient(135deg, #1a365d 0%, #2d5a8c 100%);
+            color: white;
+        }
+
+        th {
+            padding: 0.8em 0.9em;
+            text-align: left;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            border: none;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tbody tr:nth-child(odd) {
+            background-color: #f9fbfd;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #ffffff;
+        }
+
+        tbody tr:hover {
+            background-color: #f0f5ff;
+        }
+
+        td {
+            padding: 0.8em 0.9em;
+            border: none;
+        }
+
+        strong {
+            font-weight: 700;
+            color: #1a365d;
+        }
+
+        em {
+            font-style: italic;
+            color: #34495e;
+        }
+
+        .note, .warning, .admin-only {
+            margin: 1.2em 0;
+            padding: 1em 1.2em;
+            page-break-inside: avoid;
+            border-left: 4px solid;
+            border-radius: 2px;
+        }
+
+        .note {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+        .note strong {
+            color: #1976d2;
+        }
+
+        .warning {
+            background-color: #fff3e0;
+            border-color: #ff9800;
+        }
+
+        .warning strong {
+            color: #e65100;
+        }
+
+        .admin-only {
+            background-color: #f3e5f5;
+            border-color: #9c27b0;
+        }
+
+        .admin-only strong {
+            color: #7b1fa2;
+        }
+
+        hr {
+            border: none;
+            border-top: 2px solid #d97706;
+            margin: 2em 0;
+            opacity: 0.5;
+        }
+
+        .section-break {
+            page-break-before: always;
+            padding-top: 1em;
+        }
+
+        .page-break {
+            page-break-after: always;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            a {
+                color: #2980b9;
+                text-decoration: underline;
+                border: none;
+            }
+
+            h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid;
+                orphans: 2;
+                widows: 2;
+            }
+
+            p, li {
+                orphans: 2;
+                widows: 2;
+            }
+
+            table {
+                page-break-inside: avoid;
+            }
+
+            tr {
+                page-break-inside: avoid;
+            }
+        }
+
+        .toc, .note, .warning, .admin-only, table {
+            page-break-inside: avoid;
+        }
+    </style>
+</head>
+<body>
+    <div class="title-page">
+        <h1>HR Quick Reference</h1>
+        <div class="subtitle">AECE Checkpoint Training Documentation</div>
+        <div class="meta">
+            Version 1<br>
+            Complete Reference<br>
+            <br>
+            Generated April 2026
+        </div>
+    </div>
+
+    <div class="toc">
+        <h2>Contents</h2>
+        <div class="toc-content">
+            <ul>
+<li><strong>HR Quick Reference — Checkpoint Leave Management System</strong></li>
+  <li>1. Morning Checklist</li>
+  <li>2. Common Tasks</li>
+  <li>3. Leave Status Guide</li>
+  <li>4. Key Rules to Remember</li>
+  <li>5. Email Notifications Reference</li>
+  <li>Quick Escalation Contacts</li>
+</ul>
+
+        </div>
+    </div>
+
+    <div class="content">
+        <h1>HR Quick Reference — Checkpoint Leave Management System</h1>
+<p><strong>Designed to be scanned in under 2 minutes. Keep this tab open or print and post by your desk.</strong></p>
+<hr />
+<h2>1. Morning Checklist</h2>
+<p>Do this when you start your day:</p>
+<ol>
+<li><strong>Check your inbox</strong> — Look for leave requests waiting in <code>Queue</code>. If red badge shows on leave requests, prioritize those first.</li>
+<li><strong>Review yesterday's notifications</strong> — Any bounced approvals or manager escalations? Address immediately.</li>
+<li><strong>Check for new grievances</strong> — Badge on Grievances nav. Flag urgent confidential matters.</li>
+<li><strong>Scan the Dashboard</strong> — Pending approval count, overdue requests, staff on leave today.</li>
+<li><strong>Update any manual attendance</strong> — If kiosk failed to record, fix attendance records before 9 AM.</li>
+</ol>
+<hr />
+<h2>2. Common Tasks</h2>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Steps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Approve a leave request</strong></td>
+<td>Open Queue → find request → Review manager recommendation → Click Approve → Done</td>
+</tr>
+<tr>
+<td><strong>Reject a leave request</strong></td>
+<td>Queue → find request → Click Reject → Optionally add comment to staff → Done</td>
+</tr>
+<tr>
+<td><strong>Request medical certificate</strong></td>
+<td>Queue → find sick leave → Click "Request Medical Cert" → Certificate marked due</td>
+</tr>
+<tr>
+<td><strong>Add a new employee</strong></td>
+<td>Personnel → Create Employee → Fill required fields (Name, ID, email, role) → Password auto-sent → Done</td>
+</tr>
+<tr>
+<td><strong>Adjust leave balance manually</strong></td>
+<td>Leave Balances → Select employee → Select leave type → Click pencil → Adjust reason → Update</td>
+</tr>
+<tr>
+<td><strong>Register employee faces</strong></td>
+<td>Face Registration → Select employee → Capture 2–3 angles → Save → Test on kiosk</td>
+</tr>
+<tr>
+<td><strong>Create public holiday</strong></td>
+<td>Leave Rules → Public Holidays → Add Date → Name → Apply → Auto-blocks leave approvals</td>
+</tr>
+<tr>
+<td><strong>Check who's on leave today</strong></td>
+<td>Dashboard → <strong>On Leave Today</strong> card → See list with leave type</td>
+</tr>
+<tr>
+<td><strong>Export attendance for payroll</strong></td>
+<td>Attendance → Select date range → Click Export → CSV downloads → Save for payroll</td>
+</tr>
+<tr>
+<td><strong>View audit log for an employee</strong></td>
+<td>Personnel → Select employee → Scroll to Activity → All changes logged with timestamp &amp; user</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>3. Leave Status Guide</h2>
+<table>
+<thead>
+<tr>
+<th>Leave Status</th>
+<th>What It Means</th>
+<th>Where It Sits</th>
+<th>Who Acts Next</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Draft</strong></td>
+<td>Employee started but didn't submit</td>
+<td>Employee inbox</td>
+<td>Employee (must submit to manager)</td>
+</tr>
+<tr>
+<td><strong>Submitted</strong></td>
+<td>Waiting for manager recommendation</td>
+<td>Manager Queue</td>
+<td>Manager (approves or declines)</td>
+</tr>
+<tr>
+<td><strong>Recommended</strong></td>
+<td>Manager approved, now waiting for HR</td>
+<td>Your Queue</td>
+<td><strong>You</strong> (approve or reject)</td>
+</tr>
+<tr>
+<td><strong>Approved</strong></td>
+<td>HR approved, leave is locked</td>
+<td>Employee calendar</td>
+<td>None (leave is granted)</td>
+</tr>
+<tr>
+<td><strong>Rejected</strong></td>
+<td>HR rejected (employee notified)</td>
+<td>Employee history</td>
+<td>Employee (can reapply if eligible)</td>
+</tr>
+<tr>
+<td><strong>Cancelled</strong></td>
+<td>Employee or admin cancelled approved leave</td>
+<td>Employee history</td>
+<td>None (leave refunded to balance)</td>
+</tr>
+<tr>
+<td><strong>Escalated</strong></td>
+<td>Manager didn't respond in 3 days</td>
+<td>Escalation reminder sent to manager</td>
+<td>Manager (urgent response needed)</td>
+</tr>
+<tr>
+<td><strong>Awaiting Cert</strong></td>
+<td>Medical cert requested for sick leave</td>
+<td>Employee inbox</td>
+<td>Employee (must upload cert, or leave voids)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>4. Key Rules to Remember</h2>
+<p>These catch people out — memorize them:</p>
+<ol>
+<li>
+<p><strong>Sick leave requires medical cert after 2 consecutive days.</strong> If employee doesn't upload by deadline, leave request voids automatically.</p>
+</li>
+<li>
+<p><strong>Half-day leave counts as 0.5 days, not full day.</strong> If employee takes morning off, balance deducts 0.5 (not 1).</p>
+</li>
+<li>
+<p><strong>Annual leave accrues monthly, not upfront.</strong> New employees don't get full year's balance on day 1. Check their cycle start date.</p>
+</li>
+<li>
+<p><strong>You cannot approve your own leave.</strong> The system blocks self-approval. Manager recommends, HR approves.</p>
+</li>
+<li>
+<p><strong>Carry-over unused leave expires 3 months after cycle end.</strong> Mark a calendar reminder for expiry dates to avoid losing days.</p>
+</li>
+<li>
+<p><strong>FRL (Family Responsibility Leave) is 3 days per year, not per request.</strong> Once employee uses 3 days total, no more FRL can be approved until next cycle.</p>
+</li>
+<li>
+<p><strong>Manager can only see and approve their direct reports' leave.</strong> Create correct supervisor hierarchy or manager won't see anything to action.</p>
+</li>
+<li>
+<p><strong>Public holidays block leave approval.</strong> If the date falls on a public holiday, leave request auto-rejects (employee cannot take leave on a public holiday).</p>
+</li>
+<li>
+<p><strong>Unpaid leave requires 7-day notice in advance.</strong> If employee requests unpaid with fewer than 7 days notice, system flags it — check your escalations.</p>
+</li>
+<li>
+<p><strong>Attendance records must be corrected by 9 AM.</strong> Any manual edits after 9 AM may affect payroll. Post a morning cutoff in your team chat.</p>
+</li>
+</ol>
+<hr />
+<h2>5. Email Notifications Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Email</th>
+<th>Sent To</th>
+<th>What Triggers It</th>
+<th>Your Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Leave Request Submitted</strong></td>
+<td>Manager</td>
+<td>Employee submitted leave (waiting for recommendation)</td>
+<td>Manager must review in Queue</td>
+</tr>
+<tr>
+<td><strong>Manager Recommendation Given</strong></td>
+<td>You (HR)</td>
+<td>Manager approved/rejected in their queue</td>
+<td>Check Queue; approve or reject</td>
+</tr>
+<tr>
+<td><strong>Leave Approved</strong></td>
+<td>Employee</td>
+<td>You approved in HR Queue</td>
+<td>None (employee sees on calendar)</td>
+</tr>
+<tr>
+<td><strong>Leave Rejected</strong></td>
+<td>Employee</td>
+<td>You rejected in HR Queue</td>
+<td>None (employee notified, can reapply)</td>
+</tr>
+<tr>
+<td><strong>Medical Certificate Requested</strong></td>
+<td>Employee</td>
+<td>Sick leave requires cert (2+ days)</td>
+<td>Employee must upload cert</td>
+</tr>
+<tr>
+<td><strong>Cert Deadline Approaching</strong></td>
+<td>Employee</td>
+<td>24 hours before cert deadline</td>
+<td>Remind employee if they haven't uploaded</td>
+</tr>
+<tr>
+<td><strong>Medical Certificate Overdue</strong></td>
+<td>You (HR)</td>
+<td>Employee missed cert deadline</td>
+<td>Void the leave request manually</td>
+</tr>
+<tr>
+<td><strong>Manager Escalation Alert</strong></td>
+<td>Manager</td>
+<td>Manager took &gt;3 days to respond</td>
+<td>Manager reminded to action request</td>
+</tr>
+<tr>
+<td><strong>Unpaid Leave Notice</strong></td>
+<td>You (HR)</td>
+<td>Employee requested unpaid with &lt;7 days notice</td>
+<td>Check escalation flag; may need follow-up</td>
+</tr>
+<tr>
+<td><strong>Leave Cancelled</strong></td>
+<td>Manager + Employee</td>
+<td>Leave was cancelled (approved → cancelled)</td>
+<td>Balance auto-refunded to employee</td>
+</tr>
+<tr>
+<td><strong>Attendance Manual Edit</strong></td>
+<td>Your email</td>
+<td>Someone edited an attendance record</td>
+<td>Review audit log to confirm change</td>
+</tr>
+<tr>
+<td><strong>Grievance Filed</strong></td>
+<td>You (HR)</td>
+<td>New grievance submitted</td>
+<td>Review immediately; flag if confidential</td>
+</tr>
+<tr>
+<td><strong>Grievance Status Updated</strong></td>
+<td>Employee</td>
+<td>You updated grievance status</td>
+<td>Employee kept in the loop</td>
+</tr>
+<tr>
+<td><strong>Face Registration Needed</strong></td>
+<td>Employee</td>
+<td>Face not registered or failed kiosk</td>
+<td>Employee needs to visit registration</td>
+</tr>
+<tr>
+<td><strong>System Backup Complete</strong></td>
+<td>You (Admin)</td>
+<td>Nightly backup completed (6-hour interval)</td>
+<td>No action (confirmation only)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Quick Escalation Contacts</h2>
+<ul>
+<li><strong>System down or container issue</strong> → Admin (check troubleshooting guide)</li>
+<li><strong>Balance calculation looks wrong</strong> → Admin (may need balance reset or accrual debug)</li>
+<li><strong>Face recognition failing at kiosk</strong> → Check employee face registration; re-register if needed</li>
+<li><strong>Email not received</strong> → Check spam; may be Postmark issue (admin escalates to support)</li>
+<li><strong>Leave Rules questions</strong> → See Admin Reference Manual section 10 for BCEA rules and tiers</li>
+<li><strong>Policy question not in these docs</strong> → Check HR User Guide section 11 (Common Scenarios)</li>
+</ul>
+<hr />
+<p><strong>Last Updated:</strong> 2026-04-09<br />
+<strong>For full details:</strong> See HR User Guide (new hires) or Admin Reference Manual (admins)</p>
+    </div>
+
+    <p style="text-align: center; font-size: 9pt; color: #999; margin: 3em 0 1em 0; page-break-before: always;">
+        <strong>AECE Checkpoint Training Documentation – Version 1</strong><br>
+        This document is confidential and intended for AECE Checkpoint users only.<br>
+        Last updated: April 2026
+    </p>
+</body>
+</html>

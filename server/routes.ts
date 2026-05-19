@@ -132,6 +132,13 @@ function calcRequestedDays(
   return Math.max(days, 0);
 }
 
+function getAppUrl(): string {
+  return process.env.APP_URL
+    || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null)
+    || process.env.REPLIT_DEPLOYMENT_URL
+    || 'http://localhost:5000';
+}
+
 // Decrement pending balance when a non-historic leave request is cancelled or rejected.
 // For historic entries use decrementTaken instead.
 // NOTE: We do not restore carryOverDays here — carryConsumed is not stored on the request
@@ -608,9 +615,7 @@ export async function registerRoutes(
 
       // Send reset email
       const senderEmail = "noreply@aece.co.za";
-      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-        : 'http://localhost:5000';
+      const baseUrl = getAppUrl();
       const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
       await sendPasswordResetEmail(email, senderEmail, {
@@ -916,12 +921,18 @@ export async function registerRoutes(
   app.post("/api/users", requireAdmin, async (req, res) => {
     try {
       const validatedData = insertUserSchema.parse(req.body);
-      
+
       const plaintextPassword = validatedData.password;
       if (validatedData.password) {
         validatedData.password = await hashPassword(validatedData.password);
       }
-      
+
+      // Auto-set excludeFromLeave for admin/hr users
+      const hasAdminRole = (validatedData.roles || []).some(r => ['admin', 'hr'].includes(r));
+      if (hasAdminRole) {
+        validatedData.excludeFromLeave = true;
+      }
+
       const newUser = await storage.createUser(validatedData);
 
       // Auto-provision mandatory BCEA leave balances if the employee has a start date.
@@ -998,6 +1009,14 @@ export async function registerRoutes(
 
       if (updateData.password && !updateData.password.startsWith('$2')) {
         updateData.password = await hashPassword(updateData.password);
+      }
+
+      // Auto-set excludeFromLeave for admin/hr users
+      if (updateData.roles) {
+        const hasAdminRole = updateData.roles.some((r: string) => ['admin', 'hr'].includes(r));
+        if (hasAdminRole) {
+          updateData.excludeFromLeave = true;
+        }
       }
 
       const updatedUser = await storage.updateUser(req.params.id, updateData);
@@ -1375,11 +1394,16 @@ export async function registerRoutes(
 
       const allUsers = await storage.getAllUsers();
       const workers = allUsers.filter(
-        (u) =>
-          u.startDate &&
-          !u.terminationDate &&
-          !u.excludeFromLeave &&
-          (!employeeIds || employeeIds.includes(u.id))
+        (u) => {
+          const hasAdminRole = (u.roles || []).some(r => ['admin', 'hr'].includes(r));
+          return (
+            u.startDate &&
+            !u.terminationDate &&
+            !u.excludeFromLeave &&
+            !hasAdminRole &&
+            (!employeeIds || employeeIds.includes(u.id))
+          );
+        }
       );
 
       const results: { updated: number; skipped: number; errors: string[]; details: { userId: string; name: string; annualLeave: number; sickLeave: number; familyResponsibility: number; monthsWorked: number }[] } = {
@@ -1818,10 +1842,8 @@ export async function registerRoutes(
         const adminEmailSetting = await storage.getSetting('admin_email');
         const senderEmail = "noreply@aece.co.za";
         
-        // Construct the app URL from the request
-        const appUrl = process.env.REPLIT_DEV_DOMAIN 
-          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-          : process.env.REPLIT_DEPLOYMENT_URL || 'https://aece-checkpoint.replit.app';
+        // Construct the app URL
+        const appUrl = getAppUrl();
         
         const emailData = {
           employeeName: user ? `${user.firstName} ${user.surname}` : 'Unknown',
@@ -3567,10 +3589,8 @@ export async function registerRoutes(
       
       const fromEmailSetting = await storage.getSetting('from_email');
       const fromEmail = fromEmailSetting?.value || 'noreply@aece.co.za';
-      
-      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-        : 'https://factory-flow--quanga01.replit.app';
+
+      const baseUrl = getAppUrl();
       
       const resetToken = crypto.randomBytes(32).toString('hex');
       const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);

@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR User Guide - Version 1</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            size: A4;
+            margin: 2.5cm 2cm;
+            @bottom-center {
+                content: counter(page);
+                font-family: 'Source Sans Pro', sans-serif;
+                font-size: 10px;
+                color: #666;
+            }
+            @top-right {
+                content: "AECE Checkpoint HR User Guide";
+                font-family: 'Source Sans Pro', sans-serif;
+                font-size: 9px;
+                color: #999;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.7;
+            color: #2c3e50;
+            font-size: 11pt;
+            background: #fafbfc;
+        }
+
+        /* Title Page */
+        .title-page {
+            page-break-after: always;
+            padding: 4cm 0 0 0;
+            text-align: center;
+            background: linear-gradient(135deg, #1a365d 0%, #2d5a8c 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .title-page h1 {
+            font-family: 'Merriweather', serif;
+            font-size: 48pt;
+            font-weight: 700;
+            margin-bottom: 0.5em;
+            letter-spacing: -0.5px;
+        }
+
+        .title-page .subtitle {
+            font-size: 14pt;
+            font-weight: 400;
+            opacity: 0.95;
+            margin-bottom: 1.5em;
+            letter-spacing: 1px;
+        }
+
+        .title-page .meta {
+            opacity: 0.8;
+            font-size: 11pt;
+            line-height: 1.8;
+        }
+
+        /* Table of Contents */
+        .toc {
+            page-break-after: always;
+            padding: 2cm 0;
+            background: #f8f9fa;
+        }
+
+        .toc h2 {
+            font-family: 'Merriweather', serif;
+            font-size: 28pt;
+            color: #1a365d;
+            margin-bottom: 1.5em;
+            border-bottom: 3px solid #d97706;
+            padding-bottom: 0.5em;
+        }
+
+        .toc-content {
+            column-count: 2;
+            column-gap: 2em;
+        }
+
+        .toc ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .toc li {
+            margin: 0.7em 0;
+            padding-left: 0;
+        }
+
+        .toc li a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            border-bottom: 1px dotted #d97706;
+        }
+
+        .toc li a:hover {
+            color: #d97706;
+        }
+
+        .toc-level-2 {
+            margin-left: 1.5em;
+            font-size: 10pt;
+            color: #555;
+        }
+
+        /* Main Content */
+        .content {
+            background: white;
+            padding: 0;
+        }
+
+        h1 {
+            font-family: 'Merriweather', serif;
+            font-size: 32pt;
+            color: #1a365d;
+            margin: 2em 0 1em 0;
+            page-break-after: avoid;
+            border-bottom: 2px solid #d97706;
+            padding-bottom: 0.4em;
+            letter-spacing: -0.5px;
+        }
+
+        h2 {
+            font-family: 'Merriweather', serif;
+            font-size: 22pt;
+            color: #1a365d;
+            margin: 1.8em 0 0.8em 0;
+            page-break-after: avoid;
+            border-left: 4px solid #d97706;
+            padding-left: 0.8em;
+            letter-spacing: -0.3px;
+        }
+
+        h3 {
+            font-family: 'Source Sans Pro', sans-serif;
+            font-size: 14pt;
+            color: #2c3e50;
+            margin: 1.3em 0 0.6em 0;
+            page-break-after: avoid;
+            font-weight: 600;
+        }
+
+        h4 {
+            font-size: 12pt;
+            color: #34495e;
+            margin: 1em 0 0.5em 0;
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0.8em 0;
+            text-align: justify;
+        }
+
+        a {
+            color: #2980b9;
+            text-decoration: none;
+            border-bottom: 1px solid #e8e8e8;
+        }
+
+        a:hover {
+            border-bottom-color: #2980b9;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1em 0 1em 2em;
+            padding: 0;
+        }
+
+        li {
+            margin: 0.5em 0;
+            line-height: 1.7;
+        }
+
+        li p {
+            margin: 0.3em 0;
+        }
+
+        /* Code & Pre */
+        code {
+            font-family: 'Courier New', monospace;
+            font-size: 10pt;
+            background-color: #f5f5f5;
+            padding: 0.2em 0.5em;
+            border-radius: 3px;
+            color: #e83e8c;
+        }
+
+        pre {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 1.2em;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1.2em 0;
+            page-break-inside: avoid;
+            font-size: 9.5pt;
+            line-height: 1.5;
+            border-left: 4px solid #d97706;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        /* Blockquotes */
+        blockquote {
+            border-left: 4px solid #d97706;
+            padding: 1em 1.2em;
+            margin: 1.2em 0;
+            background-color: #fffbf0;
+            page-break-inside: avoid;
+            font-style: italic;
+            color: #555;
+        }
+
+        blockquote p {
+            margin: 0.5em 0;
+            text-align: left;
+        }
+
+        blockquote strong {
+            font-weight: 600;
+            color: #1a365d;
+            font-style: normal;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5em 0;
+            page-break-inside: avoid;
+            font-size: 10pt;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        thead {
+            background: linear-gradient(135deg, #1a365d 0%, #2d5a8c 100%);
+            color: white;
+        }
+
+        th {
+            padding: 0.8em 0.9em;
+            text-align: left;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            border: none;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tbody tr:nth-child(odd) {
+            background-color: #f9fbfd;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #ffffff;
+        }
+
+        tbody tr:hover {
+            background-color: #f0f5ff;
+        }
+
+        td {
+            padding: 0.8em 0.9em;
+            border: none;
+        }
+
+        /* Emphasis */
+        strong {
+            font-weight: 700;
+            color: #1a365d;
+        }
+
+        em {
+            font-style: italic;
+            color: #34495e;
+        }
+
+        /* Callouts */
+        .note, .warning, .admin-only {
+            margin: 1.2em 0;
+            padding: 1em 1.2em;
+            page-break-inside: avoid;
+            border-left: 4px solid;
+            border-radius: 2px;
+        }
+
+        .note {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+        .note strong {
+            color: #1976d2;
+        }
+
+        .warning {
+            background-color: #fff3e0;
+            border-color: #ff9800;
+        }
+
+        .warning strong {
+            color: #e65100;
+        }
+
+        .admin-only {
+            background-color: #f3e5f5;
+            border-color: #9c27b0;
+        }
+
+        .admin-only strong {
+            color: #7b1fa2;
+        }
+
+        /* Horizontal Rule */
+        hr {
+            border: none;
+            border-top: 2px solid #d97706;
+            margin: 2em 0;
+            opacity: 0.5;
+        }
+
+        /* Section Break */
+        .section-break {
+            page-break-before: always;
+            padding-top: 1em;
+        }
+
+        /* Utility */
+        .page-break {
+            page-break-after: always;
+        }
+
+        /* Print optimizations */
+        @media print {
+            body {
+                background: white;
+            }
+
+            a {
+                color: #2980b9;
+                text-decoration: underline;
+                border: none;
+            }
+
+            h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid;
+                orphans: 2;
+                widows: 2;
+            }
+
+            p, li {
+                orphans: 2;
+                widows: 2;
+            }
+
+            table {
+                page-break-inside: avoid;
+            }
+
+            tr {
+                page-break-inside: avoid;
+            }
+        }
+
+        /* Avoid page breaks in bad places */
+        .toc, .note, .warning, .admin-only, table {
+            page-break-inside: avoid;
+        }
+    </style>
+</head>
+<body>
+    <div class="title-page">
+        <h1>HR User Guide</h1>
+        <div class="subtitle">AECE Checkpoint Leave Management System</div>
+        <div class="meta">
+            Version 1<br>
+            Complete Training Documentation<br>
+            <br>
+            Generated April 2026
+        </div>
+    </div>
+
+    <div class="toc">
+        <h2>Contents</h2>
+        <div class="toc-content">
+            <ul>
+                <li><a href="#section-welcome">1. Welcome & Orientation</a></li>
+                <li><a href="#section-daily">2. Daily Workflow</a></li>
+                <li><a href="#section-leave-requests">3. Managing Leave Requests</a></li>
+                <li><a href="#section-personnel">4. Personnel Management</a></li>
+                <li><a href="#section-balances">5. Leave Balances</a></li>
+                <li><a href="#section-rules">6. Leave Rules Configuration</a></li>
+                <li><a href="#section-attendance">7. Attendance Management</a></li>
+                <li><a href="#section-grievance">8. Grievance Management</a></li>
+                <li><a href="#section-reporting">9. Reporting & Audit</a></li>
+                <li><a href="#section-face">10. Face Registration</a></li>
+                <li><a href="#section-scenarios">11. Common Scenarios</a></li>
+                <li><a href="#section-help">12. Quick Help Reference</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="content">
+        <h1 id="section-welcome">1. Welcome & Orientation</h1>
+
+        <h2>What is AECE Checkpoint?</h2>
+        <p>AECE Checkpoint is a comprehensive leave management and workforce administration system. As an HR professional, you'll use it daily to approve leave requests, manage employee records, track attendance, and ensure compliance with South African employment law (BCEA).</p>
+
+        <blockquote><strong>Welcome to the team!</strong> This guide covers every task you'll perform in your first week and beyond. Bookmark this document and refer to sections as needed.</blockquote>
+
+        <h2>System Purpose</h2>
+        <p>The system handles:</p>
+        <ul>
+            <li><strong>Leave management</strong> — Employees request, managers recommend, you approve or reject</li>
+            <li><strong>Attendance tracking</strong> — Face recognition kiosk, manual correction, infringement monitoring</li>
+            <li><strong>Personnel records</strong> — Employee creation, updates, terminations, contract management</li>
+            <li><strong>Leave balances</strong> — Automatic accrual, manual adjustments, statutory compliance</li>
+            <li><strong>Grievance tracking</strong> — Confidential case management with full audit trail</li>
+        </ul>
+
+        <h2>Your Role</h2>
+        <p>As HR, you are the final approval authority. Your responsibilities:</p>
+        <ul>
+            <li>Review leave requests recommended by managers</li>
+            <li>Approve or reject based on policy and balances</li>
+            <li>Manage employee records and on/off-boarding</li>
+            <li>Configure leave types, rules, and public holidays</li>
+            <li>Monitor attendance and infringements</li>
+            <li>Handle grievance escalations</li>
+            <li>Run reports for payroll and compliance</li>
+        </ul>
+
+        <h2>Logging In</h2>
+        <ol>
+            <li>Open your browser and navigate to the Checkpoint URL (provided by your admin)</li>
+            <li>Enter your email address</li>
+            <li>Enter your temporary password (provided on day one)</li>
+            <li>On first login, you'll be prompted to create a new password</li>
+            <li>Two-factor authentication is enabled for security — follow the prompt</li>
+            <li>You'll land on the Dashboard</li>
+        </ol>
+
+        <blockquote><strong>Note:</strong> If you can't log in, contact your system administrator immediately. Do not try to reset your password yourself.</blockquote>
+
+        <h2>Dashboard Tour</h2>
+        <p>When you log in, the Dashboard shows:</p>
+        <ul>
+            <li><strong>Pending Approvals</strong> — Number of leave requests waiting in your queue (red badge if overdue)</li>
+            <li><strong>Staff on Leave Today</strong> — Who's out and what type of leave</li>
+            <li><strong>Recent Grievances</strong> — New cases or status updates</li>
+            <li><strong>Attendance Summary</strong> — Infringements, AWOL flags</li>
+            <li><strong>Upcoming Milestones</strong> — Leave cycle changes, statutory holidays</li>
+        </ul>
+
+        <h2>Navigation & Key Areas</h2>
+        <p>Top navigation bar provides access to:</p>
+        <ul>
+            <li><strong>Queue</strong> — Leave requests waiting for your approval (your most-used area)</li>
+            <li><strong>Personnel</strong> — Create, edit, or terminate employee records</li>
+            <li><strong>Leave Balances</strong> — View and manually adjust leave days</li>
+            <li><strong>Leave Rules</strong> — Configure leave types, accrual, public holidays</li>
+            <li><strong>Attendance</strong> — Review and correct attendance records</li>
+            <li><strong>Grievances</strong> — Review and track grievance cases</li>
+            <li><strong>Reporting</strong> — Generate compliance and audit reports</li>
+            <li><strong>Settings</strong> — System configuration (admin only)</li>
+        </ul>
+
+        <blockquote><strong>Tip:</strong> The Queue is your primary workspace. Check it first thing each morning and keep it cleared by end of day.</blockquote>
+
+        <h1 id="section-daily">2. Daily Workflow</h1>
+
+        <h2>Morning Checklist (5 minutes)</h2>
+        <ol>
+            <li>Log in and review Dashboard — note pending approvals and any red badges</li>
+            <li>Open the Queue — sort by submitted date (oldest first)</li>
+            <li>Scan for medical certificate requests — if any are overdue, follow up with employee</li>
+            <li>Check for escalations — if a request has been waiting >3 days, manager reminder was sent</li>
+            <li>Review grievances for new high-priority cases</li>
+        </ol>
+
+        <h2>Types of Emails You'll Receive</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Email Type</th>
+                    <th>What It Means</th>
+                    <th>Your Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Leave Request Submitted</strong></td>
+                    <td>Employee submitted, manager is reviewing</td>
+                    <td>None yet — wait for manager recommendation</td>
+                </tr>
+                <tr>
+                    <td><strong>Manager Recommendation</strong></td>
+                    <td>Manager approved/rejected — now in your queue</td>
+                    <td>Review in Queue; approve or reject</td>
+                </tr>
+                <tr>
+                    <td><strong>Medical Cert Requested</strong></td>
+                    <td>Sick leave >2 days requires medical proof</td>
+                    <td>Employee must upload cert by deadline</td>
+                </tr>
+                <tr>
+                    <td><strong>Manager Escalation</strong></td>
+                    <td>Manager didn't respond in 3 days</td>
+                    <td>Forward reminder to manager; may need to override</td>
+                </tr>
+                <tr>
+                    <td><strong>Cert Overdue</strong></td>
+                    <td>Employee missed cert deadline</td>
+                    <td>Void the leave request (or contact employee for grace period)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Prioritizing Your Queue</h2>
+        <p>Work through requests in this order:</p>
+        <ol>
+            <li><strong>Red/urgent flags</strong> — Leave starting today, cert overdue, or awaiting cert</li>
+            <li><strong>Oldest first</strong> — Sort by submitted date; approve in order</li>
+            <li><strong>New submissions</strong> — Process same day if possible</li>
+            <li><strong>Escalations</strong> — Manager follow-ups, flag for urgent handling</li>
+        </ol>
+
+        <blockquote><strong>Best practice:</strong> Clear the Queue by 2 PM each day. This ensures leaves are approved before the day ends and employees see decisions promptly.</blockquote>
+
+        <h2>Managing Interruptions</h2>
+        <p>When employees or managers contact you directly:</p>
+        <ul>
+            <li>Ask them to use the system (most answers are in their inbox)</li>
+            <li>If urgent, check the Queue immediately and action the request</li>
+            <li>Never approve a leave request in an email — use the system only</li>
+            <li>Document your decision in the system so audit trail is clear</li>
+        </ul>
+
+        <h1 id="section-leave-requests">3. Managing Leave Requests</h1>
+
+        <h2>The 3-Stage Workflow</h2>
+        <p><strong>Stage 1: Employee submits</strong> → <strong>Stage 2: Manager recommends</strong> → <strong>Stage 3: You approve/reject</strong></p>
+
+        <p>You only see requests that passed Stage 2 (manager approved). Your job is the final gate: approve if eligible and balance exists, reject if not.</p>
+
+        <h2>Reviewing a Request</h2>
+        <ol>
+            <li>In the Queue, click the request to open it</li>
+            <li>Check the employee name, dates, and leave type</li>
+            <li>Review the manager's recommendation and comment</li>
+            <li>Check the employee's balance — is there enough leave?</li>
+            <li>Check the leave type rules — are the dates valid?</li>
+            <li>Decide: Approve or Reject</li>
+        </ol>
+
+        <h2>Approving a Leave Request</h2>
+        <ol>
+            <li>Open the request in the Queue</li>
+            <li>Review all details (dates, balance, manager comment)</li>
+            <li>Click <strong>Approve</strong></li>
+            <li>Optional: Add a comment for the record</li>
+            <li>Click <strong>Confirm</strong></li>
+        </ol>
+        <p>Leave is immediately locked on the calendar and balance is deducted. Employee receives approval email.</p>
+
+        <h2>Rejecting a Leave Request</h2>
+        <ol>
+            <li>Open the request in the Queue</li>
+            <li>Click <strong>Reject</strong></li>
+            <li>Choose a reason (required):</li>
+            <ul style="margin-top: 0.3em;">
+                <li>Insufficient balance</li>
+                <li>Policy violation</li>
+                <li>Operational need</li>
+                <li>Other (custom reason)</li>
+            </ul>
+            <li>Optional: Add a comment explaining next steps</li>
+            <li>Click <strong>Confirm</strong></li>
+        </ol>
+        <p>Employee receives rejection email and can reapply once the issue is resolved (e.g., balance restored).</p>
+
+        <blockquote><strong>Warning:</strong> Rejections are final and logged. Always provide a reason. Employee can appeal through grievance process if they disagree.</blockquote>
+
+        <h2>Medical Certificate Workflow</h2>
+        <p>Sick leave requests for 2+ consecutive days must include a medical certificate to be valid.</p>
+
+        <h3>If medical cert is required:</h3>
+        <ol>
+            <li>System automatically sends employee a "Medical Cert Requested" email</li>
+            <li>Employee has 5 business days to upload the certificate</li>
+            <li>You can download and review the certificate in the request details</li>
+            <li>If cert is invalid (not from a doctor, too old, doesn't cover dates), request a new one</li>
+            <li>If deadline passes with no cert, leave request automatically voids</li>
+        </ol>
+
+        <blockquote><strong>Note:</strong> A medical certificate is required by South African labor law. Do not approve sick leave without one. If employee says they're waiting for the doctor, grant a 2-day grace period and follow up.</blockquote>
+
+        <h2>Half-Day Leave</h2>
+        <p>Employees can request a half day (morning or afternoon only).</p>
+        <ul>
+            <li>Half-day = 0.5 day deducted from balance</li>
+            <li>Two half-days = 1 full day</li>
+            <li>Approval process is the same — check balance for 0.5 days</li>
+            <li>Half-days cannot have medical certs</li>
+        </ul>
+
+        <h2>Historic/Backdated Leave</h2>
+        <p>Employees sometimes need to add leave that already happened (e.g., "I took leave last Tuesday but forgot to request it").</p>
+        <ul>
+            <li>Backdated requests appear in Queue like any other request</li>
+            <li>Check the date — is it in the past?</li>
+            <li>Approve only if employee has documented proof (email chain, calendar, witness)</li>
+            <li>Be careful: historic leave can cause attendance discrepancies</li>
+            <li>For major discrepancies, ask Admin to investigate</li>
+        </ul>
+
+        <blockquote><strong>Best practice:</strong> Discourage backdated leave. Encourage employees to request on the day they take leave or the day before.</blockquote>
+
+        <h1 id="section-personnel">4. Personnel Management</h1>
+
+        <h2>Creating a New Employee</h2>
+        <ol>
+            <li>Click <strong>Personnel</strong> in navigation</li>
+            <li>Click <strong>Create Employee</strong></li>
+            <li>Fill in required fields:
+                <ul style="margin-top: 0.3em;">
+                    <li><strong>Full Name</strong> — Must match payroll system</li>
+                    <li><strong>Email</strong> — Company email (used for login)</li>
+                    <li><strong>ID Number</strong> — 13-digit South African ID</li>
+                    <li><strong>Department</strong> — Select from dropdown</li>
+                    <li><strong>Manager</strong> — Who approves their leave?</li>
+                    <li><strong>Employment Type</strong> — Full-time, part-time, contract, intern</li>
+                    <li><strong>Start Date</strong> — Date they begin</li>
+                </ul>
+            </li>
+            <li>Optional fields:
+                <ul style="margin-top: 0.3em;">
+                    <li>Phone, personal email, address, bank details (if integrated with payroll)</li>
+                    <li>Emergency contact</li>
+                    <li>Reporting structure (org chart positioning)</li>
+                </ul>
+            </li>
+            <li>Click <strong>Create</strong></li>
+            <li>System auto-generates a temporary password and emails it to the employee</li>
+        </ol>
+
+        <blockquote><strong>Important:</strong> The employee's email address is their username. Must be unique. If email is wrong, create a new record and archive the old one.</blockquote>
+
+        <h2>Editing an Employee Record</h2>
+        <ol>
+            <li>Click <strong>Personnel</strong></li>
+            <li>Search for employee by name or email</li>
+            <li>Click their name to open the profile</li>
+            <li>Click <strong>Edit</strong> button</li>
+            <li>Update fields as needed (most fields can be changed anytime)</li>
+            <li>Click <strong>Save</strong></li>
+        </ol>
+
+        <p><strong>Fields you can always edit:</strong> Department, manager, phone, email.</p>
+        <p><strong>Fields with restrictions:</strong> ID number (never change — tied to leave history), employment type (change creates contract history record).</p>
+
+        <h2>Manager Assignment</h2>
+        <p>The <strong>Manager</strong> field is critical — this person reviews leave requests before they reach you.</p>
+        <ul>
+            <li>Each employee must have exactly one manager</li>
+            <li>Manager must also be a user in the system (create their record first)</li>
+            <li>Manager can see all leave requests from their direct reports</li>
+            <li>If you change someone's manager, future leave requests go to the new manager</li>
+        </ul>
+
+        <blockquote><strong>Troubleshooting:</strong> If a manager can't see leave requests, check: (1) the employee's manager field points to them, (2) the manager has the "Approve Leave" role enabled.</blockquote>
+
+        <h2>Password Reset</h2>
+        <p>If an employee forgets their password:</p>
+        <ol>
+            <li>They click "Forgot Password" on the login page</li>
+            <li>They enter their email</li>
+            <li>System sends a reset link (valid 1 hour)</li>
+            <li>They click the link and set a new password</li>
+        </ol>
+
+        <p>If they don't receive the email:</p>
+        <ul>
+            <li>Check spam folder</li>
+            <li>Ask Admin to trigger a manual reset</li>
+            <li>Do NOT create a new employee record — this deletes their leave history</li>
+        </ul>
+
+        <h2>Terminating an Employee</h2>
+        <ol>
+            <li>Open the employee's personnel record</li>
+            <li>Click <strong>Terminate</strong> button</li>
+            <li>Enter termination date</li>
+            <li>Select reason (Resignation, Dismissal, End of Contract, Retrenchment)</li>
+            <li>Optional: Final balance payout amount</li>
+            <li>Click <strong>Confirm</strong></li>
+        </ol>
+
+        <blockquote><strong>Warning:</strong> Termination is irreversible in the system. The employee's record is archived and all leave requests are locked. Do not terminate until confirmed by HR/Management.</blockquote>
+
+        <p>After termination:</p>
+        <ul>
+            <li>Employee can no longer log in</li>
+            <li>Their account is hidden from dropdowns (but accessible in archive)</li>
+            <li>All leave balances are frozen for audit purposes</li>
+            <li>A termination report is generated for payroll</li>
+        </ul>
+
+        <h1 id="section-balances">5. Leave Balances</h1>
+
+        <h2>Understanding Leave Balances</h2>
+        <p>The system tracks how many days of leave each employee has earned and used.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Term</th>
+                    <th>Definition</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Accrued</strong></td>
+                    <td>Days earned but not yet taken. Example: Employee earned 10 days annual leave this year.</td>
+                </tr>
+                <tr>
+                    <td><strong>Used</strong></td>
+                    <td>Days already taken and locked. Example: Employee took 3 days in January.</td>
+                </tr>
+                <tr>
+                    <td><strong>Available</strong></td>
+                    <td>Days they can use now = Accrued − Used. Example: 10 − 3 = 7 days left.</td>
+                </tr>
+                <tr>
+                    <td><strong>Projected</strong></td>
+                    <td>Estimated future balance (system forecasts next quarter's accrual).</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Viewing Leave Balances</h2>
+        <ol>
+            <li>Click <strong>Leave Balances</strong> in navigation</li>
+            <li>Search for employee by name or ID</li>
+            <li>System shows all leave types and their status:</li>
+        </ol>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Leave Type</th>
+                    <th>Accrued</th>
+                    <th>Used</th>
+                    <th>Available</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Annual</td>
+                    <td>10.00</td>
+                    <td>3.50</td>
+                    <td>6.50</td>
+                    <td>Active</td>
+                </tr>
+                <tr>
+                    <td>Sick</td>
+                    <td>20.00</td>
+                    <td>1.00</td>
+                    <td>19.00</td>
+                    <td>Active</td>
+                </tr>
+                <tr>
+                    <td>Maternity</td>
+                    <td>4.00</td>
+                    <td>0.00</td>
+                    <td>4.00</td>
+                    <td>Eligible</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Manual Balance Adjustment</h2>
+        <p>Sometimes you need to adjust balances manually (e.g., employee was overpaid, didn't receive statutory holiday, took unpaid leave).</p>
+
+        <ol>
+            <li>In <strong>Leave Balances</strong>, find the employee</li>
+            <li>Click the leave type row</li>
+            <li>Click the pencil icon next to the balance</li>
+            <li>Enter the new balance (or the change amount)</li>
+            <li>Select reason for adjustment:
+                <ul style="margin-top: 0.3em;">
+                    <li>Correction (system error)</li>
+                    <li>Overpayment recovery</li>
+                    <li>Statutory addition</li>
+                    <li>Special circumstance</li>
+                    <li>Manual entry</li>
+                </ul>
+            </li>
+            <li>Optional: Add a note for the audit trail</li>
+            <li>Click <strong>Save</strong></li>
+        </ol>
+
+        <blockquote><strong>Warning:</strong> Balance adjustments are logged and auditable. Document the reason clearly. Never adjust without a business justification.</blockquote>
+
+        <h2>Activating Statutory Leave Types</h2>
+        <p>Some leave types are "inactive" by default (e.g., maternity leave) until the employee is eligible.</p>
+
+        <h3>When to activate:</h3>
+        <ul>
+            <li><strong>Maternity/Paternity/Adoption</strong> — When employee notifies you of pregnancy/adoption</li>
+            <li><strong>Commissioning Leave</strong> — When employee registers as foster parent</li>
+            <li><strong>FRL (Family Responsibility Leave)</strong> — Automatically active; employees request as needed</li>
+        </ul>
+
+        <h3>How to activate:</h3>
+        <ol>
+            <li>Open employee's <strong>Leave Balances</strong></li>
+            <li>Find the inactive leave type</li>
+            <li>Click <strong>Activate</strong> button</li>
+            <li>System assigns statutory days (e.g., 4 months maternity leave)</li>
+            <li>Employee can now request this leave type</li>
+        </ol>
+
+        <h2>Carry-Over Leave</h2>
+        <p>Annual leave that is not taken rolls forward to the next year (with restrictions).</p>
+
+        <p><strong>Carry-over rules (BCEA-compliant):</strong></p>
+        <ul>
+            <li>Unused annual leave carries forward</li>
+            <li>Carried-over days must be taken within <strong>3 months</strong> of the next cycle start (grace period set by Admin)</li>
+            <li>Any balance not taken within grace period is forfeited (paid out only if required by employment agreement)</li>
+            <li>Sick leave does NOT carry over (resets each year)</li>
+        </ul>
+
+        <blockquote><strong>Important:</strong> Mark carry-over expiry dates on a calendar. Follow up with employees 2 weeks before expiry to encourage them to take the leave.</blockquote>
+
+        <h2>Sick Leave Phases</h2>
+        <p>Sick leave accrual works in phases:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Phase</th>
+                    <th>Period</th>
+                    <th>Accrual Rate</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Phase 1</td>
+                    <td>Months 1–6</td>
+                    <td>5 days/month</td>
+                    <td>30 days</td>
+                </tr>
+                <tr>
+                    <td>Phase 2</td>
+                    <td>Months 7–36</td>
+                    <td>1 day/month</td>
+                    <td>6 days</td>
+                </tr>
+                <tr>
+                    <td>Full Cycle</td>
+                    <td>Every 36 months</td>
+                    <td>–</td>
+                    <td>36 days total (30 + 6)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>After 36 months, the 36-day cycle repeats.</p>
+
+        <h1 id="section-rules">6. Leave Rules Configuration</h1>
+
+        <h2>BCEA Statutory Defaults</h2>
+        <p>The system comes pre-configured with South African labor law (BCEA) defaults. These are:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Leave Type</th>
+                    <th>Accrual</th>
+                    <th>Cycle</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Annual</strong></td>
+                    <td>1.25 days/month</td>
+                    <td>12 months</td>
+                    <td>15 days/year; carries over with 3-month grace</td>
+                </tr>
+                <tr>
+                    <td><strong>Sick</strong></td>
+                    <td>5 days/month (first 6 months); 1 day/month (after)</td>
+                    <td>36 months</td>
+                    <td>30 days in first 6 months; 6 days thereafter</td>
+                </tr>
+                <tr>
+                    <td><strong>FRL</strong></td>
+                    <td>3 days/year</td>
+                    <td>12 months</td>
+                    <td>Family Responsibility Leave; 1 full day per event</td>
+                </tr>
+                <tr>
+                    <td><strong>Maternity</strong></td>
+                    <td>4 months (statutory)</td>
+                    <td>Once</td>
+                    <td>26 weeks unpaid after; activate when eligible</td>
+                </tr>
+                <tr>
+                    <td><strong>Parental</strong></td>
+                    <td>1 month (statutory)</td>
+                    <td>Once</td>
+                    <td>For non-birthing parents; activate when eligible</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <blockquote><strong>Note:</strong> Do not modify statutory defaults unless instructed by legal or management. If you need custom accrual, contact Admin to add a new leave type.</blockquote>
+
+        <h2>Custom Leave Types</h2>
+        <p>Your company may use custom leave types (e.g., "Sabbatical," "Bereavement," "Jury Duty"). Configuration is admin-only, but you'll manage them as HR.</p>
+
+        <p>When reviewing a custom leave request:</p>
+        <ul>
+            <li>Check the employee's available balance for that type</li>
+            <li>Verify the dates comply with company policy (printed or on company intranet)</li>
+            <li>Approve or reject like any other request</li>
+        </ul>
+
+        <h2>Public Holidays</h2>
+        <p>Public holidays are locked dates when employees cannot take leave.</p>
+
+        <h3>Managing Public Holidays:</h3>
+        <ol>
+            <li>Click <strong>Leave Rules</strong></li>
+            <li>Click <strong>Public Holidays</strong> tab</li>
+            <li>View the calendar with all public holidays</li>
+            <li>To add a holiday:</li>
+            <ol style="margin-top: 0.3em;">
+                <li>Click <strong>Add Holiday</strong></li>
+                <li>Enter date and name (e.g., "Family Day")</li>
+                <li>Click <strong>Save</strong></li>
+            </ol>
+        </ol>
+
+        <p><strong>Effect:</strong> If an employee requests leave that overlaps a public holiday, the system:</p>
+        <ul>
+            <li>Flags the conflict</li>
+            <li>Removes the public holiday from the leave days (employee doesn't use leave for a holiday)</li>
+        </ul>
+
+        <blockquote><strong>Example:</strong> Employee requests 5 days (Mon–Fri) but Friday is a public holiday. Approval only deducts 4 days from their balance, Friday is free.</blockquote>
+
+        <h2>Leave Accrual Tiers</h2>
+        <p>You may have tiered accrual (e.g., "employees with 10+ years get 20 days instead of 15").</p>
+
+        <p>If configured, the system automatically applies the right tier based on hire date. You don't need to manage this, but understand:</p>
+        <ul>
+            <li>Accrual changes on the anniversary of the tier threshold</li>
+            <li>The balance updates automatically (no manual adjustment needed)</li>
+            <li>You'll see a note on the balance screen showing which tier applies</li>
+        </ul>
+
+        <h2>Notice Period for Unpaid Leave</h2>
+        <p>Unpaid leave requires advance notice (default: 7 days). This is configured at system level.</p>
+
+        <p>When reviewing unpaid leave:</p>
+        <ul>
+            <li>Check the request date vs. leave start date</li>
+            <li>If less than 7 days' notice, system flags it for your review</li>
+            <li>You can approve anyway (override) if there's business justification</li>
+            <li>Or reject and ask employee to resubmit with proper notice</li>
+        </ul>
+
+        <h1 id="section-attendance">7. Attendance Management</h1>
+
+        <h2>How Attendance Is Recorded</h2>
+        <p>Employees clock in/out at the kiosk (face recognition or badge). The system records:</p>
+        <ul>
+            <li>Clock in time (morning)</li>
+            <li>Clock out time (evening)</li>
+            <li>Hours worked</li>
+            <li>Lateness or early departure</li>
+        </ul>
+
+        <p>You review this weekly or monthly to spot patterns and infringements.</p>
+
+        <h2>Viewing Attendance Records</h2>
+        <ol>
+            <li>Click <strong>Attendance</strong> in navigation</li>
+            <li>Select employee and date range</li>
+            <li>System shows daily records:</li>
+        </ol>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Clock In</th>
+                    <th>Clock Out</th>
+                    <th>Hours</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Mon, 1 Apr</td>
+                    <td>8:05 AM</td>
+                    <td>5:10 PM</td>
+                    <td>8h 50m</td>
+                    <td>5 min late</td>
+                </tr>
+                <tr>
+                    <td>Tue, 2 Apr</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>AWOL</td>
+                </tr>
+                <tr>
+                    <td>Wed, 3 Apr</td>
+                    <td>8:00 AM</td>
+                    <td>5:00 PM</td>
+                    <td>9h 0m</td>
+                    <td>On time</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Manual Entry & Correction</h2>
+        <p>If an employee didn't clock in (e.g., kiosk was down, they forgot), you can manually enter attendance.</p>
+
+        <ol>
+            <li>Find the employee's record for that date</li>
+            <li>Click the row to open details</li>
+            <li>Click <strong>Edit</strong></li>
+            <li>Enter clock in and out times (or leave blank if absent)</li>
+            <li>Reason (optional): e.g., "Kiosk malfunction," "System error"</li>
+            <li>Click <strong>Save</strong></li>
+        </ol>
+
+        <blockquote><strong>Important:</strong> Manual edits are logged with your user ID and timestamp. Do not edit attendance without a valid reason. Audit trail is reviewed during compliance checks.</blockquote>
+
+        <h2>Infringements (Lateness, Early Departure, AWOL)</h2>
+
+        <h3>Lateness</h3>
+        <p>If clock-in is after expected time, system flags it. Standard cutoffs:</p>
+        <ul>
+            <li>1–15 minutes late: Warning</li>
+            <li>16–30 minutes late: Minor infringement</li>
+            <li>30+ minutes late: Major infringement</li>
+        </ul>
+
+        <p>These thresholds are configurable by Admin.</p>
+
+        <h3>AWOL (Absent Without Leave)</h3>
+        <p>If an employee doesn't clock in and has no approved leave, they're marked AWOL.</p>
+
+        <ul>
+            <li>System automatically flags AWOL</li>
+            <li>A notification email is sent to the manager</li>
+            <li>You should follow up with the employee same day</li>
+            <li>Reasons: Medical emergency, system failure, miscommunication</li>
+        </ul>
+
+        <h3>Early Departure</h3>
+        <p>If clock-out is significantly before the expected end time, it's flagged.</p>
+
+        <p>Check with the employee — is there approved leave that afternoon? Did they leave early with manager permission? Or is this an infringement?</p>
+
+        <h2>Infringement Management</h2>
+        <p>When you spot an infringement pattern (e.g., employee is late 3 times a week), take action:</p>
+
+        <ol>
+            <li>Generate an attendance report (see Reporting section)</li>
+            <li>Document the pattern with dates and times</li>
+            <li>Schedule a disciplinary meeting with the employee (with manager present)</li>
+            <li>Record the outcome in the system (verbal warning, written warning, etc.)</li>
+            <li>Monitor improvements in next week's attendance</li>
+        </ol>
+
+        <h2>Exporting Attendance</h2>
+        <p>For payroll reconciliation, you'll export attendance monthly.</p>
+
+        <ol>
+            <li>Click <strong>Attendance</strong></li>
+            <li>Select date range (e.g., 1–30 April)</li>
+            <li>Click <strong>Export to CSV</strong></li>
+            <li>File downloads with all daily records</li>
+            <li>Send to payroll department</li>
+        </ol>
+
+        <blockquote><strong>Note:</strong> Ensure all manual edits and corrections are complete before exporting. Changes made after export won't be reflected in payroll.</blockquote>
+
+        <h1 id="section-grievance">8. Grievance Management</h1>
+
+        <h2>What Is a Grievance?</h2>
+        <p>A formal complaint filed by an employee (or union) against the company or their manager. Examples:</p>
+        <ul>
+            <li>Unfair dismissal</li>
+            <li>Discrimination</li>
+            <li>Harassment</li>
+            <li>Breach of contract</li>
+            <li>Unfair treatment</li>
+            <li>Unsafe working conditions</li>
+        </ul>
+
+        <h2>Grievance Workflow</h2>
+        <ol>
+            <li><strong>Filed</strong> — Employee submits grievance with details</li>
+            <li><strong>Acknowledged</strong> — You confirm receipt within 2 business days</li>
+            <li><strong>Investigation</strong> — HR investigates facts and interviews witnesses</li>
+            <li><strong>Hearing</strong> — Employee gets a hearing where they present their case</li>
+            <li><strong>Decision</strong> — HR issues a decision (upheld, partially upheld, dismissed)</li>
+            <li><strong>Appeal</strong> — Employee can appeal the decision if not satisfied</li>
+        </ol>
+
+        <h2>Viewing Grievances</h2>
+        <ol>
+            <li>Click <strong>Grievances</strong> in navigation</li>
+            <li>View all open cases with status, date filed, and assignee</li>
+            <li>Click a case to open full details</li>
+        </ol>
+
+        <h2>Managing a Grievance</h2>
+
+        <h3>Step 1: Acknowledge Receipt</h3>
+        <ol>
+            <li>Open the grievance</li>
+            <li>Click <strong>Acknowledge</strong> button</li>
+            <li>System sends automated "We received your grievance" email to employee</li>
+            <li>Meeting date for hearing is scheduled (typically 10 business days out)</li>
+        </ol>
+
+        <h3>Step 2: Investigate</h3>
+        <ul>
+            <li>Gather evidence (emails, messages, performance records, witness statements)</li>
+            <li>Interview the manager (the accused party)</li>
+            <li>Interview witnesses</li>
+            <li>Document everything in the system</li>
+        </ul>
+
+        <h3>Step 3: Conduct Hearing</h3>
+        <ol>
+            <li>Employee presents their case</li>
+            <li>Manager responds</li>
+            <li>You (or legal counsel) ask clarifying questions</li>
+            <li>Record the meeting and key points in the system</li>
+        </ol>
+
+        <h3>Step 4: Issue Decision</h3>
+        <ol>
+            <li>After the hearing, deliberate with management/legal team</li>
+            <li>In the system, click <strong>Issue Decision</strong></li>
+            <li>Select outcome: Upheld / Partially Upheld / Dismissed</li>
+            <li>Write detailed reasons</li>
+            <li>If remedial action needed (e.g., compensation, reinstatement), document it</li>
+            <li>System sends decision letter to employee</li>
+        </ol>
+
+        <h3>Step 5: Resolution & Appeal</h3>
+        <ul>
+            <li>Update case status to <strong>Resolved</strong> once remedy is complete</li>
+            <li>If employee appeals, case reopens for review</li>
+            <li>Appeal process follows the same steps</li>
+        </ul>
+
+        <blockquote><strong>Warning:</strong> Grievances are legally sensitive. Ensure all documentation is thorough, unbiased, and non-defamatory. Consult legal counsel if the claim is serious. Do not discuss with other employees — maintain confidentiality.</blockquote>
+
+        <h2>Confidentiality</h2>
+        <p>Grievances marked <strong>Confidential</strong> are restricted to:</p>
+        <ul>
+            <li>You (HR)</li>
+            <li>Your HR manager</li>
+            <li>Legal counsel (if needed)</li>
+            <li>Senior management (for decisions)</li>
+        </ul>
+
+        <p>NOT shared with the accused manager until the hearing date.</p>
+
+        <h1 id="section-reporting">9. Reporting & Audit</h1>
+
+        <h2>HR Leave Report</h2>
+        <p>Monthly snapshot of leave activity.</p>
+
+        <ol>
+            <li>Click <strong>Reporting</strong> in navigation</li>
+            <li>Select <strong>Leave Activity Report</strong></li>
+            <li>Choose date range (e.g., April 1–30)</li>
+            <li>System generates:</li>
+            <ul style="margin-top: 0.3em;">
+                <li>Total requests submitted</li>
+                <li>Approvals vs. rejections (count and %)</li>
+                <li>Breakdown by leave type</li>
+                <li>Medical cert compliance</li>
+                <li>Pending requests (aging)</li>
+            </ul>
+            <li>Click <strong>Download PDF</strong> to save</li>
+        </ol>
+
+        <h2>BCEA Compliance Preview</h2>
+        <p>Audit tool to verify statutory compliance.</p>
+
+        <ol>
+            <li>Click <strong>Reporting</strong></li>
+            <li>Select <strong>BCEA Compliance Report</strong></li>
+            <li>System checks:</li>
+            <ul style="margin-top: 0.3em;">
+                <li>All employees have correct minimum leave allocation</li>
+                <li>Accrual is calculated per BCEA formula</li>
+                <li>Carry-over rules are enforced</li>
+                <li>Medical certs are obtained for sick leave >2 days</li>
+                <li>Statutory leave types (maternity, etc.) are available</li>
+            </ul>
+            <li>Report flags any non-compliance</li>
+        </ol>
+
+        <blockquote><strong>Important:</strong> Run the BCEA report quarterly to catch compliance issues early. If violations are found, fix them immediately and document the correction.</blockquote>
+
+        <h2>Audit Logs</h2>
+        <p>Complete record of every action in the system (who did what, when, why).</p>
+
+        <ol>
+            <li>Click <strong>Reporting</strong></li>
+            <li>Select <strong>Audit Log</strong></li>
+            <li>Filter by:</li>
+            <ul style="margin-top: 0.3em;">
+                <li>Date range</li>
+                <li>Employee</li>
+                <li>Action (Approve, Reject, Edit, Delete)</li>
+                <li>User (who made the change)</li>
+            </ul>
+            <li>View detailed log entries</li>
+        </ol>
+
+        <p><strong>Example log entry:</strong></p>
+        <blockquote>"2026-04-05 14:32:15 | Jane Doe (HR) | Approved Leave Request #1234 for John Smith (3 days annual, 2–4 April) | Reason: Manager recommended, balance verified"</blockquote>
+
+        <h2>Leave Calendar</h2>
+        <p>Visual overview of who's on leave and when.</p>
+
+        <ol>
+            <li>Click <strong>Reporting</strong></li>
+            <li>Select <strong>Leave Calendar</strong></li>
+            <li>Choose department and month</li>
+            <li>Color-coded calendar shows:
+                <ul style="margin-top: 0.3em;">
+                    <li>Blue = approved leave</li>
+                    <li>Yellow = pending approval</li>
+                    <li>Red = rejected</li>
+                </ul>
+            </li>
+            <li>Hover over a date to see who's out and leave type</li>
+        </ol>
+
+        <h1 id="section-face">10. Face Registration</h1>
+
+        <h2>Face Registration Purpose</h2>
+        <p>Employees are photographed and enrolled in the face recognition system for kiosk clock-in. This ensures each person can only clock in using their own face (prevents buddy clocking).</p>
+
+        <h2>When to Register Faces</h2>
+        <ul>
+            <li>New employee's first day (onboarding)</li>
+            <li>Employee can't be recognized at kiosk (poor photo, aging, beard change)</li>
+            <li>System fails to match face to an employee</li>
+        </ul>
+
+        <h2>How to Capture Faces</h2>
+        <ol>
+            <li>Click <strong>Face Registration</strong> in navigation</li>
+            <li>Search for employee</li>
+            <li>Click <strong>Capture Face</strong></li>
+            <li>Use a device with camera (laptop, tablet, smartphone)</li>
+            <li>Good lighting (natural light preferred; avoid shadows on face)</li>
+            <li>Employee faces the camera, neutral expression</li>
+            <li>System captures 3–5 photos from slightly different angles</li>
+            <li>Click <strong>Enroll</strong> to save</li>
+        </ol>
+
+        <h2>Tips for Good Face Capture</h2>
+        <ul>
+            <li>Remove sunglasses and hats</li>
+            <li>Avoid backlighting (light source behind them)</li>
+            <li>Stand 60–80 cm from camera</li>
+            <li>Face directly at camera; avoid tilting head</li>
+            <li>Neutral expression (not smiling)</li>
+            <li>Take photos in the same room and lighting where kiosk will be used</li>
+        </ul>
+
+        <h2>Re-Registration</h2>
+        <p>If an employee can't clock in at the kiosk, re-register their face:</p>
+
+        <ol>
+            <li>Open their profile in <strong>Face Registration</strong></li>
+            <li>Click <strong>Delete Photo</strong> (removes old enrollment)</li>
+            <li>Click <strong>Capture Face</strong> again</li>
+            <li>Take new photos with better lighting/angle</li>
+            <li>System re-enrolls and updates kiosk</li>
+        </ol>
+
+        <h1 id="section-scenarios">11. Common Scenarios & Edge Cases</h1>
+
+        <h2>Employee Has No Manager</h2>
+
+        <p><strong>Scenario:</strong> You create a new employee but haven't assigned a manager yet. They try to request leave and can't.</p>
+
+        <p><strong>Solution:</strong></p>
+        <ol>
+            <li>Open the employee's personnel record</li>
+            <li>Set the <strong>Manager</strong> field</li>
+            <li>Click <strong>Save</strong></li>
+            <li>Employee can now request leave (it goes to the assigned manager)</li>
+        </ol>
+
+        <h2>Balance Dispute: Employee Says Balance Is Wrong</h2>
+
+        <p><strong>Scenario:</strong> "I should have 10 days left, but the system says 7!"</p>
+
+        <p><strong>Steps:</strong></p>
+        <ol>
+            <li>Open employee's <strong>Leave Balances</strong></li>
+            <li>Check the <strong>Accrued</strong> amount — has it been calculated correctly?</li>
+            <li>Check the <strong>Used</strong> amount — are all approved leave requests counted?</li>
+            <li>If a leave request is missing or incorrectly counted, it's a system error (escalate to Admin)</li>
+            <li>If accrual calculation looks wrong, check the hire date and accrual tier</li>
+            <li>If still unsure, generate an <strong>Audit Log</strong> for that employee's balance changes over time</li>
+            <li>Explain discrepancy to employee with evidence (show them the audit trail)</li>
+            <li>If legitimate error, manually adjust the balance and document the reason</li>
+        </ol>
+
+        <h2>Part-Time Employee Changes to Full-Time</h2>
+
+        <p><strong>Scenario:</strong> Employee was part-time 50%, now promoted to full-time 100%.</p>
+
+        <p><strong>Solution:</strong></p>
+        <ol>
+            <li>Open employee's <strong>Personnel</strong> record</li>
+            <li>Change <strong>Employment Type</strong> from Part-time to Full-time</li>
+            <li>System automatically recalculates leave accrual going forward</li>
+            <li>Example: If they were earning 0.625 days/month (50% of 1.25), next month they'll earn 1.25 days</li>
+            <li>No need to manually adjust past accrual (system handles it)</li>
+        </ol>
+
+        <h2>Employee On Leave During Leave Cycle Change</h2>
+
+        <p><strong>Scenario:</strong> Company's leave cycle resets on 1 January. Employee is on leave 30 Dec – 5 Jan. How is balance handled?</p>
+
+        <p><strong>Answer:</strong></p>
+        <ul>
+            <li>Leave request is marked against whichever cycle it was submitted in</li>
+            <li>Typically, Dec 30 leave is paid from the Dec cycle; Jan 5 leave is paid from the Jan cycle</li>
+            <li>The system automatically splits the days between cycles</li>
+            <li>You don't need to do anything — it's automatic</li>
+        </ul>
+
+        <h2>Carry-Over About to Expire</h2>
+
+        <p><strong>Scenario:</strong> Employee has 5 days of carried-over leave that expires on 31 March. Today is 15 March.</p>
+
+        <p><strong>Action:</strong></p>
+        <ol>
+            <li>Send employee a reminder email (company intranet, manager, or direct)</li>
+            <li>Encourage them to submit leave requests for those 5 days before expiry</li>
+            <li>After 31 March, if unused, days are automatically forfeited (system removes them)</li>
+            <li>Document the forfeiture in the audit log for compliance</li>
+        </ol>
+
+        <blockquote><strong>Best practice:</strong> Set a recurring calendar reminder to check for expiring carry-over 1 month before cycle end. Send bulk reminders to all affected employees.</blockquote>
+
+        <h2>Medical Certificate Is Questionable</h2>
+
+        <p><strong>Scenario:</strong> Employee submitted a sick leave request for 3 days with a "medical cert" that's just a handwritten note saying "Not fit for work."</p>
+
+        <p><strong>Solution:</strong></p>
+        <ol>
+            <li>In the request details, click <strong>Request Medical Cert</strong> again</li>
+            <li>Tell employee the certificate doesn't meet requirements (must be from a registered doctor with letterhead, date, specific diagnosis)</li>
+            <li>Give them 2 business days to submit a valid cert</li>
+            <li>If they don't comply, the system automatically voids the leave request</li>
+            <li>Employee's balance is refunded</li>
+        </ol>
+
+        <h2>Manager Disagrees With HR Decision</h2>
+
+        <p><strong>Scenario:</strong> You rejected a leave request. Manager says "That doesn't make sense, please approve it."</p>
+
+        <p><strong>Response:</strong></p>
+        <ul>
+            <li>Explain your reasoning (e.g., insufficient balance, policy violation)</li>
+            <li>If manager provides new information (e.g., "The employee will earn the days by then"), you can reopen the request and reconsider</li>
+            <li>If you disagree with the manager's recommendation, stand firm (you have final authority as HR)</li>
+            <li>Escalate to your manager if there's a policy dispute</li>
+        </ul>
+
+        <h1 id="section-help">12. Quick Help Reference</h1>
+
+        <h2>Glossary</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Term</th>
+                    <th>Definition</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Accrual</strong></td>
+                    <td>Days earned based on service. Example: 1.25 days/month for annual leave.</td>
+                </tr>
+                <tr>
+                    <td><strong>AWOL</strong></td>
+                    <td>Absent Without Leave — employee didn't come to work and has no approved leave.</td>
+                </tr>
+                <tr>
+                    <td><strong>BCEA</strong></td>
+                    <td>Basic Conditions of Employment Act — South African labor law.</td>
+                </tr>
+                <tr>
+                    <td><strong>Carry-over</strong></td>
+                    <td>Unused leave from one year carried forward to the next (with 3-month grace period).</td>
+                </tr>
+                <tr>
+                    <td><strong>FRL</strong></td>
+                    <td>Family Responsibility Leave — 3 days/year for family emergencies.</td>
+                </tr>
+                <tr>
+                    <td><strong>Grace Period</strong></td>
+                    <td>Time allowed to use carry-over leave (default: 3 months from cycle start).</td>
+                </tr>
+                <tr>
+                    <td><strong>Infringement</strong></td>
+                    <td>Attendance violation (lateness, early departure, AWOL).</td>
+                </tr>
+                <tr>
+                    <td><strong>Kiosk</strong></td>
+                    <td>Attendance device (face recognition or badge) where employees clock in/out.</td>
+                </tr>
+                <tr>
+                    <td><strong>Queue</strong></td>
+                    <td>Your approval inbox — leave requests waiting for your decision.</td>
+                </tr>
+                <tr>
+                    <td><strong>Statutory Leave</strong></td>
+                    <td>Leave required by law (maternity, parental, FRL, sick).</td>
+                </tr>
+                <tr>
+                    <td><strong>Tier</strong></td>
+                    <td>Accrual bracket based on service. Example: "Employees with 10+ years get 20 days/year instead of 15."</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Date & Time Format</h2>
+        <p><strong>Dates:</strong> DD/MM/YYYY (e.g., 05/04/2026 is 5 April 2026)</p>
+        <p><strong>Times:</strong> 24-hour format (e.g., 13:30 is 1:30 PM)</p>
+        <p><strong>Timezone:</strong> All times displayed in SAST (South Africa Standard Time, UTC+2)</p>
+
+        <h2>Escalation Contacts</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Issue</th>
+                    <th>Contact</th>
+                    <th>When</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>System Down / Can't Log In</strong></td>
+                    <td>System Administrator</td>
+                    <td>Immediately</td>
+                </tr>
+                <tr>
+                    <td><strong>Balance Calculation Wrong</strong></td>
+                    <td>System Administrator</td>
+                    <td>Same day</td>
+                </tr>
+                <tr>
+                    <td><strong>Face Recognition Failing</strong></td>
+                    <td>Kiosk Technician / Admin</td>
+                    <td>Next business day</td>
+                </tr>
+                <tr>
+                    <td><strong>Email Not Received</strong></td>
+                    <td>System Administrator</td>
+                    <td>Next business day</td>
+                </tr>
+                <tr>
+                    <td><strong>Serious Grievance / Legal Issue</strong></td>
+                    <td>Legal / Management</td>
+                    <td>Same day</td>
+                </tr>
+                <tr>
+                    <td><strong>Policy Question</strong></td>
+                    <td>Your HR Manager</td>
+                    <td>Next business day</td>
+                </tr>
+                <tr>
+                    <td><strong>Permission/Access Issue</strong></td>
+                    <td>System Administrator</td>
+                    <td>Same day</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Quick Command Reference</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>Navigation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Review leave requests</td>
+                    <td>Queue</td>
+                </tr>
+                <tr>
+                    <td>Create/edit employee</td>
+                    <td>Personnel</td>
+                </tr>
+                <tr>
+                    <td>View/adjust leave balance</td>
+                    <td>Leave Balances</td>
+                </tr>
+                <tr>
+                    <td>Configure leave types & rules</td>
+                    <td>Leave Rules</td>
+                </tr>
+                <tr>
+                    <td>Review attendance</td>
+                    <td>Attendance</td>
+                </tr>
+                <tr>
+                    <td>Track grievances</td>
+                    <td>Grievances</td>
+                </tr>
+                <tr>
+                    <td>Run reports</td>
+                    <td>Reporting</td>
+                </tr>
+                <tr>
+                    <td>Register employee faces</td>
+                    <td>Face Registration</td>
+                </tr>
+                <tr>
+                    <td>Configure system</td>
+                    <td>Settings (Admin only)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Keyboard Shortcuts</h2>
+        <ul>
+            <li><kbd>Ctrl</kbd> + <kbd>Q</kbd> — Jump to Queue</li>
+            <li><kbd>Ctrl</kbd> + <kbd>F</kbd> — Search employee</li>
+            <li><kbd>Ctrl</kbd> + <kbd>S</kbd> — Save/Submit</li>
+            <li><kbd>Esc</kbd> — Close dialog</li>
+        </ul>
+
+        <h2>Getting Help</h2>
+        <p>If you're stuck:</p>
+        <ol>
+            <li>Check this guide (Ctrl+F to search)</li>
+            <li>Ask your HR manager or colleague</li>
+            <li>Contact your system administrator if it's a technical issue</li>
+            <li>For policy questions, check your employee handbook or company intranet</li>
+        </ol>
+
+        <hr>
+
+        <p style="text-align: center; font-size: 9pt; color: #999; margin-top: 2em;">
+            <strong>AECE Checkpoint HR User Guide – Version 1</strong><br>
+            This document is confidential and intended for AECE Checkpoint HR users only.<br>
+            Last updated: April 2026
+        </p>
+    </div>
+</body>
+</html>
