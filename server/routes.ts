@@ -59,6 +59,7 @@ import { storage, pool } from "./storage";
 import { z } from "zod";
 import { insertUserSchema, insertLeaveRequestSchema, insertAttendanceRecordSchema, insertDepartmentSchema, insertUserGroupSchema, insertEmployeeTypeSchema, insertLeaveRuleSchema, insertLeaveRulePhaseSchema, insertGrievanceSchema } from "@shared/schema";
 import { sendLeaveRequestNotification, sendLateAttendanceNotification, sendAdminWelcomeEmail, sendLeaveStatusNotification, sendPasswordResetEmail, sendAdminCredentialsEmail, sendManagerMissedClockOutAlert, sendLeaveStageNotification, sendLeaveEscalationReminder, sendAWOLAlert } from "./email";
+import { runAbsentCheck } from "./absentCheck";
 import { STATUTORY_LEAVE_ENTITLEMENTS, completedMonths, isFrlEligible, determineAccrualRate } from "./bcea";
 import { processTerminationSettlement, backfillUserAccrual } from "./leave-accrual";
 import { projectLeaveBalance } from "./leave-projection";
@@ -2952,6 +2953,17 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Auto-reset error:", error);
       return res.status(500).json({ error: "Failed to process auto clock-out" });
+    }
+  });
+
+  // Admin: manually trigger the same-day absent / no-show (AWOL) check
+  app.post("/api/admin/run-absent-check", requireAdmin, async (req, res) => {
+    try {
+      const result = await runAbsentCheck();
+      return res.json(result);
+    } catch (error) {
+      console.error("Run absent check error:", error);
+      return res.status(500).json({ error: "Failed to run absent check" });
     }
   });
 

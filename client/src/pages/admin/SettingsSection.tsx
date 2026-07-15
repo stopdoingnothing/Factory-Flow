@@ -17,8 +17,8 @@ import {
   UserCog, Plus, Pencil, Trash2, Key, Copy, RefreshCw, Eye, EyeOff, Lock, AlertTriangle
 } from 'lucide-react';
 import { useRolePermissions, ROLE_PERMISSION_DEFAULTS, type RolePermissionsMap } from '@/hooks/use-role-permissions';
-import { 
-  settingsApi, userApi, userGroupApi, backupApi, leaveBalanceApi 
+import {
+  settingsApi, userApi, userGroupApi, backupApi, leaveBalanceApi, adminApi
 } from '@/lib/api';
 import type { User, UserGroup } from '@shared/schema';
 import { generatePassword, isManagerOrAbove } from './utils';
@@ -63,6 +63,13 @@ export default function SettingsSection() {
   const [senderEmail, setSenderEmail] = useState('');
   const [clockInCutoff, setClockInCutoff] = useState('08:00');
   const [clockOutCutoff, setClockOutCutoff] = useState('17:00');
+  const [absentCheckTime, setAbsentCheckTime] = useState('09:00');
+  const [absentCheckRunning, setAbsentCheckRunning] = useState(false);
+  const [absentCheckResult, setAbsentCheckResult] = useState<{
+    date: string; checked: number; absent: number; emailsSent: number;
+    absentEmployees: { id: string; name: string; department?: string }[];
+    note?: string;
+  } | null>(null);
   const [lateArrivalMessage, setLateArrivalMessage] = useState('{name} (ID: {id}) clocked in late at {time}.');
   const [earlyDepartureMessage, setEarlyDepartureMessage] = useState('{name} (ID: {id}) left early at {time}.');
   const [timezone, setTimezone] = useState('Africa/Johannesburg');
@@ -121,6 +128,11 @@ export default function SettingsSection() {
   const { data: clockOutCutoffSetting } = useQuery({
     queryKey: ['settings', 'clock_out_cutoff'],
     queryFn: () => settingsApi.get('clock_out_cutoff'),
+  });
+
+  const { data: absentCheckTimeSetting, isFetched: absentCheckTimeFetched } = useQuery({
+    queryKey: ['settings', 'absent_check_time'],
+    queryFn: () => settingsApi.get('absent_check_time'),
   });
 
   const { data: lateArrivalMessageSetting } = useQuery({
@@ -183,6 +195,15 @@ export default function SettingsSection() {
   useEffect(() => { if (senderEmailSetting) setSenderEmail(senderEmailSetting.value); }, [senderEmailSetting]);
   useEffect(() => { if (clockInCutoffSetting) setClockInCutoff(clockInCutoffSetting.value); }, [clockInCutoffSetting]);
   useEffect(() => { if (clockOutCutoffSetting) setClockOutCutoff(clockOutCutoffSetting.value); }, [clockOutCutoffSetting]);
+  useEffect(() => {
+    if (absentCheckTimeSetting) {
+      setAbsentCheckTime(absentCheckTimeSetting.value);
+    } else if (absentCheckTimeFetched && clockInCutoffSetting) {
+      // No saved value yet — default to one hour after the clock-in cut-off
+      const [h, m] = clockInCutoffSetting.value.split(':').map(Number);
+      setAbsentCheckTime(`${String((h + 1) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }, [absentCheckTimeSetting, absentCheckTimeFetched, clockInCutoffSetting]);
   useEffect(() => { if (lateArrivalMessageSetting) setLateArrivalMessage(lateArrivalMessageSetting.value); }, [lateArrivalMessageSetting]);
   useEffect(() => { if (earlyDepartureMessageSetting) setEarlyDepartureMessage(earlyDepartureMessageSetting.value); }, [earlyDepartureMessageSetting]);
   useEffect(() => { if (timezoneSetting) setTimezone(timezoneSetting.value); }, [timezoneSetting]);
@@ -291,6 +312,7 @@ export default function SettingsSection() {
         updateSettingMutation.mutateAsync({ key: 'sender_email', value: senderEmail }),
         updateSettingMutation.mutateAsync({ key: 'clock_in_cutoff', value: clockInCutoff }),
         updateSettingMutation.mutateAsync({ key: 'clock_out_cutoff', value: clockOutCutoff }),
+        updateSettingMutation.mutateAsync({ key: 'absent_check_time', value: absentCheckTime }),
         updateSettingMutation.mutateAsync({ key: 'late_arrival_message', value: lateArrivalMessage }),
         updateSettingMutation.mutateAsync({ key: 'early_departure_message', value: earlyDepartureMessage }),
         updateSettingMutation.mutateAsync({ key: 'timezone', value: timezone }),
@@ -551,16 +573,92 @@ export default function SettingsSection() {
 
               <div className="space-y-2">
                 <Label>Clock-Out Cut-off Time</Label>
-                <Input 
+                <Input
                   type="time"
-                  value={clockOutCutoff} 
+                  value={clockOutCutoff}
                   onChange={(e) => setClockOutCutoff(e.target.value)}
                   className="w-40"
                   data-testid="input-clock-out-cutoff"
                 />
                 <p className="text-xs text-muted-foreground">Employees clocking out before this time will be flagged for early departure.</p>
               </div>
+
+              <div className="space-y-2">
+                <Label>Daily Absent Check Time</Label>
+                <Input
+                  type="time"
+                  value={absentCheckTime}
+                  onChange={(e) => setAbsentCheckTime(e.target.value)}
+                  className="w-40"
+                  data-testid="input-absent-check-time"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Each day at this time the system emails managers a list of employees who have not clocked in and have no approved leave. Defaults to one hour after the clock-in cut-off.
+                </p>
+              </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Absent / No-Show Check</CardTitle>
+            <CardDescription>Manually run today's absent check or review the last result</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 max-w-xl">
+            <p className="text-sm text-muted-foreground">
+              Checks all active employees who haven't clocked in today and have no approved leave, then emails their manager
+              (or the admin email for unmanaged employees). The check also runs automatically each day at the time configured above.
+            </p>
+            <Button
+              data-testid="button-run-absent-check"
+              onClick={async () => {
+                setAbsentCheckRunning(true);
+                setAbsentCheckResult(null);
+                try {
+                  const result = await adminApi.runAbsentCheck();
+                  setAbsentCheckResult(result);
+                  toast({ title: "Check Complete", description: result.note || `${result.absent} absent of ${result.checked} employees checked. ${result.emailsSent} email(s) sent.` });
+                } catch {
+                  toast({ variant: "destructive", title: "Error", description: "Failed to run absent check." });
+                } finally {
+                  setAbsentCheckRunning(false);
+                }
+              }}
+              disabled={absentCheckRunning}
+              variant="outline"
+            >
+              {absentCheckRunning ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Running...</> : <><RefreshCw className="h-4 w-4 mr-2" />Run Check Now</>}
+            </Button>
+
+            {absentCheckResult && (
+              <div className="rounded-lg border p-4 space-y-3 bg-slate-50 dark:bg-slate-800">
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                  <span><span className="font-medium">Date:</span> {absentCheckResult.date}</span>
+                  <span><span className="font-medium">Checked:</span> {absentCheckResult.checked}</span>
+                  <span className={absentCheckResult.absent > 0 ? 'text-status-error font-medium' : 'text-status-success font-medium'}>
+                    Absent: {absentCheckResult.absent}
+                  </span>
+                  <span><span className="font-medium">Emails sent:</span> {absentCheckResult.emailsSent}</span>
+                </div>
+                {absentCheckResult.note && (
+                  <p className="text-sm text-muted-foreground">{absentCheckResult.note}</p>
+                )}
+                {absentCheckResult.absentEmployees.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Absent employees</p>
+                    <div className="divide-y rounded border bg-card">
+                      {absentCheckResult.absentEmployees.map(e => (
+                        <div key={e.id} className="flex justify-between px-3 py-2 text-sm">
+                          <span>{e.name} <span className="text-muted-foreground text-xs">({e.id})</span></span>
+                          {e.department && <span className="text-muted-foreground text-xs">{e.department}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
