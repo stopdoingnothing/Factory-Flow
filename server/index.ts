@@ -3,6 +3,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pg from "pg";
 import { registerRoutes, runEscalationReminders, settlePastApprovedLeave } from "./routes";
+import { startScheduler } from "./scheduler";
 import { applyCustomLeaveRules } from "./custom-leave-rules";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -136,6 +137,8 @@ app.use((req, res, next) => {
       applyCustomLeaveRules(storage)
         .then(n => { if (n > 0) log(`[startup] Custom leave rules: updated ${n} balance record(s)`); })
         .catch(err => console.error('[startup] Custom leave rule engine failed:', err));
+      // Start the daily same-day absent (AWOL) check scheduler
+      startScheduler().catch(err => console.error('[scheduler] Failed to start:', err));
       // Schedule escalation reminders every 8 hours
       const EIGHT_HOURS = 8 * 60 * 60 * 1000;
       setInterval(() => {

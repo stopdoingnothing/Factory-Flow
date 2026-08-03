@@ -631,6 +631,22 @@ export const settingsApi = {
   },
 };
 
+// Admin API
+export const adminApi = {
+  async runAbsentCheck(): Promise<{
+    date: string;
+    checked: number;
+    absent: number;
+    emailsSent: number;
+    absentEmployees: { id: string; name: string; department?: string }[];
+    note?: string;
+  }> {
+    const res = await apiFetch(`${API_BASE}/admin/run-absent-check`, { method: "POST" });
+    if (!res.ok) throw new Error("Failed to run absent check");
+    return res.json();
+  },
+};
+
 // Department API
 export const companyApi = {
   async getAll(): Promise<any[]> {
