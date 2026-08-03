@@ -8,10 +8,18 @@ const TINY_OPTIONS = new faceapi.TinyFaceDetectorOptions({
   scoreThreshold: 0.3
 });
 
-const SSD_OPTIONS = new faceapi.SsdMobilenetv1Options({ 
+const SSD_OPTIONS = new faceapi.SsdMobilenetv1Options({
   minConfidence: 0.2,
   maxResults: 10
 });
+
+// @vladmandic/face-api bundles TensorFlow.js, but the `tf` namespace in its own type definitions
+// re-exports only the tensor/layer subset — backend selection is absent even though it works at
+// runtime. Declaring just the two functions used here keeps them type-checked instead of `any`.
+type TfBackendControls = {
+  setBackend(backendName: string): Promise<boolean>;
+  ready(): Promise<void>;
+};
 
 export async function loadFaceModels(): Promise<boolean> {
   if (modelsLoaded) return true;
@@ -24,7 +32,7 @@ export async function loadFaceModels(): Promise<boolean> {
 
   modelsLoading = true;
   try {
-    const tf = faceapi.tf;
+    const tf = faceapi.tf as unknown as TfBackendControls;
     await tf.setBackend('webgl');
     await tf.ready();
     
@@ -177,15 +185,19 @@ export function findBestMatchFromMultipleDescriptors(
   return bestMatch;
 }
 
+// The field is `faceDescriptor`, matching GET /api/users/face-descriptors and FaceDescriptorUser.
+// It was previously declared as `descriptor`, which no caller ever supplied: item.descriptor came
+// back undefined for every row, so bestDistance stayed Infinity and the attendance kiosk never
+// recognised anyone. Two other type errors were masking the mismatch.
 export function findMatchesForUser(
   queryDescriptor: Float32Array | number[],
-  userDescriptors: { descriptor: string }[],
+  userDescriptors: { faceDescriptor: string }[],
   threshold: number = 0.6
 ): { bestDistance: number; isMatch: boolean } {
   let bestDistance = Infinity;
-  
+
   for (const item of userDescriptors) {
-    const storedDescriptor = jsonToDescriptor(item.descriptor);
+    const storedDescriptor = jsonToDescriptor(item.faceDescriptor);
     if (!storedDescriptor) continue;
     
     const distance = compareFaceDescriptors(queryDescriptor, storedDescriptor);

@@ -6,6 +6,9 @@
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
     "noEmit": true,
     "module": "ESNext",
+    // Without this, target defaults to ES5 and iterating a Set or Map is an error even though
+    // both the server (Node 20) and the esbuild/vite output are modern.
+    "target": "ES2022",
     "strict": true,
     "lib": ["esnext", "dom", "dom.iterable"],
     "jsx": "preserve",
