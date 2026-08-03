@@ -201,7 +201,9 @@ docker compose up -d
 
 **Schema errors / missing tables**
 
-The entrypoint script runs `drizzle-kit push` on every startup to apply any schema changes. If it fails, check the logs:
+On every startup the entrypoint applies each `migrations/0*.sql` file in order via `psql` (it no longer uses `drizzle-kit push`, which could exit 0 on failure). The files are written to be idempotent, so re-applying them is safe. If it fails, check the logs:
 ```bash
-docker compose logs app | grep "drizzle\|schema\|migrate"
+docker compose logs app | grep "entrypoint\|ERROR\|migrate"
 ```
+
+Adding a schema change means adding a new numbered file under `migrations/` — a column that exists only in `shared/schema.ts` will be missing from every deployed database.

@@ -63,7 +63,7 @@ pool.on('error', (err) => {
 
 const db = drizzle(pool, { schema });
 
-export { pool };
+export { pool, db };
 
 export interface IStorage {
   // User operations

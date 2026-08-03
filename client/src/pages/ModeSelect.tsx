@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Clock, FileText, LogIn, LogOut, Settings, Camera, Grid3X3, Upload, Database, CheckCircle2, Loader2, AlertCircle, ShieldCheck, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { settingsApi } from '@/lib/api';
+import type { ImportResponse } from '@shared/backup';
 import aeceLogo from '@assets/AECE_Logo_1765516911038.png';
 
 const api = (path: string, init?: RequestInit) =>
@@ -31,6 +32,7 @@ function RestoreModal({ onClose }: { onClose: () => void }) {
   const [pendingBackup, setPendingBackup] = useState<any>(null);
   const [restoring, setRestoring] = useState(false);
   const [resultMessage, setResultMessage] = useState('');
+  const [result, setResult] = useState<ImportResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // On mount: check whether the DB is empty (bootstrap mode) or needs login
@@ -74,14 +76,17 @@ function RestoreModal({ onClose }: { onClose: () => void }) {
     setLoginError('');
     setLoggingIn(true);
     try {
-      const res = await api('/api/auth/login', {
+      // /api/auth/login authenticates by employee ID, not email, and would always 400 here.
+      // admin-login is the email + roles[] gated endpoint.
+      const res = await api('/api/auth/admin-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login failed');
-      if (!Array.isArray(data.user?.roles) || !data.user.roles.includes('admin')) {
+      // Both login endpoints return the user object directly, not wrapped in { user }.
+      if (!Array.isArray(data.roles) || !data.roles.includes('admin')) {
         await api('/api/auth/logout', { method: 'POST' });
         throw new Error('Only admin accounts can restore backups');
       }
@@ -134,10 +139,22 @@ function RestoreModal({ onClose }: { onClose: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ backup: pendingBackup }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Import failed');
-      const total = Object.values(result.importedCounts as Record<string, number>).reduce((a, b) => a + b, 0);
-      setResultMessage(`${total.toLocaleString()} records processed.`);
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Import failed');
+      const imported: ImportResponse = body;
+      setResult(imported);
+      // Count rows the database actually accepted, not the length of the input arrays — the old
+      // version reported the file's own counts and so always looked like a clean restore.
+      const { totalInserted, totalSkipped, totalFailed } = imported.report;
+      setResultMessage(
+        [
+          `${totalInserted.toLocaleString()} records restored`,
+          totalSkipped > 0 ? `${totalSkipped.toLocaleString()} already present` : null,
+          totalFailed > 0 ? `${totalFailed.toLocaleString()} rejected` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') + '.'
+      );
       setStep('done');
       if (!isBootstrap) await api('/api/auth/logout', { method: 'POST' });
     } catch (err: any) {
@@ -279,14 +296,78 @@ function RestoreModal({ onClose }: { onClose: () => void }) {
         )}
 
         {step === 'done' && (
-          <div className="space-y-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8 text-green-600" />
+          <div className="space-y-4">
+            <div className="text-center space-y-4">
+              <div
+                className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
+                  result?.report.totalFailed ? 'bg-amber-100' : 'bg-green-100'
+                }`}
+              >
+                {result?.report.totalFailed ? (
+                  <AlertCircle className="w-8 h-8 text-amber-600" />
+                ) : (
+                  <CheckCircle2 className="w-8 h-8 text-green-600" />
+                )}
+              </div>
+              <div>
+                <p className="font-semibold text-slate-800">
+                  {result?.report.totalFailed ? 'Restore Incomplete' : 'Restore Complete'}
+                </p>
+                <p className="text-sm text-slate-500 mt-1">{resultMessage}</p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-slate-800">Restore Complete</p>
-              <p className="text-sm text-slate-500 mt-1">{resultMessage}</p>
-            </div>
+
+            {/* Rows the database rejected. Previously these were swallowed and the restore still
+                reported success. */}
+            {!!result?.report.totalFailed && (
+              <div className="rounded-md bg-red-50 border border-red-200 p-3 text-left space-y-2 max-h-48 overflow-y-auto">
+                <p className="text-xs font-semibold text-red-800 uppercase tracking-wider">
+                  Records not restored
+                </p>
+                {Object.entries(result.report.tables)
+                  .filter(([, t]) => t.failed > 0)
+                  .map(([name, t]) => (
+                    <div key={name} className="text-xs text-red-700">
+                      <span className="font-medium">{name}</span>: {t.failed} of {t.attempted} failed
+                      {t.errors[0] && (
+                        <div className="text-red-600/80 mt-0.5 break-words">{t.errors[0]}</div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {/* Data the importer had to adjust — e.g. an older backup with no companies table. */}
+            {!!result?.report.warnings.length && (
+              <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-left space-y-1 max-h-48 overflow-y-auto">
+                <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">
+                  Data adjusted
+                </p>
+                {result.report.warnings.map((w, i) => (
+                  <p key={i} className="text-xs text-amber-700">{w}</p>
+                ))}
+              </div>
+            )}
+
+            {/* After a bootstrap restore this is the operator's only clue which accounts can reach
+                the admin screens. */}
+            {!!result?.adminAccounts?.length && (
+              <div className="rounded-md bg-slate-50 border border-slate-200 p-3 text-left space-y-1 max-h-40 overflow-y-auto">
+                <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5" /> Admin accounts restored
+                </p>
+                {result.adminAccounts.map(a => (
+                  <p key={a.id} className="text-xs text-slate-600">
+                    {a.name} <span className="text-slate-400">({a.id})</span>
+                    {a.email && <span className="text-slate-500"> · {a.email}</span>}
+                  </p>
+                ))}
+                <p className="text-xs text-slate-500 pt-1">
+                  Sign in with the password these accounts used on the old system.
+                </p>
+              </div>
+            )}
+
             <Button onClick={onClose} className="w-full">Done</Button>
           </div>
         )}

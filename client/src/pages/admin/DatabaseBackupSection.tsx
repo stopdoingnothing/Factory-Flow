@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import type { ImportResponse } from '@shared/backup';
 const api = (path: string, init?: RequestInit) =>
   fetch(path, { credentials: 'include', ...init });
 import {
@@ -44,6 +45,7 @@ export default function DatabaseBackupSection() {
   const [restoring, setRestoring] = useState(false);
   const [backupInfo, setBackupInfo] = useState<BackupInfo | null>(null);
   const [pendingBackup, setPendingBackup] = useState<any>(null);
+  const [result, setResult] = useState<ImportResponse | null>(null);
 
   const handleDownload = async () => {
     setDownloading(true);
@@ -100,16 +102,33 @@ export default function DatabaseBackupSection() {
   const handleRestore = async () => {
     if (!pendingBackup) return;
     setRestoring(true);
+    setResult(null);
     try {
       const res = await api('/api/backup/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ backup: pendingBackup }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Import failed');
-      const total = Object.values(result.importedCounts as Record<string, number>).reduce((a, b) => a + b, 0);
-      toast({ title: 'Restore complete', description: `${total.toLocaleString()} records processed. Existing records were not overwritten.` });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Import failed');
+      const imported: ImportResponse = body;
+      setResult(imported);
+
+      // Report rows the database accepted, not the length of the input arrays — the old version
+      // reported the file's own counts and so always looked like a clean restore.
+      const { totalInserted, totalSkipped, totalFailed } = imported.report;
+      if (totalFailed > 0) {
+        toast({
+          title: 'Restore incomplete',
+          description: `${totalInserted.toLocaleString()} records restored, ${totalFailed.toLocaleString()} rejected. See the details below.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Restore complete',
+          description: `${totalInserted.toLocaleString()} records restored, ${totalSkipped.toLocaleString()} already present and left unchanged.`,
+        });
+      }
       setBackupInfo(null);
       setPendingBackup(null);
     } catch (err: any) {
@@ -225,6 +244,69 @@ export default function DatabaseBackupSection() {
                   </Button>
                 </div>
               </>
+            )}
+
+            {/* Outcome of the last restore. The toast disappears; this stays, because a partial
+                restore needs to be actionable rather than glimpsed. */}
+            {result && (
+              <div className="space-y-3 pt-2 border-t border-border">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-foreground">Last restore</span>
+                  <span className="text-muted-foreground">
+                    {formatCount(result.report.totalInserted)} restored
+                    {result.report.totalSkipped > 0 &&
+                      ` · ${formatCount(result.report.totalSkipped)} already present`}
+                    {result.report.totalFailed > 0 &&
+                      ` · ${formatCount(result.report.totalFailed)} rejected`}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  {Object.entries(result.report.tables).map(([key, t]) => (
+                    <div key={key} className="flex justify-between text-xs">
+                      <span className="text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+                      <Badge
+                        variant={t.failed > 0 ? 'destructive' : 'secondary'}
+                        className="text-xs h-4"
+                      >
+                        {t.inserted === t.attempted
+                          ? formatCount(t.inserted)
+                          : `${formatCount(t.inserted)}/${formatCount(t.attempted)}`}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+
+                {result.report.totalFailed > 0 && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 space-y-2 max-h-48 overflow-y-auto">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-destructive">
+                      Records not restored
+                    </p>
+                    {Object.entries(result.report.tables)
+                      .filter(([, t]) => t.failed > 0)
+                      .map(([key, t]) => (
+                        <div key={key} className="text-xs text-destructive">
+                          <span className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+                          : {formatCount(t.failed)} of {formatCount(t.attempted)} failed
+                          {t.errors[0] && (
+                            <div className="opacity-80 mt-0.5 break-words font-mono">{t.errors[0]}</div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                {result.report.warnings.length > 0 && (
+                  <div className="rounded-md border border-status-warning/30 bg-status-warning-muted p-3 space-y-1 max-h-48 overflow-y-auto">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-status-warning">
+                      Data adjusted
+                    </p>
+                    {result.report.warnings.map((w, i) => (
+                      <p key={i} className="text-xs text-status-warning">{w}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
