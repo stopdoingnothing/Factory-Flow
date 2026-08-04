@@ -229,6 +229,17 @@ export function LeaveRequest() {
     }
     setFieldErrors({});
 
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Not signed in",
+        description: "Your session has expired. Please sign in again before submitting.",
+      });
+      return;
+    }
+    // Already reported by the check above; this narrows `from` to a Date for the calls below.
+    if (!dateRange.from) return;
+
     const submitStartDate = format(dateRange.from, 'yyyy-MM-dd');
     const submitEndDate = dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : submitStartDate;
     const submitIsSingleDay = submitStartDate === submitEndDate;

@@ -56,6 +56,7 @@ const requireAdmin = requireRole('hr', 'admin');
 // Pure system-config routes — admin only.
 const requireAdminOnly = requireRole('admin');
 import { storage, pool } from "./storage";
+import { importBackup, resetSequences, toImportedCounts } from "./backup-import";
 import { z } from "zod";
 import { insertUserSchema, insertLeaveRequestSchema, insertAttendanceRecordSchema, insertDepartmentSchema, insertUserGroupSchema, insertEmployeeTypeSchema, insertLeaveRuleSchema, insertLeaveRulePhaseSchema, insertGrievanceSchema } from "@shared/schema";
 import { sendLeaveRequestNotification, sendLateAttendanceNotification, sendAdminWelcomeEmail, sendLeaveStatusNotification, sendPasswordResetEmail, sendAdminCredentialsEmail, sendManagerMissedClockOutAlert, sendLeaveStageNotification, sendLeaveEscalationReminder, sendAWOLAlert } from "./email";
@@ -70,6 +71,25 @@ const BCRYPT_ROUNDS = 10;
 
 async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
+/**
+ * Accounts holding the admin role, for display after a bootstrap restore.
+ * Restoring onto an empty database leaves the operator with no way to tell which of the restored
+ * users can reach the admin screens — this is that list. Never includes password material.
+ */
+async function listRestoredAdmins(): Promise<Array<{ id: string; name: string; email: string | null }>> {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email FROM users
+        WHERE 'admin' = ANY(roles) AND termination_date IS NULL
+        ORDER BY id`
+    );
+    return result.rows;
+  } catch (error: any) {
+    console.error("Failed to list restored admin accounts:", error?.message);
+    return [];
+  }
 }
 
 /**
@@ -376,6 +396,15 @@ export async function registerRoutes(
     console.log('[migration] roles column migration complete');
   } catch (e) {
     console.warn('[migration] roles column migration failed:', (e as Error).message);
+  }
+
+  // Realign id sequences with the data actually present. Rows restored from a backup keep their
+  // original ids, which does not advance a serial sequence — so an instance restored before this fix
+  // landed still has sequences sitting at 1 and fails the next insert with a duplicate key. Running
+  // it here repairs those instances; importBackup() also calls it directly after every restore.
+  const sequenceProblems = await resetSequences();
+  if (sequenceProblems.length > 0) {
+    console.warn('[migration] could not reset id sequences:', sequenceProblems.join('; '));
   }
 
   // Apply session enforcement to all /api routes
@@ -3966,126 +3995,22 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid backup file format" });
       }
 
-      // JSON serialisation turns Date objects into strings — convert them back
-      // so Drizzle's timestamp columns receive proper Date instances.
-      const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-      function reviveDates(obj: any): any {
-        if (obj == null || typeof obj !== 'object') return obj;
-        if (Array.isArray(obj)) return obj.map(reviveDates);
-        const out: any = {};
-        for (const [k, v] of Object.entries(obj)) {
-          out[k] = typeof v === 'string' && ISO_DATE_RE.test(v) ? new Date(v) : reviveDates(v);
-        }
-        return out;
-      }
-      backup.data = reviveDates(backup.data);
+      const report = await importBackup(backup.data);
 
-      const importedCounts: Record<string, number> = {};
+      // This is the only account list the operator has after a bootstrap restore — without it there
+      // is no way to know which of the restored users can actually reach the admin screens.
+      const adminAccounts = await listRestoredAdmins();
 
-      if (backup.data.departments?.length) {
-        for (const dept of backup.data.departments) {
-          try { const e = await storage.getDepartment(dept.id); if (!e) await storage.createDepartment({ name: dept.name, description: dept.description }); } catch (e) {}
-        }
-        importedCounts.departments = backup.data.departments.length;
-      }
-      if (backup.data.userGroups?.length) {
-        for (const group of backup.data.userGroups) {
-          try { const e = await storage.getUserGroup(group.id); if (!e) await storage.createUserGroup({ name: group.name, description: group.description }); } catch (e) {}
-        }
-        importedCounts.userGroups = backup.data.userGroups.length;
-      }
-      if (backup.data.employeeTypes?.length) {
-        for (const type of backup.data.employeeTypes) {
-          try { const e = await storage.getEmployeeType(type.id); if (!e) await storage.createEmployeeType({ name: type.name, description: type.description, leaveLabel: type.leaveLabel, hasLeaveEntitlement: type.hasLeaveEntitlement, isDefault: type.isDefault, isPermanent: type.isPermanent }); } catch (e) {}
-        }
-        importedCounts.employeeTypes = backup.data.employeeTypes.length;
-      }
-      if (backup.data.companies?.length) {
-        const existing = await storage.getAllCompanies();
-        const existingNames = new Set(existing.map((c: any) => c.name));
-        for (const company of backup.data.companies) {
-          try { if (!existingNames.has(company.name)) await storage.createCompany({ name: company.name, registrationNumber: company.registrationNumber, description: company.description }); } catch (e) {}
-        }
-        importedCounts.companies = backup.data.companies.length;
-      }
-      if (backup.data.orgPositions?.length) {
-        const sorted = [...backup.data.orgPositions].sort((a: any, b: any) => a.id - b.id);
-        const existing = await storage.getAllOrgPositions();
-        const existingIds = new Set(existing.map((p: any) => p.id));
-        for (const pos of sorted) {
-          try { if (!existingIds.has(pos.id)) await storage.createOrgPosition({ title: pos.title, department: pos.department, parentPositionId: pos.parentPositionId, sortOrder: pos.sortOrder, isOutsourced: pos.isOutsourced, tier: pos.tier }); } catch (e) {}
-        }
-        importedCounts.orgPositions = backup.data.orgPositions.length;
-      }
-      if (backup.data.users?.length) {
-        let userCount = 0;
-        for (const user of backup.data.users) {
-          try { const e = await storage.getUser(user.id); if (!e) { await storage.createUser(user); userCount++; } } catch (e) { console.error(`[bootstrap-import] user ${user.id}:`, (e as Error).message); }
-        }
-        importedCounts.users = userCount;
-      }
-      if (backup.data.leaveBalances?.length) {
-        for (const balance of backup.data.leaveBalances) {
-          try { await storage.createLeaveBalance({ userId: balance.userId, leaveType: balance.leaveType, total: balance.total, taken: balance.taken, pending: balance.pending, carryOverDays: balance.carryOverDays ?? 0 }); } catch (e) {}
-        }
-        importedCounts.leaveBalances = backup.data.leaveBalances.length;
-      }
-      if (backup.data.leaveRequests?.length) {
-        for (const request of backup.data.leaveRequests) {
-          try { await storage.createLeaveRequest(request); } catch (e) {}
-        }
-        importedCounts.leaveRequests = backup.data.leaveRequests.length;
-      }
-      if (backup.data.leaveRules?.length) {
-        for (const rule of backup.data.leaveRules) {
-          try { await storage.createLeaveRule(rule); } catch (e) {}
-        }
-        importedCounts.leaveRules = backup.data.leaveRules.length;
-      }
-      if (backup.data.leaveRulePhases?.length) {
-        for (const phase of backup.data.leaveRulePhases) {
-          try { await storage.createLeaveRulePhase(phase); } catch (e) {}
-        }
-        importedCounts.leaveRulePhases = backup.data.leaveRulePhases.length;
-      }
-      if (backup.data.attendanceRecords?.length) {
-        for (const record of backup.data.attendanceRecords) {
-          try { await storage.createAttendanceRecord(record); } catch (e) {}
-        }
-        importedCounts.attendanceRecords = backup.data.attendanceRecords.length;
-      }
-      if (backup.data.contractHistory?.length) {
-        for (const entry of backup.data.contractHistory) {
-          try { await storage.createContractHistory(entry); } catch (e) {}
-        }
-        importedCounts.contractHistory = backup.data.contractHistory.length;
-      }
-      if (backup.data.grievances?.length) {
-        for (const grievance of backup.data.grievances) {
-          try { await storage.createGrievance(grievance); } catch (e) {}
-        }
-        importedCounts.grievances = backup.data.grievances.length;
-      }
-      if (backup.data.publicHolidays?.length) {
-        for (const holiday of backup.data.publicHolidays) {
-          try { await storage.createPublicHoliday(holiday); } catch (e) {}
-        }
-        importedCounts.publicHolidays = backup.data.publicHolidays.length;
-      }
-      if (backup.data.settings?.length) {
-        for (const setting of backup.data.settings) {
-          try { await storage.upsertSetting(setting.key, setting.value); } catch (e) {}
-        }
-        importedCounts.settings = backup.data.settings.length;
-      }
-      if (backup.data.faceDescriptors?.length) {
-        for (const fd of backup.data.faceDescriptors) {
-          try { await storage.createFaceDescriptor({ userId: fd.userId, descriptor: fd.descriptor, photoData: fd.photoData ?? null, label: fd.label ?? null }); } catch (e) {}
-        }
-        importedCounts.faceDescriptors = backup.data.faceDescriptors.length;
-      }
-
-      return res.json({ success: true, message: "Bootstrap restore completed", importedCounts });
+      return res.json({
+        success: report.totalFailed === 0,
+        message:
+          report.totalFailed === 0
+            ? "Bootstrap restore completed"
+            : `Bootstrap restore completed with ${report.totalFailed} rejected record(s)`,
+        importedCounts: toImportedCounts(report),
+        report,
+        adminAccounts,
+      });
     } catch (error) {
       console.error("Bootstrap import error:", error);
       return res.status(500).json({ error: "Bootstrap restore failed" });
@@ -4148,176 +4073,22 @@ export async function registerRoutes(
   // Import database backup
   app.post("/api/backup/import", requireAdminOnly, async (req, res) => {
     try {
-      const { backup, options } = req.body;
-      
+      const { backup } = req.body;
+
       if (!backup || !backup.data) {
         return res.status(400).json({ error: "Invalid backup file format" });
       }
-      
-      const clearExisting = options?.clearExisting ?? false;
 
-      // JSON serialisation turns Date objects into strings — convert them back
-      const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-      function reviveDates(obj: any): any {
-        if (obj == null || typeof obj !== 'object') return obj;
-        if (Array.isArray(obj)) return obj.map(reviveDates);
-        const out: any = {};
-        for (const [k, v] of Object.entries(obj)) {
-          out[k] = typeof v === 'string' && ISO_DATE_RE.test(v) ? new Date(v) : reviveDates(v);
-        }
-        return out;
-      }
-      backup.data = reviveDates(backup.data);
-
-      const importedCounts: Record<string, number> = {};
-
-      // Import in dependency order — referenced tables before referencing tables.
-      // All inserts are additive: existing records (matched by natural key or id) are skipped.
-
-      // 1. Departments
-      if (backup.data.departments?.length) {
-        for (const dept of backup.data.departments) {
-          try { const e = await storage.getDepartment(dept.id); if (!e) await storage.createDepartment({ name: dept.name, description: dept.description }); } catch (e) {}
-        }
-        importedCounts.departments = backup.data.departments.length;
-      }
-
-      // 2. User Groups
-      if (backup.data.userGroups?.length) {
-        for (const group of backup.data.userGroups) {
-          try { const e = await storage.getUserGroup(group.id); if (!e) await storage.createUserGroup({ name: group.name, description: group.description }); } catch (e) {}
-        }
-        importedCounts.userGroups = backup.data.userGroups.length;
-      }
-
-      // 3. Employee Types
-      if (backup.data.employeeTypes?.length) {
-        for (const type of backup.data.employeeTypes) {
-          try { const e = await storage.getEmployeeType(type.id); if (!e) await storage.createEmployeeType({ name: type.name, description: type.description, leaveLabel: type.leaveLabel, hasLeaveEntitlement: type.hasLeaveEntitlement, isDefault: type.isDefault, isPermanent: type.isPermanent }); } catch (e) {}
-        }
-        importedCounts.employeeTypes = backup.data.employeeTypes.length;
-      }
-
-      // 4. Companies
-      if (backup.data.companies?.length) {
-        const existing = await storage.getAllCompanies();
-        const existingNames = new Set(existing.map((c: any) => c.name));
-        for (const company of backup.data.companies) {
-          try { if (!existingNames.has(company.name)) await storage.createCompany({ name: company.name, registrationNumber: company.registrationNumber, description: company.description }); } catch (e) {}
-        }
-        importedCounts.companies = backup.data.companies.length;
-      }
-
-      // 5. Org Positions (insert in order: parents before children, sort by id)
-      if (backup.data.orgPositions?.length) {
-        const sorted = [...backup.data.orgPositions].sort((a: any, b: any) => a.id - b.id);
-        const existing = await storage.getAllOrgPositions();
-        const existingIds = new Set(existing.map((p: any) => p.id));
-        for (const pos of sorted) {
-          try { if (!existingIds.has(pos.id)) await storage.createOrgPosition({ title: pos.title, department: pos.department, parentPositionId: pos.parentPositionId, sortOrder: pos.sortOrder, isOutsourced: pos.isOutsourced, tier: pos.tier }); } catch (e) {}
-        }
-        importedCounts.orgPositions = backup.data.orgPositions.length;
-      }
-
-      // 6. Users
-      if (backup.data.users?.length) {
-        let userCount = 0;
-        for (const user of backup.data.users) {
-          try { const e = await storage.getUser(user.id); if (!e) { await storage.createUser(user); userCount++; } } catch (e) { console.error(`[import] user ${user.id}:`, (e as Error).message); }
-        }
-        importedCounts.users = userCount;
-      }
-
-      // 7. Leave Balances
-      if (backup.data.leaveBalances?.length) {
-        for (const balance of backup.data.leaveBalances) {
-          try { await storage.createLeaveBalance({ userId: balance.userId, leaveType: balance.leaveType, total: balance.total, taken: balance.taken, pending: balance.pending, carryOverDays: balance.carryOverDays ?? 0 }); } catch (e) {}
-        }
-        importedCounts.leaveBalances = backup.data.leaveBalances.length;
-      }
-
-      // 8. Leave Requests
-      if (backup.data.leaveRequests?.length) {
-        for (const request of backup.data.leaveRequests) {
-          try { await storage.createLeaveRequest(request); } catch (e) {}
-        }
-        importedCounts.leaveRequests = backup.data.leaveRequests.length;
-      }
-
-      // 9. Leave Rules and Phases
-      if (backup.data.leaveRules?.length) {
-        for (const rule of backup.data.leaveRules) {
-          try { await storage.createLeaveRule(rule); } catch (e) {}
-        }
-        importedCounts.leaveRules = backup.data.leaveRules.length;
-      }
-      if (backup.data.leaveRulePhases?.length) {
-        for (const phase of backup.data.leaveRulePhases) {
-          try { await storage.createLeaveRulePhase(phase); } catch (e) {}
-        }
-        importedCounts.leaveRulePhases = backup.data.leaveRulePhases.length;
-      }
-
-      // 10. Attendance Records
-      if (backup.data.attendanceRecords?.length) {
-        for (const record of backup.data.attendanceRecords) {
-          try { await storage.createAttendanceRecord(record); } catch (e) {}
-        }
-        importedCounts.attendanceRecords = backup.data.attendanceRecords.length;
-      }
-
-      // 11. Contract History
-      if (backup.data.contractHistory?.length) {
-        for (const entry of backup.data.contractHistory) {
-          try { await storage.createContractHistory(entry); } catch (e) {}
-        }
-        importedCounts.contractHistory = backup.data.contractHistory.length;
-      }
-
-      // 12. Grievances
-      if (backup.data.grievances?.length) {
-        for (const grievance of backup.data.grievances) {
-          try { await storage.createGrievance(grievance); } catch (e) {}
-        }
-        importedCounts.grievances = backup.data.grievances.length;
-      }
-
-      // 13. Public Holidays
-      if (backup.data.publicHolidays?.length) {
-        for (const holiday of backup.data.publicHolidays) {
-          try { await storage.createPublicHoliday(holiday); } catch (e) {}
-        }
-        importedCounts.publicHolidays = backup.data.publicHolidays.length;
-      }
-
-      // 14. Notifications
-      if (backup.data.notifications?.length) {
-        for (const notif of backup.data.notifications) {
-          try { await storage.createNotification(notif); } catch (e) {}
-        }
-        importedCounts.notifications = backup.data.notifications.length;
-      }
-
-      // 15. Settings
-      if (backup.data.settings?.length) {
-        for (const setting of backup.data.settings) {
-          try { await storage.upsertSetting(setting.key, setting.value); } catch (e) {}
-        }
-        importedCounts.settings = backup.data.settings.length;
-      }
-
-      // 16. Face Descriptors
-      if (backup.data.faceDescriptors?.length) {
-        for (const fd of backup.data.faceDescriptors) {
-          try { await storage.createFaceDescriptor({ userId: fd.userId, descriptor: fd.descriptor, photoData: fd.photoData ?? null, label: fd.label ?? null }); } catch (e) {}
-        }
-        importedCounts.faceDescriptors = backup.data.faceDescriptors.length;
-      }
+      const report = await importBackup(backup.data);
 
       return res.json({
-        success: true,
-        message: "Backup imported successfully",
-        importedCounts,
+        success: report.totalFailed === 0,
+        message:
+          report.totalFailed === 0
+            ? `Backup imported: ${report.totalInserted} added, ${report.totalSkipped} already present`
+            : `Backup imported with ${report.totalFailed} rejected record(s)`,
+        importedCounts: toImportedCounts(report),
+        report,
       });
     } catch (error) {
       console.error("Import backup error:", error);

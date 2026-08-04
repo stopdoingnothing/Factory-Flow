@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pkg from "pg";
 const { Pool } = pkg;
-import { eq, and, desc, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, lte, inArray, getTableColumns } from "drizzle-orm";
 import * as schema from "@shared/schema";
 // bcea import removed — leave provisioning is handled in routes.ts
 import type {
@@ -63,7 +63,7 @@ pool.on('error', (err) => {
 
 const db = drizzle(pool, { schema });
 
-export { pool };
+export { pool, db };
 
 export interface IStorage {
   // User operations
@@ -371,7 +371,11 @@ export class DrizzleStorage implements IStorage {
   async getLeaveRequests(userId?: string) {
     const query = db
       .select({
-        ...schema.leaveRequests,
+        // getTableColumns, not a bare spread of the table: spreading the table object mixes
+        // Drizzle's internals (_, brand, config, getSQL) into the select shape, which makes the
+        // result type collapse to Record<string, unknown> and turns every caller's field access
+        // into an `unknown`.
+        ...getTableColumns(schema.leaveRequests),
         employeeFirstName: schema.users.firstName,
         employeeSurname: schema.users.surname,
       })

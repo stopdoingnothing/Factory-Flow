@@ -12,13 +12,17 @@ const db = drizzle(pool, { schema });
 async function seed() {
   console.log("Seeding database...");
 
-  // Create admin user
+  // firstName and surname are NOT NULL; `name` is the legacy combined column kept in sync with them.
+  // `roles` is the authorisation source of truth — `role` alone grants nothing.
   await db.insert(schema.users).values({
     id: "admin",
+    firstName: "System",
+    surname: "Admin",
     name: "System Admin",
     email: "admin@factory.com",
     password: "admin123",
     role: "manager",
+    roles: ["employee", "manager", "admin"],
     department: "Management",
     photoUrl: "https://github.com/shadcn.png",
   }).onConflictDoNothing();
@@ -27,28 +31,37 @@ async function seed() {
   await db.insert(schema.users).values([
     {
       id: "46",
+      firstName: "Theunis",
+      surname: "Scheepers",
       name: "Theunis Scheepers",
       email: null,
       password: null,
       role: "worker",
+      roles: ["employee"],
       department: "Technical",
       photoUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
     },
     {
       id: "102",
+      firstName: "Sarah",
+      surname: "Connor",
       name: "Sarah Connor",
       email: null,
       password: null,
       role: "worker",
+      roles: ["employee"],
       department: "Production",
       photoUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
     },
     {
       id: "105",
+      firstName: "Mike",
+      surname: "Ross",
       name: "Mike Ross",
       email: null,
       password: null,
       role: "worker",
+      roles: ["employee"],
       department: "Logistics",
       photoUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
     },

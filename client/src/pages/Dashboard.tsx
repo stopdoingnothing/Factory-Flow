@@ -214,7 +214,7 @@ export default function Dashboard() {
                 })}
               </div>
             </div>
-          )}
+          ))}
         </div>
 
         {/* Recent Requests */}

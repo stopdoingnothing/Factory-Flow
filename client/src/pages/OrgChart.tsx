@@ -43,6 +43,11 @@ interface OrgNodeData {
   tier?: number; // Visual tier: 1 = normal level, higher numbers push node down within siblings
 }
 
+// Children of <foreignObject> must declare the XHTML namespace, or the SVG produced by
+// buildExportSvg() below is not well-formed XML and the exported chart comes out blank.
+// React's HTMLAttributes types have no `xmlns`, so it is spread in rather than written as a prop.
+const XHTML_NS = { xmlns: 'http://www.w3.org/1999/xhtml' } as const;
+
 const NODE_WIDTH = 240;
 const MANAGER_NODE_HEIGHT = 90;
 const WORKER_ROW_HEIGHT = 36;
@@ -82,7 +87,7 @@ function ManagerNode({ data, x, y, showAttendance, clockedInUserIds }: { data: O
     <g transform={`translate(${x - NODE_WIDTH / 2}, ${y})`} style={{ opacity }}>
       <foreignObject width={NODE_WIDTH} height={MANAGER_NODE_HEIGHT}>
         <div
-          xmlns="http://www.w3.org/1999/xhtml"
+          {...XHTML_NS}
           className={`h-full rounded-lg border-2 shadow-md overflow-hidden ${
             isVacant ? 'border-dashed border-destructive bg-destructive/10' :
             isOutsourced ? 'border-dashed border-status-warning bg-status-warning-muted' :
@@ -148,7 +153,7 @@ function DepartmentGroupNode({ data, x, y, showAttendance, clockedInUserIds }: {
     <g transform={`translate(${x - NODE_WIDTH / 2}, ${y})`}>
       <foreignObject width={NODE_WIDTH} height={data.nodeHeight}>
         <div
-          xmlns="http://www.w3.org/1999/xhtml"
+          {...XHTML_NS}
           className="h-full rounded-lg border-2 shadow-sm overflow-hidden"
           style={{ borderColor: deptColor }}
         >
