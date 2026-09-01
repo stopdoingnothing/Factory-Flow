@@ -620,7 +620,15 @@ export default function OrgChart() {
   const isLoading = usersLoading || deptsLoading || positionsLoading;
   const isError = usersError || deptsError || positionsError;
 
-  const activeUsers = useMemo(() => users.filter(u => !u.terminationDate && !u.exclude), [users]);
+  // A self-reporting employee (the MD / top of the reporting line) is normalised to "no manager"
+  // here so the whole chart below sees them as a root rather than as their own direct report.
+  // Without this they would be filtered out of `roots` and never rendered at all.
+  const activeUsers = useMemo(
+    () => users
+      .filter(u => !u.terminationDate && !u.exclude)
+      .map(u => (u.managerId === u.id ? { ...u, managerId: null } : u)),
+    [users]
+  );
 
   const { treeData, dimensions } = useMemo(() => {
     try {
