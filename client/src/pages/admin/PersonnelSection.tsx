@@ -244,7 +244,7 @@ export default function PersonnelSection() {
     }
 
     if (!currentUser.managerId) {
-      toast({ variant: "destructive", title: "Error", description: "A line manager (Reports To) is required" });
+      toast({ variant: "destructive", title: "Error", description: "A line manager (Reports To) is required — select the employee themselves if they are the top of the reporting line" });
       return;
     }
 
@@ -1745,10 +1745,17 @@ export default function PersonnelSection() {
                   onValueChange={(value) => setCurrentUser({...currentUser, managerId: value === 'none' ? undefined : value, reportsToPositionId: undefined})}
                   options={[
                     { value: 'none', label: 'No Manager' },
-                    ...users
-                      .filter(u => u.id !== currentUser.id)
+                    // Self is a valid choice: the MD / top of the reporting line reports to nobody
+                    // above them. Leave from a self-reporting employee skips the manager stage and
+                    // goes straight to HR (see server/routes.ts POST /api/leave-requests).
+                    ...[...users]
                       .sort((a, b) => `${a.firstName} ${a.surname}`.localeCompare(`${b.firstName} ${b.surname}`))
-                      .map(u => ({ value: u.id, label: `${u.firstName} ${u.surname}${u.department ? ` (${u.department})` : ''}` })),
+                      .map(u => ({
+                        value: u.id,
+                        label: u.id === currentUser.id
+                          ? `${u.firstName} ${u.surname} (self — top of reporting line)`
+                          : `${u.firstName} ${u.surname}${u.department ? ` (${u.department})` : ''}`,
+                      })),
                   ]}
                   placeholder="Select a line manager"
                   searchPlaceholder="Search employees..."

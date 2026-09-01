@@ -40,7 +40,8 @@ export default function MyTeamSection() {
       return (user as any)?.orgPositionId != null &&
         (u as any).reportsToPositionId === (user as any).orgPositionId;
     }
-    return u.managerId === user?.id;
+    // A self-reporting employee is not a member of their own team
+    return u.managerId === user?.id && u.id !== user?.id;
   });
 
   const filtered = teamMembers

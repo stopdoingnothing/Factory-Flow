@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { isTrackableEmployee } from '@/lib/userFilters';
+import { isLeaveEligible } from '@/lib/userFilters';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -95,7 +95,7 @@ export default function DashboardSection({
   });
 
   const activeEmployees = React.useMemo(() =>
-    users.filter((u: any) => isTrackableEmployee(u) && (!u.startDate || u.startDate <= todayStr)),
+    users.filter((u: any) => isLeaveEligible(u) && (!u.startDate || u.startDate <= todayStr)),
   [users, todayStr]);
 
   // All employees required to clock in (any role), excluding those explicitly excluded from attendance

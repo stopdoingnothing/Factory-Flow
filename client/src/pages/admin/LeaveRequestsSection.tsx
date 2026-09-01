@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { isTrackableEmployee } from '@/lib/userFilters';
+import { isLeaveEligible } from '@/lib/userFilters';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -448,8 +448,8 @@ export default function LeaveRequestsSection() {
                   const employeeBalances = new Map<string, LeaveBalance[]>();
                   leaveBalances.forEach((balance: LeaveBalance) => {
                     const employee = users.find(u => u.id === balance.userId);
-                    // Skip balances for non-trackable employees (admin, excluded)
-                    if (employee && !isTrackableEmployee(employee)) return;
+                    // Skip balances for employees explicitly excluded from leave
+                    if (employee && !isLeaveEligible(employee)) return;
                     const existing = employeeBalances.get(balance.userId) || [];
                     existing.push(balance);
                     employeeBalances.set(balance.userId, existing);

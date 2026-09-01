@@ -250,7 +250,12 @@ export function LeaveRequest() {
       endDate: submitEndDate,
       reason,
       comments: comments || undefined,
-      status: (user.reportsToPositionId || user.managerId) ? 'pending_manager' : 'pending_hr',
+      // A self-reporting employee (top of the reporting line) has no manager above them, so their
+      // request skips straight to HR. The server recomputes this either way — see
+      // POST /api/leave-requests — this just keeps the optimistic value honest.
+      status: (user.reportsToPositionId || (user.managerId && user.managerId !== user.id))
+        ? 'pending_manager'
+        : 'pending_hr',
       documents: fileContents.map(f => f.data),
       startHalfDay: startHalfDay ?? null,
       endHalfDay: (!submitIsSingleDay && endHalfDay) ? endHalfDay : null,

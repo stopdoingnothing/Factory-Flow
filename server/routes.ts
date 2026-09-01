@@ -372,6 +372,54 @@ async function getHierarchyEmails(userId: string): Promise<string[]> {
   return emails;
 }
 
+/**
+ * Auto-provision the mandatory BCEA leave balances for an employee and backfill accrual for any
+ * months already elapsed since their start date.
+ *
+ * Called when a user is created, and again when an existing user is brought back into leave
+ * management (excludeFromLeave switched off) — the latter matters because hr/admin users used to
+ * be force-excluded at creation time and so never got balance rows.
+ *
+ * Safe to call on someone who already has balances: existing leave types are left alone, and
+ * backfillUserAccrual() is idempotent per (user, month) via the accrual records unique constraint.
+ */
+async function provisionLeaveBalances(userId: string, startDate: string): Promise<void> {
+  try {
+    const existing = await storage.getLeaveBalances(userId);
+    const have = new Set(existing.map(b => b.leaveType));
+    // Create skeleton balance rows at zero — backfillUserAccrual() below calculates and credits
+    // all completed months including the start month. Do NOT pre-credit any amount here; doing so
+    // would double-count the start month when the backfill also processes it.
+    for (const leaveType of ['Annual Leave', 'Sick Leave', 'Family Responsibility']) {
+      if (have.has(leaveType)) continue;
+      await storage.createLeaveBalance({ userId, leaveType, total: 0, taken: 0, pending: 0 });
+    }
+    // NOTE: Statutory event-based leaves (Maternity, Parental, Adoption, Commissioning)
+    // and custom leave types are NOT auto-provisioned. HR or Admin must activate them
+    // per employee via the Personnel > Leave Balances panel.
+    // Initialise sick leave tracking record
+    await storage.upsertSickLeaveTracking({
+      userId,
+      sickCycleStartDate: startDate,
+      graduatedAccrualActive: true,
+      cumulativeDaysWorked: 0,
+      graduatedDaysCredited: 0,
+    });
+  } catch (leaveErr) {
+    console.error(`Failed to provision leave balances for user ${userId}:`, leaveErr);
+  }
+
+  // Backfill accrual for any months that have already passed since startDate.
+  // Runs asynchronously so it doesn't block the calling request's response.
+  backfillUserAccrual(userId)
+    .then(({ monthsProcessed }) => {
+      if (monthsProcessed > 0) {
+        console.log(`[backfill] Accrued ${monthsProcessed} past month(s) for user ${userId}`);
+      }
+    })
+    .catch(err => console.error(`[backfill] Failed for user ${userId}:`, err));
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -405,6 +453,31 @@ export async function registerRoutes(
   const sequenceProblems = await resetSequences();
   if (sequenceProblems.length > 0) {
     console.warn('[migration] could not reset id sequences:', sequenceProblems.join('; '));
+  }
+
+  // ── Self-healing: provision leave balances for anyone in scope who has none ──
+  // migrations/0006 un-excludes hr/admin users that the old role override had force-excluded, but
+  // SQL can't run the accrual maths. Anyone leave-eligible with a start date and zero balance rows
+  // gets their skeleton rows plus a backfill of every elapsed month. Naturally idempotent: once the
+  // rows exist the query matches nobody, so this is a no-op on every subsequent boot.
+  // Must run after resetSequences() — it inserts into serial-id tables.
+  try {
+    const [allUsers, allBalances] = await Promise.all([
+      storage.getAllUsers(),
+      storage.getAllLeaveBalances(),
+    ]);
+    const usersWithBalances = new Set(allBalances.map(b => b.userId));
+    const needsProvisioning = allUsers.filter(u =>
+      u.startDate && !u.terminationDate && !u.excludeFromLeave && !usersWithBalances.has(u.id)
+    );
+    for (const u of needsProvisioning) {
+      await provisionLeaveBalances(u.id, u.startDate!);
+    }
+    if (needsProvisioning.length > 0) {
+      console.log(`[migration] Provisioned leave balances for ${needsProvisioning.length} user(s) that had none`);
+    }
+  } catch (e) {
+    console.warn('[migration] leave balance provisioning failed:', (e as Error).message);
   }
 
   // Apply session enforcement to all /api routes
@@ -957,11 +1030,9 @@ export async function registerRoutes(
         validatedData.password = await hashPassword(validatedData.password);
       }
 
-      // Auto-set excludeFromLeave for admin/hr users
-      const hasAdminRole = (validatedData.roles || []).some(r => ['admin', 'hr'].includes(r));
-      if (hasAdminRole) {
-        validatedData.excludeFromLeave = true;
-      }
+      // NOTE: holding an hr/admin role does NOT exclude someone from leave. They are still
+      // employees who accrue and take leave; `excludeFromLeave` is an explicit per-person switch
+      // in Personnel (external contractors, system accounts) and is the only thing that excludes.
 
       const newUser = await storage.createUser(validatedData);
 
@@ -969,38 +1040,7 @@ export async function registerRoutes(
       // Grants a pro-rated first-month annual leave accrual; sick and FRL start at 0
       // (sick leave accrues per 26 days worked; FRL unlocks at 4 months).
       if (newUser.startDate && newUser.excludeFromLeave !== true) {
-        try {
-          // Create skeleton balance rows at zero — backfillUserAccrual() below
-          // calculates and credits all completed months including the start month.
-          // Do NOT pre-credit any amount here; doing so would double-count
-          // the start month when the backfill also processes it.
-          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Annual Leave',          total: 0, taken: 0, pending: 0 });
-          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Sick Leave',             total: 0, taken: 0, pending: 0 });
-          await storage.createLeaveBalance({ userId: newUser.id, leaveType: 'Family Responsibility',  total: 0, taken: 0, pending: 0 });
-          // NOTE: Statutory event-based leaves (Maternity, Parental, Adoption, Commissioning)
-          // and custom leave types are NOT auto-provisioned. HR or Admin must activate them
-          // per employee via the Personnel > Leave Balances panel.
-          // Initialise sick leave tracking record
-          await storage.upsertSickLeaveTracking({
-            userId: newUser.id,
-            sickCycleStartDate: newUser.startDate,
-            graduatedAccrualActive: true,
-            cumulativeDaysWorked: 0,
-            graduatedDaysCredited: 0,
-          });
-        } catch (leaveErr) {
-          console.error('Failed to provision leave balances for new user:', leaveErr);
-        }
-
-        // Backfill accrual for any months that have already passed since startDate.
-        // Runs asynchronously so it doesn't block the create response.
-        backfillUserAccrual(newUser.id)
-          .then(({ monthsProcessed }) => {
-            if (monthsProcessed > 0) {
-              console.log(`[backfill] Accrued ${monthsProcessed} past month(s) for new user ${newUser.id}`);
-            }
-          })
-          .catch(err => console.error(`[backfill] Failed for user ${newUser.id}:`, err));
+        await provisionLeaveBalances(newUser.id, newUser.startDate);
       }
 
       if (validatedData.role === 'manager' && validatedData.email && plaintextPassword) {
@@ -1041,13 +1081,8 @@ export async function registerRoutes(
         updateData.password = await hashPassword(updateData.password);
       }
 
-      // Auto-set excludeFromLeave for admin/hr users
-      if (updateData.roles) {
-        const hasAdminRole = updateData.roles.some((r: string) => ['admin', 'hr'].includes(r));
-        if (hasAdminRole) {
-          updateData.excludeFromLeave = true;
-        }
-      }
+      // NOTE: assigning an hr/admin role deliberately does NOT touch excludeFromLeave — see the
+      // note on POST /api/users. Only the explicit Personnel switch excludes someone from leave.
 
       const updatedUser = await storage.updateUser(req.params.id, updateData);
 
@@ -1071,6 +1106,16 @@ export async function registerRoutes(
           changes,
           description: `Updated ${Object.keys(changes).join(', ')} for user ${req.params.id}`,
         }).catch(e => console.error('[audit] log failed:', e));
+      }
+
+      // Brought back into leave management (excludeFromLeave switched off): provision the balance
+      // rows and backfill accrual they never received while excluded. This is the path hr/admin
+      // users take now that the role no longer force-excludes them.
+      const leaveReEnabled = 'excludeFromLeave' in updateData &&
+        updateData.excludeFromLeave !== true &&
+        before?.excludeFromLeave === true;
+      if (leaveReEnabled && updatedUser.startDate && !updatedUser.terminationDate) {
+        await provisionLeaveBalances(updatedUser.id, updatedUser.startDate);
       }
 
       // Termination settlement (spec §5.8): if terminationDate is newly set, process final accrual.
@@ -1423,17 +1468,15 @@ export async function registerRoutes(
       const { employeeIds } = req.body as { employeeIds?: string[] };
 
       const allUsers = await storage.getAllUsers();
+      // hr/admin role is deliberately not a filter here — those users accrue leave like anyone
+      // else. Only the explicit excludeFromLeave switch keeps someone out.
       const workers = allUsers.filter(
-        (u) => {
-          const hasAdminRole = (u.roles || []).some(r => ['admin', 'hr'].includes(r));
-          return (
-            u.startDate &&
-            !u.terminationDate &&
-            !u.excludeFromLeave &&
-            !hasAdminRole &&
-            (!employeeIds || employeeIds.includes(u.id))
-          );
-        }
+        (u) => (
+          u.startDate &&
+          !u.terminationDate &&
+          !u.excludeFromLeave &&
+          (!employeeIds || employeeIds.includes(u.id))
+        )
       );
 
       const results: { updated: number; skipped: number; errors: string[]; details: { userId: string; name: string; annualLeave: number; sickLeave: number; familyResponsibility: number; monthsWorked: number }[] } = {
@@ -1836,9 +1879,14 @@ export async function registerRoutes(
       // Determine initial status based on whether user has a manager/reporting position
       let initialStatus = 'pending_manager';
 
-      // Resolve manager via managerId
+      // Resolve manager via managerId. A self-reporting employee (the MD / top of the reporting
+      // line) has nobody above them, so treat it the same as no manager: nobody can recommend
+      // their leave but themselves, so it skips the manager stage and goes straight to HR.
       let resolvedManagerId: string | null = user?.managerId || null;
-      
+      if (resolvedManagerId === validatedData.userId) {
+        resolvedManagerId = null;
+      }
+
       if (!resolvedManagerId) {
         // No manager assigned, go directly to HR
         initialStatus = 'pending_hr';
@@ -2023,7 +2071,9 @@ export async function registerRoutes(
       if (!isHrOrAdmin) {
         const employee = await storage.getUser(request.userId);
         const approverUser = await storage.getUser(approverId);
-        const isReportingManager = employee?.managerId === approverId;
+        // A self-reporting employee is never their own approver — their requests are routed to HR
+        // at creation, and this stops one being self-approved if the status is ever forced back.
+        const isReportingManager = employee?.managerId === approverId && employee?.id !== approverId;
         if (!employee || !isReportingManager) {
           return res.status(403).json({ error: "You are not the reporting manager for this employee" });
         }
